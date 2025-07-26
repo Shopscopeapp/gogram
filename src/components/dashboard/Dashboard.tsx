@@ -121,10 +121,10 @@ export default function Dashboard() {
   // Get upcoming tasks (next 7 days)
   const upcomingTasks = tasks
     .filter(task => {
-      const daysUntil = Math.ceil((task.endDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+      const daysUntil = Math.ceil((task.end_date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
       return daysUntil <= 7 && daysUntil >= 0 && task.status !== 'completed';
     })
-    .sort((a, b) => a.endDate.getTime() - b.endDate.getTime())
+    .sort((a, b) => a.end_date.getTime() - b.end_date.getTime())
     .slice(0, 5);
 
   // Get active tasks
@@ -134,7 +134,7 @@ export default function Dashboard() {
 
   // Get recent deliveries
   const recentDeliveries = deliveries
-    .filter(delivery => delivery.status === 'pending' || delivery.confirmationStatus === 'pending')
+    .filter(delivery => delivery.confirmation_status === 'pending')
     .slice(0, 4);
 
   const welcomeMessage = () => {

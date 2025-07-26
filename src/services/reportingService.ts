@@ -12,28 +12,47 @@ interface DelayRegisterEntry {
   plannedDuration: number;
   actualDuration?: number;
   delayDays: number;
-  delayReason?: string;
-  impactDescription?: string;
+  delayReason: string;
+  impactDescription: string;
   responsibleParty?: string;
-  mitigationActions?: string;
-  costImpact?: number;
+  mitigationActions: string;
+  costImpact: number;
   status: string;
 }
 
 interface ProgressReportData {
-  reportDate: Date;
-  projectName: string;
-  totalTasks: number;
-  completedTasks: number;
-  completionPercentage: number;
-  tasksOnSchedule: number;
-  delayedTasks: number;
-  criticalPath: Task[];
-  upcomingMilestones: Task[];
-  keyIssues: string[];
-  nextWeekFocus: string[];
-  weatherImpact?: string;
-  safetyNotes?: string;
+  projectInfo: {
+    name: string;
+    startDate: Date;
+    endDate: Date;
+    overallProgress: number;
+    status: string;
+  };
+  taskSummary: {
+    totalTasks: number;
+    completedTasks: number;
+    inProgressTasks: number;
+    delayedTasks: number;
+    pendingTasks: number;
+  };
+  milestones: Array<{
+    title: string;
+    dueDate: Date;
+    status: 'completed' | 'on_track' | 'at_risk' | 'delayed';
+    progress: number;
+  }>;
+  upcomingDeadlines: Array<{
+    taskTitle: string;
+    dueDate: Date;
+    assignee?: string;
+    priority: string;
+  }>;
+  riskAreas: Array<{
+    area: string;
+    risk: string;
+    impact: 'low' | 'medium' | 'high';
+    mitigation: string;
+  }>;
 }
 
 interface ChangeHistoryEntry {
@@ -72,18 +91,17 @@ class ReportingService {
    * Generate delay register report
    */
   public generateDelayRegister(
-    tasks: Task[],
-    taskDelays: TaskDelay[],
-    options: ReportOptions = { format: 'pdf' }
+    tasks: Task[], 
+    taskDelays: TaskDelay[]
   ): DelayRegisterEntry[] {
     const delayEntries: DelayRegisterEntry[] = [];
 
     for (const task of tasks) {
-      const taskDelaysForTask = taskDelays.filter(delay => delay.taskId === task.id);
+      const taskDelaysForTask = taskDelays.filter(delay => delay.task_id === task.id);
       
       if (taskDelaysForTask.length > 0 || task.status === 'delayed') {
         const totalDelayDays = taskDelaysForTask.reduce(
-          (total, delay) => total + delay.delayDays, 
+          (total, delay) => total + delay.delay_days, 
           0
         );
 
@@ -91,18 +109,18 @@ class ReportingService {
           taskId: task.id,
           taskTitle: task.title,
           category: task.category,
-          originalStartDate: task.startDate,
-          originalEndDate: task.endDate,
-          actualStartDate: task.actualStartDate,
-          actualEndDate: task.actualEndDate,
-          plannedDuration: task.plannedDuration,
-          actualDuration: task.actualDuration,
+          originalStartDate: task.start_date,
+          originalEndDate: task.end_date,
+          actualStartDate: task.actual_start_date,
+          actualEndDate: task.actual_end_date,
+          plannedDuration: task.planned_duration,
+          actualDuration: task.actual_duration,
           delayDays: totalDelayDays,
-          delayReason: taskDelaysForTask.map(d => d.reason).join('; '),
-          impactDescription: taskDelaysForTask.map(d => d.impact).join('; '),
-          responsibleParty: taskDelaysForTask[0]?.responsibleParty,
-          mitigationActions: taskDelaysForTask.map(d => d.mitigationActions).filter(Boolean).join('; '),
-          costImpact: taskDelaysForTask.reduce((total, d) => total + (d.costImpact || 0), 0),
+          delayReason: taskDelaysForTask.map(d => d.reason || '').join('; '),
+          impactDescription: taskDelaysForTask.map(d => d.impact || '').join('; '),
+          responsibleParty: taskDelaysForTask[0]?.responsible_party,
+          mitigationActions: taskDelaysForTask.map(d => d.mitigation_actions).filter(Boolean).join('; '),
+          costImpact: taskDelaysForTask.reduce((total, d) => total + (d.cost_impact || 0), 0),
           status: task.status
         };
 
@@ -121,102 +139,114 @@ class ReportingService {
     tasks: Task[]
   ): ChangeHistoryEntry[] {
     return taskChangeProposals.map(proposal => {
-      const task = tasks.find(t => t.id === proposal.taskId);
-      
+      const task = tasks.find(t => t.id === proposal.task_id);
+      const taskTitle = task?.title || 'Unknown Task';
+
       return {
         changeId: proposal.id,
-        taskId: proposal.taskId,
-        taskTitle: task?.title || 'Unknown Task',
-        changeType: 'date_change', // Simplified for now
-        proposedBy: proposal.proposedBy,
-        proposedDate: proposal.createdAt,
-        approvedBy: proposal.reviewedBy,
-        approvedDate: proposal.reviewedAt,
+        taskId: proposal.task_id,
+        taskTitle,
+        changeType: 'date_change' as const,
+        proposedBy: proposal.proposed_by || '',
+        proposedDate: proposal.created_at,
+        approvedBy: proposal.reviewed_by,
+        approvedDate: proposal.reviewed_at,
         status: proposal.status,
-        originalValue: task ? `${format(task.startDate, 'MMM dd')} - ${format(task.endDate, 'MMM dd')}` : '',
-        newValue: proposal.proposedStartDate && proposal.proposedEndDate 
-          ? `${format(proposal.proposedStartDate, 'MMM dd')} - ${format(proposal.proposedEndDate, 'MMM dd')}`
+        originalValue: task ? `${format(task.start_date, 'MMM dd')} - ${format(task.end_date, 'MMM dd')}` : '',
+        newValue: proposal.proposed_start_date && proposal.proposed_end_date 
+          ? `${format(proposal.proposed_start_date, 'MMM dd')} - ${format(proposal.proposed_end_date, 'MMM dd')}`
           : '',
         reason: proposal.reason,
-        impact: proposal.impact || 'Schedule adjustment',
-        reviewComments: proposal.reviewComments
+        impact: proposal.impact || '',
+        reviewComments: undefined
       };
-    }).sort((a, b) => b.proposedDate.getTime() - a.proposedDate.getTime());
+    });
   }
 
   /**
-   * Generate progress report data
+   * Generate comprehensive progress report
    */
   public generateProgressReport(
     project: Project,
     tasks: Task[],
-    options: ReportOptions = { format: 'pdf' }
+    taskDelays: TaskDelay[],
+    qaAlerts: QAAlert[]
   ): ProgressReportData {
-    const completedTasks = tasks.filter(t => t.status === 'completed');
-    const delayedTasks = tasks.filter(t => t.status === 'delayed');
-    const onScheduleTasks = tasks.filter(t => 
-      t.status !== 'delayed' && t.status !== 'completed'
-    );
-
-    // Get upcoming milestones (next 2 weeks)
-    const twoWeeksFromNow = new Date();
-    twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
+    const completedTasks = tasks.filter(t => t.status === 'completed').length;
+    const inProgressTasks = tasks.filter(t => t.status === 'in_progress').length;
+    const delayedTasks = tasks.filter(t => t.status === 'delayed').length;
+    const pendingTasks = tasks.filter(t => t.status === 'pending').length;
     
-    const upcomingMilestones = tasks.filter(task => 
-      task.endDate <= twoWeeksFromNow && 
-      task.status !== 'completed' &&
-      (task.priority === 'high' || task.priority === 'critical')
-    );
+    const overallProgress = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
 
-    // Generate key issues
-    const keyIssues: string[] = [];
-    if (delayedTasks.length > 0) {
-      keyIssues.push(`${delayedTasks.length} tasks currently delayed`);
-    }
-    if (upcomingMilestones.length > 3) {
-      keyIssues.push(`${upcomingMilestones.length} critical milestones due within 2 weeks`);
-    }
+    // Calculate milestones (critical path tasks)
+    const criticalTasks = tasks.filter(t => t.priority === 'critical');
+    const milestones = criticalTasks.map(task => ({
+      title: task.title,
+      dueDate: task.end_date,
+      status: this.getTaskMilestoneStatus(task, taskDelays),
+      progress: task.progress_percentage || 0
+    }));
 
-    // Generate next week focus
-    const nextWeekStart = startOfWeek(new Date());
-    nextWeekStart.setDate(nextWeekStart.getDate() + 7);
-    const nextWeekEnd = endOfWeek(nextWeekStart);
+    // Get upcoming deadlines (next 30 days)
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+    
+    const upcomingDeadlines = tasks
+      .filter(t => t.end_date <= thirtyDaysFromNow && t.status !== 'completed')
+      .sort((a, b) => a.end_date.getTime() - b.end_date.getTime())
+      .slice(0, 10)
+      .map(task => ({
+        taskTitle: task.title,
+        dueDate: task.end_date,
+        assignee: task.assigned_to,
+        priority: task.priority
+      }));
 
-    const nextWeekTasks = tasks.filter(task =>
-      task.startDate >= nextWeekStart && task.startDate <= nextWeekEnd
-    );
-
-    const nextWeekFocus = nextWeekTasks
-      .slice(0, 5)
-      .map(task => `${task.title} (${task.category})`);
+    // Identify risk areas
+    const riskAreas = this.identifyRiskAreas(tasks, taskDelays, qaAlerts);
 
     return {
-      reportDate: new Date(),
-      projectName: project.name,
-      totalTasks: tasks.length,
-      completedTasks: completedTasks.length,
-      completionPercentage: Math.round((completedTasks.length / tasks.length) * 100),
-      tasksOnSchedule: onScheduleTasks.length,
-      delayedTasks: delayedTasks.length,
-      criticalPath: this.calculateCriticalPath(tasks),
-      upcomingMilestones,
-      keyIssues,
-      nextWeekFocus,
-      weatherImpact: 'Weather conditions favorable for outdoor work',
-      safetyNotes: 'No safety incidents reported this period'
+      projectInfo: {
+        name: project.name,
+        startDate: project.start_date,
+        endDate: project.end_date,
+        overallProgress,
+        status: project.status
+      },
+      taskSummary: {
+        totalTasks: tasks.length,
+        completedTasks,
+        inProgressTasks,
+        delayedTasks,
+        pendingTasks
+      },
+      milestones,
+      upcomingDeadlines,
+      riskAreas
     };
   }
 
   /**
-   * Calculate critical path (simplified)
+   * Export delay register to various formats
    */
-  private calculateCriticalPath(tasks: Task[]): Task[] {
-    // Simplified critical path calculation
-    // In a real implementation, this would use more sophisticated algorithms
-    return tasks
-      .filter(task => task.priority === 'critical' || task.dependencies.length > 0)
-      .sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
-      .slice(0, 10);
+  public async exportDelayRegister(
+    delayEntries: DelayRegisterEntry[],
+    format: 'pdf' | 'excel' | 'json' = 'json'
+  ): Promise<Blob | string> {
+    switch (format) {
+      case 'json':
+        return JSON.stringify(delayEntries, null, 2);
+      
+      case 'excel':
+        return this.generateExcelReport(delayEntries);
+      
+      case 'pdf':
+        return this.generatePDFReport(delayEntries);
+      
+      default:
+        throw new Error(`Unsupported export format: ${format}`);
+    }
   }
 
   /**
@@ -224,182 +254,268 @@ class ReportingService {
    */
   public generateExecutiveSummary(
     project: Project,
-    tasks: Task[],
+    tasks: Task[], 
     taskDelays: TaskDelay[]
   ): {
-    overallStatus: 'on_track' | 'at_risk' | 'delayed';
-    completionPercentage: number;
-    projectedCompletion: Date;
-    budgetStatus: 'on_budget' | 'over_budget' | 'under_budget';
-    keyMetrics: Record<string, number>;
-    riskAreas: string[];
+    projectHealth: 'excellent' | 'good' | 'at_risk' | 'critical';
+    keyMetrics: Record<string, number | string>;
+    topRisks: string[];
     recommendations: string[];
   } {
     const completedTasks = tasks.filter(t => t.status === 'completed').length;
-    const completionPercentage = Math.round((completedTasks / tasks.length) * 100);
     const delayedTasks = tasks.filter(t => t.status === 'delayed').length;
+    const overallProgress = Math.round((completedTasks / tasks.length) * 100);
     
-    // Determine overall status
-    let overallStatus: 'on_track' | 'at_risk' | 'delayed' = 'on_track';
-    if (delayedTasks > tasks.length * 0.2) {
-      overallStatus = 'delayed';
-    } else if (delayedTasks > tasks.length * 0.1) {
-      overallStatus = 'at_risk';
+    const totalDelayDays = taskDelays.reduce((total, delay) => total + delay.delay_days, 0);
+    const avgDelayPerTask = tasks.length > 0 ? totalDelayDays / tasks.length : 0;
+    
+    const totalCostImpact = taskDelays.reduce((total, delay) => total + (delay.cost_impact || 0), 0);
+
+    // Determine project health
+    let projectHealth: 'excellent' | 'good' | 'at_risk' | 'critical';
+    if (overallProgress >= 90 && delayedTasks === 0) {
+      projectHealth = 'excellent';
+    } else if (overallProgress >= 70 && delayedTasks <= 2) {
+      projectHealth = 'good';
+    } else if (overallProgress >= 50 && delayedTasks <= 5) {
+      projectHealth = 'at_risk';
+    } else {
+      projectHealth = 'critical';
     }
 
-    // Calculate projected completion (simplified)
-    const remainingTasks = tasks.filter(t => t.status !== 'completed');
-    const avgTaskDuration = tasks.reduce((sum, t) => sum + t.plannedDuration, 0) / tasks.length;
-    const projectedDays = remainingTasks.length * avgTaskDuration * 0.8; // Account for parallelization
-    const projectedCompletion = new Date();
-    projectedCompletion.setDate(projectedCompletion.getDate() + projectedDays);
-
     return {
-      overallStatus,
-      completionPercentage,
-      projectedCompletion,
-      budgetStatus: 'on_budget', // Simplified
+      projectHealth,
       keyMetrics: {
-        totalTasks: tasks.length,
-        completedTasks,
-        delayedTasks,
-        onScheduleTasks: tasks.length - completedTasks - delayedTasks,
-        totalDelayDays: taskDelays.reduce((sum, d) => sum + d.delayDays, 0)
+        'Overall Progress': `${overallProgress}%`,
+        'Tasks Completed': `${completedTasks}/${tasks.length}`,
+        'Delayed Tasks': delayedTasks,
+        'Average Delay': `${avgDelayPerTask.toFixed(1)} days`,
+        'Cost Impact': `$${totalCostImpact.toLocaleString()}`,
+        'Project Status': project.status
       },
-      riskAreas: [
-        ...(delayedTasks > 5 ? ['Schedule delays affecting multiple tasks'] : []),
-        ...(taskDelays.some(d => d.costImpact && d.costImpact > 10000) ? ['Significant cost impacts from delays'] : []),
-        ...(tasks.filter(t => t.category === 'Concrete' && t.status === 'delayed').length > 0 ? ['Weather-sensitive concrete work at risk'] : [])
-      ],
-      recommendations: [
-        ...(delayedTasks > 0 ? ['Implement mitigation strategies for delayed tasks'] : []),
-        'Continue monitoring critical path activities',
-        'Maintain regular stakeholder communication'
-      ]
+      topRisks: this.identifyTopRisks(tasks, taskDelays),
+      recommendations: this.generateRecommendations(projectHealth, tasks, taskDelays)
     };
   }
 
   /**
-   * Export to Excel format (simulated)
+   * Generate weekly progress report
    */
-  public async exportToExcel(
-    data: any,
-    reportType: string,
-    filename: string
-  ): Promise<void> {
-    // In a real implementation, you would use a library like xlsx or exceljs
-    console.log('📊 Exporting to Excel:', {
-      reportType,
-      filename,
-      recordCount: Array.isArray(data) ? data.length : 'N/A'
-    });
+  public generateWeeklyProgressReport(
+    tasks: Task[],
+    startDate: Date = startOfWeek(new Date()),
+    endDate: Date = endOfWeek(new Date())
+  ): {
+    weekRange: string;
+    tasksCompleted: Task[];
+    tasksStarted: Task[];
+    upcomingTasks: Task[];
+    delaysReported: number;
+    progressPercentage: number;
+  } {
+    const tasksCompleted = tasks.filter(task => 
+      task.status === 'completed' &&
+      task.updated_at >= startDate &&
+      task.updated_at <= endDate
+    );
 
-    // Simulate export process
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // In production, this would trigger a download
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${filename}.json`; // Would be .xlsx in production
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const tasksStarted = tasks.filter(task =>
+      task.status === 'in_progress' &&
+      task.start_date >= startDate &&
+      task.start_date <= endDate
+    );
+
+    const nextWeekStart = new Date(endDate);
+    nextWeekStart.setDate(nextWeekStart.getDate() + 1);
+    const nextWeekEnd = new Date(nextWeekStart);
+    nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
+
+    const upcomingTasks = tasks.filter(task =>
+      task.start_date >= nextWeekStart &&
+      task.start_date <= nextWeekEnd &&
+      task.status === 'pending'
+    );
+
+    const delaysReported = tasks.filter(task =>
+      task.status === 'delayed' &&
+      task.updated_at >= startDate &&
+      task.updated_at <= endDate
+    ).length;
+
+    const totalTasks = tasks.length;
+    const completedTasksCount = tasks.filter(t => t.status === 'completed').length;
+    const progressPercentage = totalTasks > 0 ? Math.round((completedTasksCount / totalTasks) * 100) : 0;
+
+    return {
+      weekRange: `${format(startDate, 'MMM dd')} - ${format(endDate, 'MMM dd, yyyy')}`,
+      tasksCompleted,
+      tasksStarted,
+      upcomingTasks,
+      delaysReported,
+      progressPercentage
+    };
   }
 
-  /**
-   * Export to PDF format (simulated)
-   */
-  public async exportToPDF(
-    data: any,
-    reportType: string,
-    filename: string,
-    options: ReportOptions
-  ): Promise<void> {
-    // In a real implementation, you would use a library like jsPDF or Puppeteer
-    console.log('📄 Exporting to PDF:', {
-      reportType,
-      filename,
-      template: options.template,
-      includeQA: options.includeQA
-    });
-
-    // Simulate PDF generation
-    await new Promise(resolve => setTimeout(resolve, 3000));
+  // Private helper methods
+  private getTaskMilestoneStatus(
+    task: Task, 
+    taskDelays: TaskDelay[]
+  ): 'completed' | 'on_track' | 'at_risk' | 'delayed' {
+    if (task.status === 'completed') return 'completed';
+    if (task.status === 'delayed') return 'delayed';
     
-    // Generate PDF content (simplified HTML representation)
-    const htmlContent = this.generateHTMLReport(data, reportType, options);
+    const hasDelays = taskDelays.some(delay => delay.task_id === task.id);
+    if (hasDelays) return 'at_risk';
     
-    // In production, this would generate an actual PDF
-    const blob = new Blob([htmlContent], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${filename}.html`; // Would be .pdf in production
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const daysUntilDue = differenceInDays(task.end_date, new Date());
+    if (daysUntilDue < 3) return 'at_risk';
+    
+    return 'on_track';
   }
 
-  /**
-   * Generate HTML report template
-   */
-  private generateHTMLReport(
-    data: any,
-    reportType: string,
-    options: ReportOptions
-  ): string {
-    const styles = `
-      <style>
-        body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
-        .header { border-bottom: 3px solid #3b82f6; padding-bottom: 20px; margin-bottom: 30px; }
-        .logo { font-size: 24px; font-weight: bold; color: #3b82f6; }
-        .report-title { font-size: 28px; font-weight: bold; margin: 10px 0; }
-        .report-date { color: #666; }
-        .section { margin: 30px 0; }
-        .section-title { font-size: 20px; font-weight: bold; color: #1f2937; border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; }
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        th, td { border: 1px solid #e5e7eb; padding: 12px; text-align: left; }
-        th { background-color: #f9fafb; font-weight: bold; }
-        .status-completed { color: #22c55e; font-weight: bold; }
-        .status-delayed { color: #ef4444; font-weight: bold; }
-        .status-pending { color: #f59e0b; font-weight: bold; }
-        .metric-box { display: inline-block; background: #f9fafb; border: 1px solid #e5e7eb; padding: 15px; margin: 10px; border-radius: 8px; text-align: center; min-width: 120px; }
-        .metric-value { font-size: 24px; font-weight: bold; color: #3b82f6; }
-        .metric-label { font-size: 12px; color: #666; text-transform: uppercase; }
-        .footer { margin-top: 50px; border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center; color: #666; font-size: 12px; }
-      </style>
-    `;
+  private identifyRiskAreas(
+    tasks: Task[], 
+    taskDelays: TaskDelay[],
+    qaAlerts: QAAlert[]
+  ): Array<{
+    area: string;
+    risk: string;
+    impact: 'low' | 'medium' | 'high';
+    mitigation: string;
+  }> {
+    const risks: Array<{
+      area: string;
+      risk: string;
+      impact: 'low' | 'medium' | 'high';
+      mitigation: string;
+    }> = [];
+
+    // Schedule risks
+    const delayedCriticalTasks = tasks.filter(t => 
+      t.status === 'delayed' && t.priority === 'critical'
+    );
+    if (delayedCriticalTasks.length > 0) {
+      risks.push({
+        area: 'Schedule',
+        risk: `${delayedCriticalTasks.length} critical task(s) delayed`,
+        impact: 'high',
+        mitigation: 'Reallocate resources, review dependencies'
+      });
+    }
+
+    // Quality risks
+    const overdueQA = qaAlerts.filter(alert => 
+      alert.status === 'overdue'
+    );
+    if (overdueQA.length > 0) {
+      risks.push({
+        area: 'Quality',
+        risk: `${overdueQA.length} overdue QA alert(s)`,
+        impact: 'medium',
+        mitigation: 'Complete inspections, update checklists'
+      });
+    }
+
+    return risks;
+  }
+
+  private identifyTopRisks(tasks: Task[], taskDelays: TaskDelay[]): string[] {
+    const risks: string[] = [];
+    
+    const criticalDelayedTasks = tasks.filter(t => 
+      t.status === 'delayed' && t.priority === 'critical'
+    ).length;
+    
+    if (criticalDelayedTasks > 0) {
+      risks.push(`${criticalDelayedTasks} critical tasks are delayed`);
+    }
+
+    const upcomingCriticalTasks = tasks.filter(t => {
+      const daysUntilDue = differenceInDays(t.end_date, new Date());
+      return t.priority === 'critical' && daysUntilDue <= 7 && t.status !== 'completed';
+    }).length;
+
+    if (upcomingCriticalTasks > 0) {
+      risks.push(`${upcomingCriticalTasks} critical tasks due within 7 days`);
+    }
+
+    return risks.slice(0, 5); // Top 5 risks
+  }
+
+  private generateRecommendations(
+    projectHealth: 'excellent' | 'good' | 'at_risk' | 'critical',
+    tasks: Task[],
+    taskDelays: TaskDelay[]
+  ): string[] {
+    const recommendations: string[] = [];
+
+    switch (projectHealth) {
+      case 'critical':
+        recommendations.push('Immediate intervention required - consider additional resources');
+        recommendations.push('Review and revise project timeline');
+        recommendations.push('Escalate to senior management');
+        break;
+      case 'at_risk':
+        recommendations.push('Focus on delayed critical tasks');
+        recommendations.push('Increase monitoring frequency');
+        recommendations.push('Consider resource reallocation');
+        break;
+      case 'good':
+        recommendations.push('Continue current pace');
+        recommendations.push('Monitor upcoming deadlines closely');
+        break;
+      case 'excellent':
+        recommendations.push('Maintain current performance');
+        recommendations.push('Document best practices');
+        break;
+    }
+
+    return recommendations;
+  }
+
+  private async generateExcelReport(delayEntries: DelayRegisterEntry[]): Promise<Blob> {
+    // In a real implementation, this would use a library like xlsx
+    const csvContent = this.convertToCSV(delayEntries);
+    return new Blob([csvContent], { type: 'text/csv' });
+  }
+
+  private async generatePDFReport(delayEntries: DelayRegisterEntry[]): Promise<Blob> {
+    // In a real implementation, this would use a library like jsPDF
+    const htmlContent = this.convertToHTML(delayEntries);
+    return new Blob([htmlContent], { type: 'text/html' });
+  }
+
+  private convertToCSV(data: DelayRegisterEntry[]): string {
+    const headers = Object.keys(data[0] || {});
+    const csvRows = [
+      headers.join(','),
+      ...data.map(row => 
+        headers.map(header => {
+          const value = (row as any)[header];
+          return typeof value === 'string' ? `"${value}"` : value;
+        }).join(',')
+      )
+    ];
+    return csvRows.join('\n');
+  }
+
+  private convertToHTML(data: DelayRegisterEntry[]): string {
+    const headers = Object.keys(data[0] || {});
+    const rows = data.map(row => 
+      `<tr>${headers.map(header => `<td>${(row as any)[header]}</td>`).join('')}</tr>`
+    ).join('');
 
     return `
-      <!DOCTYPE html>
       <html>
-        <head>
-          <meta charset="utf-8">
-          <title>${reportType} Report</title>
-          ${styles}
-        </head>
+        <head><title>Delay Register Report</title></head>
         <body>
-          <div class="header">
-            <div class="logo">🏗️ Gogram</div>
-            <div class="report-title">${reportType} Report</div>
-            <div class="report-date">Generated on ${format(new Date(), 'MMMM dd, yyyy')}</div>
-          </div>
-
-          <div class="section">
-            <div class="section-title">Report Data</div>
-            <pre style="background: #f9fafb; padding: 20px; border-radius: 8px; overflow-x: auto;">
-              ${JSON.stringify(data, null, 2)}
-            </pre>
-          </div>
-
-          <div class="footer">
-            <p>This report was generated by Gogram Construction Management Platform</p>
-            <p>© 2024 Gogram - Professional Construction Project Management</p>
-          </div>
+          <h1>Delay Register Report</h1>
+          <table border="1">
+            <thead>
+              <tr>${headers.map(header => `<th>${header}</th>`).join('')}</tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
         </body>
       </html>
     `;

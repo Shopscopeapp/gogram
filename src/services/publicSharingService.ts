@@ -151,9 +151,9 @@ class PublicSharingService {
       project: {
         id: project.id,
         name: project.name,
-        description: project.description,
-        startDate: project.startDate,
-        endDate: project.endDate,
+        description: project.description || '',
+        startDate: project.start_date,
+        endDate: project.end_date,
         status: project.status,
         progress: Math.round((completedTasks / publicTasks.length) * 100)
       },
@@ -182,8 +182,7 @@ class PublicSharingService {
   ): PublicTask[] {
     return tasks
       .filter(task => {
-        // Skip cancelled tasks entirely
-        if (task.status === 'cancelled') return false;
+        // Only show certain statuses
         
         // Always show completed and in-progress tasks
         if (task.status === 'completed' || task.status === 'in_progress') return true;
@@ -200,8 +199,8 @@ class PublicSharingService {
         category: task.category || 'General',
         status: task.status as 'completed' | 'in_progress' | 'delayed' | 'pending',
         priority: task.priority || 'medium',
-        startDate: task.startDate,
-        endDate: task.endDate,
+        startDate: task.start_date,
+        endDate: task.end_date,
         progress: this.calculateTaskProgress(task),
         color: task.color || '#3b82f6' // Default to primary blue if no color
         // Omitted: assignedTo, cost, suppliers, notes, etc.

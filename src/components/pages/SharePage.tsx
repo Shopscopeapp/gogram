@@ -375,11 +375,11 @@ export default function SharePage() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Start Date:</span>
-                  <span>{format(currentProject.startDate, 'MMM dd, yyyy')}</span>
+                  <span>{format(currentProject.start_date, 'MMM dd, yyyy')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">End Date:</span>
-                  <span>{format(currentProject.endDate, 'MMM dd, yyyy')}</span>
+                  <span>{format(currentProject.end_date, 'MMM dd, yyyy')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Status:</span>

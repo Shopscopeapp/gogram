@@ -54,7 +54,7 @@ export default function SuppliersPage() {
       {/* Suppliers Grid */}
       <div className="grid lg:grid-cols-2 gap-6">
         {suppliers.map((supplier) => {
-          const supplierDeliveries = deliveries.filter(d => d.supplierId === supplier.id);
+          const supplierDeliveries = deliveries.filter(d => d.supplier_id === supplier.id);
           
           return (
             <motion.div
@@ -75,9 +75,9 @@ export default function SuppliersPage() {
                     </div>
                   </div>
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    supplier.status === 'active' ? 'bg-success-100 text-success-800' : 'bg-gray-100 text-gray-800'
+                    supplier.is_active ? 'bg-success-100 text-success-800' : 'bg-gray-100 text-gray-800'
                   }`}>
-                    {supplier.status}
+                    {supplier.is_active ? 'active' : 'inactive'}
                   </span>
                 </div>
 
@@ -120,16 +120,16 @@ export default function SuppliersPage() {
                       {supplierDeliveries.slice(0, 3).map((delivery) => (
                         <div key={delivery.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                           <div className="flex items-center space-x-3">
-                            {getDeliveryStatusIcon(delivery.confirmationStatus)}
+                            {getDeliveryStatusIcon(delivery.confirmation_status)}
                             <div>
                               <p className="text-sm font-medium text-gray-900">{delivery.item}</p>
                               <p className="text-xs text-gray-500">
-                                {getTaskTitle(delivery.taskId)} • {format(delivery.plannedDate, 'MMM dd')}
+                                {getTaskTitle(delivery.task_id)} • {format(delivery.planned_date, 'MMM dd')}
                               </p>
                             </div>
                           </div>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(delivery.confirmationStatus)}`}>
-                            {delivery.confirmationStatus}
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(delivery.confirmation_status)}`}>
+                            {delivery.confirmation_status}
                           </span>
                         </div>
                       ))}

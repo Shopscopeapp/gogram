@@ -88,21 +88,21 @@ export default function Header() {
         <div className="relative group">
           <button className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 transition-colors">
             <div className="flex items-center space-x-2">
-              {currentUser.avatar ? (
+              {currentUser.avatar_url ? (
                 <img
-                  src={currentUser.avatar}
-                  alt={currentUser.name}
+                  src={currentUser.avatar_url}
+                  alt={currentUser.full_name}
                   className="w-8 h-8 rounded-full object-cover"
                 />
               ) : (
                 <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center">
                   <span className="text-white text-sm font-medium">
-                    {currentUser.name.charAt(0)}
+                    {currentUser.full_name.charAt(0)}
                   </span>
                 </div>
               )}
               <div className="hidden sm:block text-left">
-                <p className="text-sm font-medium text-gray-900">{currentUser.name}</p>
+                <p className="text-sm font-medium text-gray-900">{currentUser.full_name}</p>
                 <p className="text-xs text-gray-500 capitalize">
                   {currentUser.role.replace('_', ' ')}
                 </p>
@@ -114,7 +114,7 @@ export default function Header() {
           {/* Dropdown Menu */}
           <div className="absolute right-0 top-full mt-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
             <div className="px-4 py-3 border-b border-gray-100">
-              <p className="font-medium text-gray-900">{currentUser.name}</p>
+              <p className="font-medium text-gray-900">{currentUser.full_name}</p>
               <p className="text-sm text-gray-500">{currentUser.email}</p>
               <p className="text-xs text-primary-600 capitalize mt-1">
                 {currentUser.role.replace('_', ' ')}

@@ -24,14 +24,14 @@ class ProcurementService {
    * Check if a task has linked deliveries that need notification
    */
   public hasLinkedDeliveries(taskId: string, deliveries: Delivery[]): boolean {
-    return deliveries.some(delivery => delivery.taskId === taskId);
+    return deliveries.some(delivery => delivery.task_id === taskId);
   }
 
   /**
    * Get deliveries linked to a specific task
    */
   public getLinkedDeliveries(taskId: string, deliveries: Delivery[]): Delivery[] {
-    return deliveries.filter(delivery => delivery.taskId === taskId);
+    return deliveries.filter(delivery => delivery.task_id === taskId);
   }
 
   /**
@@ -84,7 +84,7 @@ class ProcurementService {
                 <p><strong>Item:</strong> ${delivery.item}</p>
                 <p><strong>Quantity:</strong> ${delivery.quantity} ${delivery.unit}</p>
                 <p><strong>For Task:</strong> ${taskTitle}</p>
-                <p><strong>Original Date:</strong> ${format(delivery.plannedDate, 'EEEE, MMMM dd, yyyy')}</p>
+                <p><strong>Original Date:</strong> ${format(delivery.planned_date, 'EEEE, MMMM dd, yyyy')}</p>
                 <p><strong>New Requested Date:</strong> <span class="highlight">${format(newDate, 'EEEE, MMMM dd, yyyy')}</span></p>
                 ${delivery.notes ? `<p><strong>Notes:</strong> ${delivery.notes}</p>` : ''}
               </div>
@@ -200,7 +200,7 @@ class ProcurementService {
 
     for (const delivery of linkedDeliveries) {
       try {
-        const supplier = suppliers.find(s => s.id === delivery.supplierId);
+        const supplier = suppliers.find(s => s.id === delivery.supplier_id);
         if (!supplier) {
           errors.push(`Supplier not found for delivery ${delivery.id}`);
           continue;
@@ -262,8 +262,8 @@ class ProcurementService {
 
     const updatedDelivery: Delivery = {
       ...delivery,
-      confirmationStatus: response.response,
-      plannedDate: response.newProposedDate || delivery.plannedDate,
+      confirmation_status: response.response,
+      planned_date: response.newProposedDate || delivery.planned_date,
       notes: response.comments ? 
         `${delivery.notes || ''}\n\nSupplier response: ${response.comments}`.trim() : 
         delivery.notes
@@ -295,13 +295,25 @@ class ProcurementService {
     text: string;
     icon: string;
   } {
-    switch (delivery.confirmationStatus) {
+    switch (delivery.confirmation_status) {
       case 'confirmed':
         return { color: 'success', text: 'Confirmed', icon: '✅' };
       case 'rejected':
         return { color: 'danger', text: 'Rejected', icon: '❌' };
       default:
         return { color: 'warning', text: 'Pending', icon: '⏳' };
+    }
+  }
+
+  private getDeliveryStatusIcon(delivery: Delivery): string {
+    switch (delivery.confirmation_status) {
+      case 'confirmed':
+        return '✅';
+      case 'rejected':
+        return '❌';
+      case 'pending':
+      default:
+        return '⏳';
     }
   }
 }

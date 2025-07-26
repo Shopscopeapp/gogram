@@ -254,21 +254,21 @@ export default function Sidebar() {
           {/* User Role Badge */}
           <div className="p-4 border-t border-gray-200">
             <div className="flex items-center space-x-3">
-              {currentUser.avatar ? (
+              {currentUser.avatar_url ? (
                 <img
-                  src={currentUser.avatar}
-                  alt={currentUser.name}
+                  src={currentUser.avatar_url}
+                  alt={currentUser.full_name}
                   className="w-10 h-10 rounded-full object-cover"
                 />
               ) : (
                 <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center">
                   <span className="text-white font-medium">
-                    {currentUser.name.charAt(0)}
+                    {currentUser.full_name.charAt(0)}
                   </span>
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900 truncate">{currentUser.name}</p>
+                <p className="font-medium text-gray-900 truncate">{currentUser.full_name}</p>
                 <p className="text-sm text-primary-600 capitalize">
                   {currentUser.role.replace('_', ' ')}
                 </p>

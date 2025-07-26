@@ -81,7 +81,7 @@ export default function ApprovalsPage() {
                     <div className="flex items-center space-x-3 mb-3">
                       <Clock className="w-5 h-5 text-warning-600" />
                       <h3 className="text-lg font-semibold text-gray-900">
-                        Change Request: {getTaskTitle(proposal.taskId)}
+                        Change Request: {getTaskTitle(proposal.task_id)}
                       </h3>
                       <span className="bg-warning-100 text-warning-800 px-2 py-1 rounded-full text-xs font-medium">
                         Pending Review
@@ -92,21 +92,21 @@ export default function ApprovalsPage() {
                       <div>
                         <h4 className="font-medium text-gray-900 mb-2">Proposed Changes</h4>
                         <div className="space-y-2 text-sm">
-                          {proposal.proposedStartDate && (
+                          {proposal.proposed_start_date && (
                             <div className="flex items-center">
                               <Calendar className="w-4 h-4 text-gray-400 mr-2" />
                               <span className="text-gray-600">Start:</span>
                               <span className="ml-2 font-medium">
-                                {format(proposal.proposedStartDate, 'MMM dd, yyyy')}
+                                {format(proposal.proposed_start_date, 'MMM dd, yyyy')}
                               </span>
                             </div>
                           )}
-                          {proposal.proposedEndDate && (
+                          {proposal.proposed_end_date && (
                             <div className="flex items-center">
                               <Calendar className="w-4 h-4 text-gray-400 mr-2" />
                               <span className="text-gray-600">End:</span>
                               <span className="ml-2 font-medium">
-                                {format(proposal.proposedEndDate, 'MMM dd, yyyy')}
+                                {format(proposal.proposed_end_date, 'MMM dd, yyyy')}
                               </span>
                             </div>
                           )}
@@ -119,13 +119,13 @@ export default function ApprovalsPage() {
                           <div className="flex items-center">
                             <User className="w-4 h-4 text-gray-400 mr-2" />
                             <span className="text-gray-600">Requested by:</span>
-                            <span className="ml-2 font-medium">{proposal.proposedBy}</span>
+                            <span className="ml-2 font-medium">{proposal.proposed_by}</span>
                           </div>
                           <div className="flex items-center">
                             <Clock className="w-4 h-4 text-gray-400 mr-2" />
                             <span className="text-gray-600">Submitted:</span>
                             <span className="ml-2 font-medium">
-                              {format(proposal.proposedAt, 'MMM dd, HH:mm')}
+                              {format(proposal.created_at, 'MMM dd, HH:mm')}
                             </span>
                           </div>
                         </div>

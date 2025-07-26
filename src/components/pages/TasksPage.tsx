@@ -145,11 +145,11 @@ export default function TasksPage() {
                       <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
                         <div className="flex items-center">
                           <Calendar className="w-4 h-4 mr-1" />
-                          {format(task.startDate, 'MMM dd')} - {format(task.endDate, 'MMM dd')}
+                          {format(task.start_date, 'MMM dd')} - {format(task.end_date, 'MMM dd')}
                         </div>
                         <div className="flex items-center">
                           <Clock className="w-4 h-4 mr-1" />
-                          {task.plannedDuration} days
+                          {task.planned_duration} days
                         </div>
                         <div className="flex items-center">
                           <CheckSquare className="w-4 h-4 mr-1" />

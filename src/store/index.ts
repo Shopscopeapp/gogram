@@ -128,6 +128,12 @@ const initialStats: DashboardStats = {
   upcomingDeadlines: 0,
   pendingApprovals: 0,
   activeDeliveries: 0,
+  qaAlerts: {
+    total: 0,
+    pending: 0,
+    overdue: 0,
+    completed: 0
+  }
 };
 
 export const useAppStore = create<AppStore>()(
@@ -209,7 +215,7 @@ export const useAppStore = create<AppStore>()(
         }));
 
         // Regenerate QA alerts if task dates or status changed
-        if (updates.startDate || updates.endDate || updates.status) {
+        if (updates.start_date || updates.end_date || updates.status) {
           setTimeout(() => get().generateQAAlerts(), 100);
         }
       },
@@ -240,9 +246,9 @@ export const useAppStore = create<AppStore>()(
               
               // Update dependent tasks
               if (t.dependencies.includes(id)) {
-                const timeDiff = newEndDate.getTime() - task.endDate.getTime();
-                const newTaskStart = new Date(t.startDate.getTime() + timeDiff);
-                const newTaskEnd = new Date(t.endDate.getTime() + timeDiff);
+                const timeDiff = newEndDate.getTime() - task.end_date.getTime();
+                const newTaskStart = new Date(t.start_date.getTime() + timeDiff);
+                const newTaskEnd = new Date(t.end_date.getTime() + timeDiff);
                 return { ...t, startDate: newTaskStart, endDate: newTaskEnd, updatedAt: new Date() };
               }
               
@@ -273,13 +279,13 @@ export const useAppStore = create<AppStore>()(
               // Add notification to the system
               get().addNotification({
                 id: `task-move-${id}-${Date.now()}`,
-                userId: get().currentUser?.id || '',
+                user_id: get().currentUser?.id || '',
                 type: 'task_update',
                 title: 'Task Rescheduled',
                 message: `${task.title} moved to ${newStartDate.toLocaleDateString()}. Suppliers notified.`,
                 data: { taskId: id, notificationsSent: result.notificationsSent },
                 read: false,
-                createdAt: new Date()
+                                  created_at: new Date()
               });
             } else {
               toast.success('Task schedule updated successfully!', { id: loadingToast });
@@ -332,13 +338,13 @@ export const useAppStore = create<AppStore>()(
         }));
 
         // Apply the changes to the actual task
-        if (proposal.proposedStartDate || proposal.proposedEndDate) {
-          const task = get().tasks.find(t => t.id === proposal.taskId);
+                if (proposal.proposed_start_date || proposal.proposed_end_date) {
+          const task = get().tasks.find(t => t.id === proposal.task_id);
           if (task) {
             get().moveTask(
-              proposal.taskId, 
-              proposal.proposedStartDate || task.startDate,
-              proposal.proposedEndDate || task.endDate
+              proposal.task_id,
+              proposal.proposed_start_date || task.start_date,
+              proposal.proposed_end_date || task.end_date
             );
           }
         }
@@ -374,7 +380,7 @@ export const useAppStore = create<AppStore>()(
       
       getTaskDelays: (taskId) => {
         const { taskDelays } = get();
-        return taskDelays.filter(delay => delay.taskId === taskId);
+        return taskDelays.filter(delay => delay.task_id === taskId);
       },
 
       // Supplier Actions

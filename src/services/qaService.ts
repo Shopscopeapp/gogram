@@ -136,15 +136,15 @@ class QAService {
     const today = new Date();
 
     for (const task of tasks) {
-      // Skip completed or cancelled tasks
-      if (task.status === 'completed' || task.status === 'cancelled') {
+      // Skip completed tasks
+      if (task.status === 'completed') {
         continue;
       }
 
       // Check each QA rule
       for (const rule of this.qaTriggerRules) {
         if (rule.taskCategories.includes(task.category)) {
-          const daysUntilTask = differenceInDays(task.startDate, today);
+          const daysUntilTask = differenceInDays(task.start_date, today);
           
           // Check if we should trigger this alert
           if (daysUntilTask <= rule.triggerDays && daysUntilTask >= 0) {
@@ -159,7 +159,7 @@ class QAService {
                 title: rule.title,
                 description: rule.description,
                 priority: rule.priority,
-                scheduledDate: new Date(task.startDate.getTime() - (rule.triggerDays * 24 * 60 * 60 * 1000)),
+                scheduledDate: new Date(task.start_date.getTime() - (rule.triggerDays * 24 * 60 * 60 * 1000)),
                 assignedTo: [], // Will be populated based on user roles
                 requirements: rule.requirements,
                 checklist: rule.checklist?.map((item, index) => ({
@@ -206,10 +206,10 @@ class QAService {
       for (const coordinator of projectCoordinators) {
         const notification: Notification = {
           id: `qa-notification-${alert.id}-${coordinator.id}`,
-          userId: coordinator.id,
+          user_id: coordinator.id,
           type: 'qa_alert',
           title: `🔍 QA Alert: ${alert.title}`,
-          message: `${alert.description} for task "${task.title}" scheduled for ${format(task.startDate, 'MMM dd')}`,
+          message: `${alert.description} for task "${task.title}" scheduled for ${format(task.start_date, 'MMM dd')}`,
           data: {
             alertId: alert.id,
             taskId: alert.taskId,
@@ -218,7 +218,7 @@ class QAService {
             scheduledDate: alert.scheduledDate
           },
           read: false,
-          createdAt: new Date()
+          created_at: new Date()
         };
 
         notifications.push(notification);
@@ -246,12 +246,12 @@ class QAService {
   /**
    * Complete checklist item
    */
-  public completeChecklistItem(
+  public   completeChecklistItem(
     alertId: string,
     itemId: string,
     completedBy: string,
-    notes?: string,
-    alerts: QAAlert[]
+    alerts: QAAlert[],
+    notes?: string
   ): QAAlert[] {
     return alerts.map(alert => {
       if (alert.id === alertId && alert.checklist) {

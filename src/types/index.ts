@@ -2,138 +2,197 @@ export type UserRole = 'project_manager' | 'project_coordinator' | 'subcontracto
 
 export interface User {
   id: string;
-  name: string;
   email: string;
+  full_name: string;
   role: UserRole;
-  avatar?: string;
-  company?: string;
+  avatar_url?: string;
   phone?: string;
+  company?: string;
+  specialties?: string[];
+  created_at: Date;
+  updated_at: Date;
 }
 
 export interface Task {
   id: string;
+  project_id: string;
   title: string;
   description?: string;
-  startDate: Date;
-  endDate: Date;
-  plannedDuration: number; // in days
-  actualDuration?: number; // in days
-  status: 'pending' | 'in_progress' | 'completed' | 'delayed' | 'cancelled';
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  assignedTo?: User[];
-  dependencies: string[]; // Task IDs that this task depends on
-  linkedSuppliers?: Supplier[];
-  linkedDeliveries?: Delivery[];
-  color?: string;
   category: string;
   location?: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'delayed';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  assigned_to?: string;
+  start_date: Date;
+  end_date: Date;
+  actual_start_date?: Date;
+  actual_end_date?: Date;
+  planned_duration: number;
+  actual_duration?: number;
+  progress_percentage: number;
+  color: string;
+  dependencies: string[];
   notes?: string;
-  createdBy: string;
-  createdAt: Date;
-  updatedAt: Date;
+  attachments?: any[];
+  created_by?: string;
+  created_at: Date;
+  updated_at: Date;
 }
 
 export interface TaskDelay {
   id: string;
-  taskId: string;
-  originalEndDate: Date;
-  newEndDate: Date;
-  reason: string;
-  delayDays: number;
-  reportedBy: string;
-  reportedAt: Date;
+  task_id: string;
+  original_end_date: Date;
+  new_end_date: Date;
+  delay_days: number;
+  reason?: string;
+  impact?: string;
+  impact_assessment?: string;
+  responsible_party?: string;
+  mitigation_actions?: string;
+  cost_impact?: number;
+  reported_by?: string;
+  created_at: Date;
 }
 
 export interface TaskChangeProposal {
   id: string;
-  taskId: string;
-  proposedStartDate?: Date;
-  proposedEndDate?: Date;
-  reason: string;
-  proposedBy: string;
-  proposedAt: Date;
+  task_id: string;
+  proposed_by?: string;
   status: 'pending' | 'approved' | 'rejected';
-  reviewedBy?: string;
-  reviewedAt?: Date;
-  reviewComments?: string;
+  proposed_start_date?: Date;
+  proposed_end_date?: Date;
+  reason: string;
+  impact?: string;
+  impact_description?: string;
+  reviewed_by?: string;
+  reviewed_at?: Date;
+  created_at: Date;
+  updated_at: Date;
 }
 
 export interface Project {
   id: string;
   name: string;
   description?: string;
-  startDate: Date;
-  endDate: Date;
-  status: 'planning' | 'active' | 'completed' | 'on_hold' | 'cancelled';
-  projectManager: User;
-  coordinators: User[];
-  tasks: Task[];
-  publicShareLink?: string;
-  isPublicLinkActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  location?: string;
+  client?: string;
+  project_manager_id?: string;
+  status: 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled';
+  start_date: Date;
+  end_date: Date;
+  budget?: number;
+  progress_percentage: number;
+  created_at: Date;
+  updated_at: Date;
 }
 
 export interface Supplier {
   id: string;
   name: string;
+  company?: string;
   email: string;
   phone?: string;
-  company: string;
+  address?: string;
   specialties: string[];
-  status: 'active' | 'inactive';
+  rating?: number;
+  notes?: string;
+  is_active: boolean;
+  created_at: Date;
+  updated_at: Date;
 }
 
 export interface Delivery {
   id: string;
-  supplierId: string;
-  taskId: string;
+  project_id: string;
+  task_id: string;
+  supplier_id: string;
   item: string;
   quantity: number;
   unit: string;
-  plannedDate: Date;
-  actualDate?: Date;
-  status: 'pending' | 'confirmed' | 'rejected' | 'delivered' | 'cancelled';
-  confirmationStatus: 'pending' | 'confirmed' | 'rejected';
+  planned_date: Date;
+  actual_date?: Date;
+  confirmation_status: 'pending' | 'confirmed' | 'rejected';
+  delivery_address?: string;
   notes?: string;
-  estimatedValue?: number;
+  confirmed_by?: string;
+  confirmed_at?: Date;
+  created_at: Date;
+  updated_at: Date;
 }
 
 export interface DeliveryConfirmation {
   id: string;
-  deliveryId: string;
-  supplierId: string;
-  response: 'confirmed' | 'rejected';
-  responseDate: Date;
-  newProposedDate?: Date;
+  delivery_id: string;
+  supplier_id: string;
+  status: 'confirmed' | 'rejected';
+  proposed_date?: Date;
   comments?: string;
+  created_at: Date;
 }
 
 export interface Notification {
   id: string;
-  userId: string;
-  type: 'task_update' | 'delivery_confirmation' | 'delay_report' | 'change_proposal' | 'qa_alert';
+  user_id: string;
+  type: 'task_update' | 'task_assignment' | 'delivery_update' | 'qa_alert' | 'approval_request' | 'system_message';
   title: string;
   message: string;
   data?: any;
   read: boolean;
-  createdAt: Date;
+  read_at?: Date;
+  created_at: Date;
 }
 
 export interface QAInspection {
   id: string;
-  taskId: string;
-  type: 'ITP' | 'pre_pour_checklist' | 'engineer_inspection';
-  scheduledDate: Date;
-  inspector?: string;
-  status: 'scheduled' | 'completed' | 'failed' | 'cancelled';
+  project_id: string;
+  task_id: string;
+  type: 'itp_required' | 'pre_pour_checklist' | 'engineer_inspection' | 'quality_checkpoint' | 'compliance_check';
+  status: 'pending' | 'in_progress' | 'completed' | 'overdue';
+  title: string;
+  description?: string;
+  due_date?: Date;
+  assigned_to?: string;
+  checklist: QAChecklistItem[];
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  completed_by?: string;
+  completed_at?: Date;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface QAAlert {
+  id: string;
+  project_id: string;
+  task_id: string;
+  type: 'itp_required' | 'pre_pour_checklist' | 'engineer_inspection' | 'quality_checkpoint' | 'compliance_check';
+  status: 'pending' | 'in_progress' | 'completed' | 'overdue';
+  title: string;
+  description?: string;
+  due_date?: Date;
+  assigned_to?: string;
+  checklist: QAChecklistItem[];
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  completed_by?: string;
+  completed_at?: Date;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface QAChecklistItem {
+  id: string;
+  text: string;
+  required: boolean;
+  completed: boolean;
+  completed_by?: string;
+  completed_at?: Date;
   notes?: string;
-  photos?: string[];
 }
 
 export interface Permission {
+  action: string;
   resource: string;
-  actions: ('create' | 'read' | 'update' | 'delete' | 'approve')[];
+  condition?: any;
 }
 
 export interface RolePermissions {
@@ -147,6 +206,12 @@ export interface DashboardStats {
   upcomingDeadlines: number;
   pendingApprovals: number;
   activeDeliveries: number;
+  qaAlerts: {
+    total: number;
+    pending: number;
+    overdue: number;
+    completed: number;
+  };
 }
 
 export interface GanttTask extends Task {
