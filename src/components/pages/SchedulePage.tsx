@@ -207,7 +207,7 @@ export default function SchedulePage() {
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Project Duration</span>
               <span className="font-medium">
-                {format(currentProject.startDate, 'MMM dd, yyyy')} - {format(currentProject.endDate, 'MMM dd, yyyy')}
+                {format(currentProject.start_date, 'MMM dd, yyyy')} - {format(currentProject.end_date, 'MMM dd, yyyy')}
               </span>
             </div>
             <div className="flex justify-between text-sm">
@@ -225,8 +225,8 @@ export default function SchedulePage() {
               />
             </div>
             <div className="flex justify-between text-xs text-gray-500">
-              <span>Started {format(currentProject.startDate, 'MMM dd')}</span>
-              <span>Due {format(currentProject.endDate, 'MMM dd')}</span>
+              <span>Started {format(currentProject.start_date, 'MMM dd')}</span>
+              <span>Due {format(currentProject.end_date, 'MMM dd')}</span>
             </div>
           </div>
         </div>

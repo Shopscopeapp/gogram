@@ -282,17 +282,17 @@ export default function Dashboard() {
                       <div>
                         <p className="font-medium text-gray-900">{delivery.item}</p>
                         <p className="text-sm text-gray-500">
-                          {delivery.quantity} {delivery.unit} • {format(delivery.plannedDate, 'MMM dd')}
+                          {delivery.quantity} {delivery.unit} • {format(delivery.planned_date, 'MMM dd')}
                         </p>
                       </div>
                       <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        delivery.confirmationStatus === 'confirmed' 
+                        delivery.confirmation_status === 'confirmed' 
                           ? 'bg-success-100 text-success-800'
-                          : delivery.confirmationStatus === 'rejected'
+                          : delivery.confirmation_status === 'rejected'
                           ? 'bg-danger-100 text-danger-800'
                           : 'bg-warning-100 text-warning-800'
                       }`}>
-                        {delivery.confirmationStatus}
+                        {delivery.confirmation_status}
                       </div>
                     </div>
                   ))}

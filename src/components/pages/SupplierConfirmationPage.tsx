@@ -32,13 +32,13 @@ export default function SupplierConfirmationPage() {
 
   // Find the delivery and related data
   const delivery = deliveries.find(d => d.id === deliveryId);
-  const supplier = delivery ? suppliers.find(s => s.id === delivery.supplierId) : null;
-  const task = delivery ? tasks.find(t => t.id === delivery.taskId) : null;
+  const supplier = delivery ? suppliers.find(s => s.id === delivery.supplier_id) : null;
+  const task = delivery ? tasks.find(t => t.id === delivery.task_id) : null;
 
   useEffect(() => {
     // Set initial proposed date to the current delivery date
     if (delivery) {
-      setProposedDate(format(delivery.plannedDate, 'yyyy-MM-dd'));
+      setProposedDate(format(delivery.planned_date, 'yyyy-MM-dd'));
     }
   }, [delivery]);
 
@@ -84,8 +84,8 @@ export default function SupplierConfirmationPage() {
       if (result.success && result.updatedDelivery) {
         // Update the delivery in the store
         updateDelivery(delivery.id, {
-          confirmationStatus: response,
-          plannedDate: proposedDate ? new Date(proposedDate) : delivery.plannedDate,
+          confirmation_status: response,
+          planned_date: proposedDate ? new Date(proposedDate) : delivery.planned_date,
           notes: result.updatedDelivery.notes
         });
 
@@ -221,7 +221,7 @@ export default function SupplierConfirmationPage() {
                 <label className="text-sm font-medium text-gray-500">Original Date</label>
                 <div className="flex items-center space-x-2">
                   <Calendar className="w-4 h-4 text-gray-400" />
-                  <span className="text-gray-900">{format(delivery.plannedDate, 'EEEE, MMMM dd, yyyy')}</span>
+                  <span className="text-gray-900">{format(delivery.planned_date, 'EEEE, MMMM dd, yyyy')}</span>
                 </div>
               </div>
             </div>
