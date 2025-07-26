@@ -14,7 +14,7 @@ export default function SchedulePage() {
   }
 
   // Sort tasks by start date for list view
-  const sortedTasks = [...tasks].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+  const sortedTasks = [...tasks].sort((a, b) => a.start_date.getTime() - b.start_date.getTime());
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -125,7 +125,7 @@ export default function SchedulePage() {
                       <div>
                         <h3 className="font-medium text-gray-900">{task.title}</h3>
                         <p className="text-sm text-gray-500">
-                          {format(task.startDate, 'MMM dd')} - {format(task.endDate, 'MMM dd')} • {task.category}
+                          {format(task.start_date, 'MMM dd')} - {format(task.end_date, 'MMM dd')} • {task.category}
                         </p>
                         {task.description && (
                           <p className="text-sm text-gray-600 mt-1">{task.description}</p>
@@ -149,7 +149,7 @@ export default function SchedulePage() {
                         {task.priority}
                       </span>
                       <div className="text-sm text-gray-500">
-                        {task.plannedDuration} days
+                        {task.planned_duration} days
                       </div>
                     </div>
                   </motion.div>

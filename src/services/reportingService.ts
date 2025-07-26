@@ -527,7 +527,7 @@ class ReportingService {
   public generateReportFilename(
     reportType: string,
     projectName: string,
-    format: 'pdf' | 'excel' | 'json'
+    fileFormat: 'pdf' | 'excel' | 'json'
   ): string {
     const timestamp = format(new Date(), 'yyyy-MM-dd_HHmm');
     const cleanProjectName = projectName.replace(/[^a-zA-Z0-9]/g, '_');

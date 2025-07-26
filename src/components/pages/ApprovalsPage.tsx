@@ -192,7 +192,7 @@ export default function ApprovalsPage() {
                       )}
                       <div>
                         <h4 className="font-medium text-gray-900">
-                          {getTaskTitle(proposal.taskId)}
+                          {getTaskTitle(proposal.task_id)}
                         </h4>
                         <p className="text-sm text-gray-500">
                           {proposal.reason}
@@ -207,21 +207,15 @@ export default function ApprovalsPage() {
                       }`}>
                         {proposal.status}
                       </span>
-                      {proposal.reviewedAt && (
+                      {proposal.reviewed_at && (
                         <p className="text-xs text-gray-500 mt-1">
-                          {format(proposal.reviewedAt, 'MMM dd, HH:mm')}
+                          {format(proposal.reviewed_at, 'MMM dd, HH:mm')}
                         </p>
                       )}
                     </div>
                   </div>
                   
-                  {proposal.reviewComments && (
-                    <div className="mt-3 pt-3 border-t border-gray-200">
-                      <p className="text-sm text-gray-600">
-                        <strong>Review Notes:</strong> {proposal.reviewComments}
-                      </p>
-                    </div>
-                  )}
+
                 </div>
               </div>
             ))}

@@ -416,7 +416,7 @@ export const useAppStore = create<AppStore>()(
               ? { 
                   ...delivery, 
                   confirmationStatus: confirmed ? 'confirmed' : 'rejected',
-                  plannedDate: newDate || delivery.plannedDate 
+                  planned_date: newDate || delivery.planned_date 
                 }
               : delivery
           )
@@ -558,11 +558,17 @@ export const useAppStore = create<AppStore>()(
           completedTasks: tasks.filter(t => t.status === 'completed').length,
           delayedTasks: tasks.filter(t => t.status === 'delayed').length,
           upcomingDeadlines: tasks.filter(t => {
-            const daysUntilDeadline = Math.ceil((t.endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+            const daysUntilDeadline = Math.ceil((t.end_date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
             return daysUntilDeadline <= 7 && daysUntilDeadline > 0;
           }).length,
           pendingApprovals: taskChangeProposals.filter(p => p.status === 'pending').length,
-          activeDeliveries: deliveries.filter(d => d.status === 'pending' || d.status === 'confirmed').length,
+          activeDeliveries: deliveries.filter(d => d.confirmation_status === 'pending' || d.confirmation_status === 'confirmed').length,
+          qaAlerts: {
+            total: qaAlerts.length,
+            pending: qaAlerts.filter(qa => qa.status === 'pending').length,
+            overdue: qaAlerts.filter(qa => qa.status === 'overdue').length,
+            completed: qaAlerts.filter(qa => qa.status === 'completed').length
+          }
         };
         
         set({ dashboardStats: stats });
