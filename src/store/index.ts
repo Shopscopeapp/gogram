@@ -216,25 +216,85 @@ export const useAppStore = create<AppStore>()(
 
       // Task Actions
       addTask: (task) => {
+        const { currentProject, users } = get();
+        
         set((state) => ({ 
           tasks: [...state.tasks, task] 
         }));
         
-        // Generate QA alerts for new task
+        // Check if this task category requires QA
+        if (qaService.requiresQA(task.category)) {
+          // Show info about QA requirements
+          const requirements = qaService.getQARequirements(task.category);
+          toast(`📋 QA Required: ${task.category} work requires quality checks: ${requirements.slice(0,2).join(', ')}${requirements.length > 2 ? '...' : ''}`, {
+            duration: 6000,
+            style: {
+              background: '#3b82f6',
+              color: 'white'
+            }
+          });
+        }
+        
+        // Generate scheduled QA alerts for new task  
         setTimeout(() => get().generateQAAlerts(), 100);
       },
       
       updateTask: (id, updates) => {
+        const { tasks, currentProject } = get();
+        const previousTask = tasks.find(t => t.id === id);
+        
+        // Update the task
         set((state) => ({
           tasks: state.tasks.map(task => 
             task.id === id ? { ...task, ...updates, updatedAt: new Date() } : task
           )
         }));
 
-        // Regenerate QA alerts if task dates or status changed
-        if (updates.start_date || updates.end_date || updates.status) {
+        // Auto-trigger QA checks if status changed or progress updated
+        if (previousTask && (updates.status || updates.progress_percentage)) {
+          const updatedTask = { ...previousTask, ...updates };
+          const newQAAlerts = qaService.autoTriggerQAChecks(
+            updatedTask, 
+            previousTask.status,
+            currentProject?.id || ''
+          );
+
+          if (newQAAlerts.length > 0) {
+            set((state) => ({
+              qaAlerts: [...state.qaAlerts, ...newQAAlerts]
+            }));
+
+            // Show notification for critical QA alerts
+            newQAAlerts.forEach(alert => {
+              if (alert.priority === 'critical') {
+                toast.error(`🚨 CRITICAL QA ALERT: ${alert.title}`, {
+                  duration: 8000,
+                  style: {
+                    background: '#dc2626',
+                    color: 'white',
+                    fontWeight: 'bold'
+                  }
+                });
+              } else if (alert.priority === 'high') {
+                toast(`⚠️ QA Alert: ${alert.title}`, {
+                  duration: 5000,
+                  style: {
+                    background: '#f59e0b',
+                    color: 'white'
+                  }
+                });
+              }
+            });
+          }
+        }
+
+        // Regenerate scheduled QA alerts if task dates changed
+        if (updates.start_date || updates.end_date) {
           setTimeout(() => get().generateQAAlerts(), 100);
         }
+
+        // Update dashboard stats
+        get().updateDashboardStats();
       },
       
       removeTask: (id) => set((state) => ({
@@ -455,9 +515,8 @@ export const useAppStore = create<AppStore>()(
             qaAlerts: [...state.qaAlerts, ...newAlerts]
           }));
 
-          // Create notifications for project coordinators
-          const projectCoordinators = users.filter(user => user.role === 'project_coordinator');
-          const qaNotifications = qaService.createQANotifications(newAlerts, tasks, projectCoordinators);
+          // Create notifications for assigned users
+          const qaNotifications = qaService.generateQANotifications(newAlerts, users);
           
           // Add notifications to the system
           qaNotifications.forEach(notification => {
@@ -477,10 +536,14 @@ export const useAppStore = create<AppStore>()(
       },
 
       updateQAAlertStatus: (alertId, status) => {
-        const { qaAlerts } = get();
-        const updatedAlerts = qaService.updateQAAlertStatus(alertId, status, qaAlerts);
+        const { qaAlerts, currentUser } = get();
+        const alertUpdates = qaService.updateAlertStatus(alertId, status, currentUser?.id);
         
-        set({ qaAlerts: updatedAlerts });
+        set((state) => ({
+          qaAlerts: state.qaAlerts.map(alert =>
+            alert.id === alertId ? { ...alert, ...alertUpdates } : alert
+          )
+        }));
         
         if (status === 'completed') {
           toast.success('QA checklist completed successfully!');
@@ -491,15 +554,38 @@ export const useAppStore = create<AppStore>()(
         const { qaAlerts, currentUser } = get();
         if (!currentUser) return;
 
-        const updatedAlerts = qaService.completeChecklistItem(
-          alertId, 
-          itemId, 
-          currentUser.id, 
-          notes, 
-          qaAlerts
-        );
+        // Update the checklist item locally
+        set((state) => ({
+          qaAlerts: state.qaAlerts.map(alert => {
+            if (alert.id === alertId) {
+              const updatedChecklist = alert.checklist.map(item =>
+                item.id === itemId
+                  ? {
+                      ...item, 
+                      completed: true,
+                      completed_at: new Date(),
+                      completed_by: currentUser.id,
+                      notes
+                    }
+                  : item
+              );
+
+              // Check if all required items are completed
+              const allRequiredCompleted = updatedChecklist
+                .filter(item => item.required)
+                .every(item => item.completed);
+
+              return {
+                ...alert,
+                checklist: updatedChecklist,
+                status: allRequiredCompleted ? 'completed' as const : alert.status,
+                updated_at: new Date()
+              };
+            }
+            return alert;
+          })
+        }));
         
-        set({ qaAlerts: updatedAlerts });
         toast.success('Checklist item completed');
       },
 
@@ -568,8 +654,6 @@ export const useAppStore = create<AppStore>()(
         const { tasks, taskChangeProposals, deliveries, qaAlerts } = get();
         const now = new Date();
         
-        const qaAlertSummary = qaService.getQAAlertSummary(qaAlerts);
-        
         const stats: DashboardStats = {
           totalTasks: tasks.length,
           completedTasks: tasks.filter(t => t.status === 'completed').length,
@@ -583,7 +667,10 @@ export const useAppStore = create<AppStore>()(
           qaAlerts: {
             total: qaAlerts.length,
             pending: qaAlerts.filter(qa => qa.status === 'pending').length,
-            overdue: qaAlerts.filter(qa => qa.status === 'overdue').length,
+            overdue: qaAlerts.filter(qa => {
+              if (qa.status === 'completed' || !qa.due_date) return false;
+              return qa.due_date < now;
+            }).length,
             completed: qaAlerts.filter(qa => qa.status === 'completed').length
           }
         };
