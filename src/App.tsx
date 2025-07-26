@@ -21,24 +21,10 @@ import ReportsPage from './components/pages/ReportsPage';
 import SharePage from './components/pages/SharePage';
 import SupplierConfirmationPage from './components/pages/SupplierConfirmationPage';
 
-// Simple placeholder components for remaining pages
-const TeamPage = () => (
-  <div className="space-y-6">
-    <h1 className="text-2xl font-bold text-gray-900">Team</h1>
-    <div className="card p-8 text-center">
-      <p className="text-gray-600">Team management coming soon...</p>
-    </div>
-  </div>
-);
+// Import the complete Team Management page
+import TeamPage from './components/pages/TeamPage';
 
-const DocumentsPage = () => (
-  <div className="space-y-6">
-    <h1 className="text-2xl font-bold text-gray-900">Documents</h1>
-    <div className="card p-8 text-center">
-      <p className="text-gray-600">Document management coming soon...</p>
-    </div>
-  </div>
-);
+import DocumentsPage from './components/pages/DocumentsPage';
 
 // Layout wrapper for authenticated routes
 function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
