@@ -140,7 +140,7 @@ export default function Dashboard() {
   const welcomeMessage = () => {
     const hour = new Date().getHours();
     const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-    return `${greeting}, ${currentUser.name.split(' ')[0]}!`;
+    return `${greeting}, ${currentUser.full_name.split(' ')[0]}!`;
   };
 
   return (
@@ -233,8 +233,8 @@ export default function Dashboard() {
               {upcomingTasks.length > 0 ? (
                 <div className="space-y-4">
                   {upcomingTasks.map(task => {
-                    const isTaskToday = isToday(task.endDate);
-                    const isTaskTomorrow = isTomorrow(task.endDate);
+                    const isTaskToday = isToday(task.end_date);
+                    const isTaskTomorrow = isTomorrow(task.end_date);
                     
                     return (
                       <div key={task.id} className="flex items-center space-x-3">
@@ -249,7 +249,7 @@ export default function Dashboard() {
                           <p className="text-xs text-gray-500 mt-1">
                             {isTaskToday ? 'Due today' :
                              isTaskTomorrow ? 'Due tomorrow' :
-                             format(task.endDate, 'MMM dd')}
+                             format(task.end_date, 'MMM dd')}
                           </p>
                         </div>
                       </div>

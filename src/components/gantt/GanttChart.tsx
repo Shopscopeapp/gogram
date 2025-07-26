@@ -64,8 +64,8 @@ function GanttTask({ task, startDate, dayWidth, onTaskMove }: GanttTaskProps) {
   };
 
   // Calculate task position and width
-  const taskStartDays = differenceInDays(task.startDate, startDate);
-  const taskDuration = differenceInDays(task.endDate, task.startDate) + 1;
+  const taskStartDays = differenceInDays(task.start_date, startDate);
+  const taskDuration = differenceInDays(task.end_date, task.start_date) + 1;
   const taskX = Math.max(0, taskStartDays * dayWidth);
   const taskWidth = taskDuration * dayWidth;
 
@@ -214,7 +214,7 @@ export default function GanttChart() {
 
   // Sort tasks by start date
   const sortedTasks = useMemo(() => 
-    [...tasks].sort((a, b) => a.startDate.getTime() - b.startDate.getTime()),
+    [...tasks].sort((a, b) => a.start_date.getTime() - b.start_date.getTime()),
     [tasks]
   );
 
@@ -228,8 +228,8 @@ export default function GanttChart() {
 
     // Calculate new dates based on drag distance
     const daysMoved = Math.round(delta.x / zoomLevel);
-    const newStartDate = addDays(task.startDate, daysMoved);
-    const newEndDate = addDays(task.endDate, daysMoved);
+    const newStartDate = addDays(task.start_date, daysMoved);
+    const newEndDate = addDays(task.end_date, daysMoved);
 
     // Update task and dependencies
     moveTask(task.id, newStartDate, newEndDate);
