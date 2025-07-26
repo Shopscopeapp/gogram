@@ -1,13 +1,255 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Clock, Users, Plus, Filter, Settings } from 'lucide-react';
+import { Calendar, Clock, Users, Plus, Filter, Settings, X } from 'lucide-react';
 import { useAppStore } from '../../store';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import GanttChart from '../gantt/GanttChart';
+import type { Task } from '../../types';
+import toast from 'react-hot-toast';
+
+interface AddTaskModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onAddTask: (taskData: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => void;
+}
+
+function AddTaskModal({ isOpen, onClose, onAddTask }: AddTaskModalProps) {
+  const { currentProject, currentUser } = useAppStore();
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    category: 'General',
+    priority: 'medium' as const,
+    status: 'pending' as const,
+    start_date: format(new Date(), 'yyyy-MM-dd'),
+    planned_duration: 1,
+    color: '#3b82f6',
+    assigned_to: currentUser?.id || '',
+    dependencies: [] as string[]
+  });
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        title: '',
+        description: '',
+        category: 'General',
+        priority: 'medium',
+        status: 'pending',
+        start_date: format(new Date(), 'yyyy-MM-dd'),
+        planned_duration: 1,
+        color: '#3b82f6',
+        assigned_to: currentUser?.id || '',
+        dependencies: []
+      });
+    }
+  }, [isOpen, currentUser]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const startDate = new Date(formData.start_date);
+    const endDate = addDays(startDate, formData.planned_duration - 1);
+    
+    const taskData: Omit<Task, 'id' | 'created_at' | 'updated_at'> = {
+      project_id: currentProject?.id || '',
+      title: formData.title,
+      description: formData.description,
+      category: formData.category,
+      location: '',
+      status: formData.status,
+      priority: formData.priority,
+      assigned_to: formData.assigned_to,
+      start_date: startDate,
+      end_date: endDate,
+      planned_duration: formData.planned_duration,
+      progress_percentage: 0,
+      color: formData.color,
+      dependencies: formData.dependencies,
+      created_by: currentUser?.id || ''
+    };
+
+    onAddTask(taskData);
+    onClose();
+    toast.success('Task added successfully!');
+  };
+
+  const categoryOptions = [
+    'General',
+    'Site Work',
+    'Foundation',
+    'Structural',
+    'Concrete',
+    'Masonry',
+    'Steel',
+    'Roofing',
+    'Electrical',
+    'Plumbing',
+    'HVAC',
+    'Finishing',
+    'Quality Control'
+  ];
+
+  const colorOptions = [
+    { name: 'Blue', value: '#3b82f6' },
+    { name: 'Green', value: '#22c55e' },
+    { name: 'Orange', value: '#f97316' },
+    { name: 'Purple', value: '#8b5cf6' },
+    { name: 'Red', value: '#ef4444' },
+    { name: 'Yellow', value: '#eab308' },
+    { name: 'Pink', value: '#ec4899' },
+    { name: 'Gray', value: '#6b7280' }
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">Add New Task</h3>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="label">Task Title *</label>
+            <input
+              type="text"
+              required
+              className="input"
+              placeholder="Enter task title"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label className="label">Description</label>
+            <textarea
+              className="input"
+              rows={3}
+              placeholder="Enter task description"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="label">Category</label>
+              <select
+                className="input"
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+              >
+                {categoryOptions.map(category => (
+                  <option key={category} value={category}>{category}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="label">Priority</label>
+              <select
+                className="input"
+                value={formData.priority}
+                onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })}
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="label">Start Date *</label>
+              <input
+                type="date"
+                required
+                className="input"
+                value={formData.start_date}
+                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="label">Duration (days) *</label>
+              <input
+                type="number"
+                required
+                min="1"
+                max="365"
+                className="input"
+                value={formData.planned_duration}
+                onChange={(e) => setFormData({ ...formData, planned_duration: parseInt(e.target.value) || 1 })}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="label">Task Color</label>
+            <div className="grid grid-cols-4 gap-2 mt-2">
+              {colorOptions.map(color => (
+                <button
+                  key={color.value}
+                  type="button"
+                  className={`p-3 rounded-lg border-2 transition-all ${
+                    formData.color === color.value
+                      ? 'border-gray-900 scale-105'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  style={{ backgroundColor: color.value }}
+                  onClick={() => setFormData({ ...formData, color: color.value })}
+                  title={color.name}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn btn-outline"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+            >
+              Add Task
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </motion.div>
+  );
+}
 
 export default function SchedulePage() {
-  const { tasks, currentProject, currentUser } = useAppStore();
+  const { tasks, currentProject, currentUser, addTask } = useAppStore();
   const [view, setView] = useState<'gantt' | 'list'>('gantt');
+  const [showAddTaskModal, setShowAddTaskModal] = useState(false);
 
   if (!currentProject) {
     return <div>Loading...</div>;
@@ -27,6 +269,17 @@ export default function SchedulePage() {
   };
 
   const canEditSchedule = currentUser?.role === 'project_manager';
+
+  const handleAddTask = (taskData: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => {
+    const newTask: Task = {
+      ...taskData,
+      id: Date.now().toString(), // In real app, this would be generated by database
+      created_at: new Date(),
+      updated_at: new Date()
+    };
+    
+    addTask(newTask);
+  };
 
   return (
     <div className="space-y-6">
@@ -67,7 +320,10 @@ export default function SchedulePage() {
               Filter
             </button>
             {canEditSchedule && (
-              <button className="btn btn-primary btn-md">
+              <button 
+                onClick={() => setShowAddTaskModal(true)}
+                className="btn btn-primary btn-md"
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Add Task
               </button>
@@ -231,6 +487,13 @@ export default function SchedulePage() {
           </div>
         </div>
       </div>
+
+      {/* Add Task Modal */}
+      <AddTaskModal
+        isOpen={showAddTaskModal}
+        onClose={() => setShowAddTaskModal(false)}
+        onAddTask={handleAddTask}
+      />
     </div>
   );
 } 

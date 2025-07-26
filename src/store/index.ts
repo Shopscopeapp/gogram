@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import toast from 'react-hot-toast';
 import procurementService from '../services/procurementService';
-import qaService, { type QAAlert } from '../services/qaService';
+import qaService from '../services/qaService';
+import { SupabaseService } from '../lib/supabase';
 import type { 
   User, 
   Project, 
@@ -13,7 +14,8 @@ import type {
   Delivery, 
   Notification,
   UserRole,
-  DashboardStats 
+  DashboardStats,
+  QAAlert
 } from '../types';
 
 interface AppState {
@@ -45,6 +47,9 @@ interface AppState {
   sidebarOpen: boolean;
   loading: boolean;
   error: string | null;
+  
+  // Real-time subscription
+  realtimeChannel: any; // Supabase channel type
   
   // Dashboard
   dashboardStats: DashboardStats;
@@ -114,6 +119,17 @@ interface AppActions {
   // Dashboard Actions
   updateDashboardStats: () => void;
   
+  // Database Integration Actions
+  initializeUserSession: () => Promise<void>;
+  initializeProjectData: (projectId: string) => Promise<void>;
+  subscribeToRealTimeUpdates: (projectId: string) => void;
+  unsubscribeFromRealTimeUpdates: () => void;
+  
+  // Authentication Actions
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, userData: { full_name: string; company?: string; phone?: string; role: string; }) => Promise<void>;
+  signOut: () => Promise<void>;
+  
   // Utility Actions
   generatePublicShareLink: (projectId: string) => string;
   exportDelayRegister: (format: 'pdf' | 'excel') => void;
@@ -155,6 +171,7 @@ export const useAppStore = create<AppStore>()(
       sidebarOpen: true,
       loading: false,
       error: null,
+      realtimeChannel: null,
       dashboardStats: initialStats,
 
       // User Actions
@@ -581,10 +598,191 @@ export const useAppStore = create<AppStore>()(
         return `${baseUrl}/public/${shareToken}`;
       },
       
-      exportDelayRegister: (format) => {
-        const { taskDelays, tasks } = get();
+              exportDelayRegister: (format) => {
+          const { taskDelays, tasks } = get();
         // Implementation would depend on chosen export library
         console.log(`Exporting delay register in ${format} format`, { taskDelays, tasks });
+      },
+
+      // Database Integration Methods
+      initializeUserSession: async () => {
+        try {
+          set({ loading: true, error: null });
+          const currentUser = await SupabaseService.getCurrentUser();
+          set({ currentUser, loading: false });
+        } catch (error) {
+          console.error('Error initializing user session:', error);
+          set({ error: 'Failed to initialize user session', loading: false });
+        }
+      },
+
+      initializeProjectData: async (projectId) => {
+        try {
+          set({ loading: true, error: null });
+          
+          // Fetch all project data in parallel
+          const [
+            projectData,
+            tasksData,
+            deliveriesData,
+            taskChangeProposalsData,
+            qaAlertsData,
+            suppliersData
+          ] = await Promise.all([
+            SupabaseService.getProjectWithMembers(projectId),
+            SupabaseService.getProjectTasks(projectId),
+            SupabaseService.getProjectDeliveries(projectId),
+            SupabaseService.getTaskChangeProposals(projectId),
+            SupabaseService.getProjectQAAlerts(projectId),
+            SupabaseService.getSuppliers()
+          ]);
+
+          // Update store with fetched data
+          if (projectData) {
+            set({ currentProject: projectData });
+          }
+          
+          if (tasksData) {
+            set({ tasks: tasksData });
+          }
+          
+          if (deliveriesData) {
+            set({ deliveries: deliveriesData });
+          }
+          
+          if (taskChangeProposalsData) {
+            set({ taskChangeProposals: taskChangeProposalsData });
+          }
+          
+          if (qaAlertsData) {
+            set({ qaAlerts: qaAlertsData });
+          }
+          
+          if (suppliersData) {
+            set({ suppliers: suppliersData });
+          }
+
+          // Update dashboard stats after loading data
+          get().updateDashboardStats();
+          
+          set({ loading: false });
+        } catch (error) {
+          console.error('Error initializing project data:', error);
+          set({ error: 'Failed to load project data', loading: false });
+        }
+      },
+
+      subscribeToRealTimeUpdates: (projectId) => {
+        const channel = SupabaseService.subscribeToProjectUpdates(projectId, (payload) => {
+          console.log('Real-time update received:', payload);
+          
+          // Handle different types of updates
+          const { eventType, new: newRecord, old: oldRecord } = payload;
+          
+          switch (payload.table) {
+            case 'tasks':
+              if (eventType === 'INSERT') {
+                get().addTask(newRecord);
+              } else if (eventType === 'UPDATE') {
+                get().updateTask(newRecord.id, newRecord);
+              } else if (eventType === 'DELETE') {
+                get().removeTask(oldRecord.id);
+              }
+              break;
+              
+            case 'deliveries':
+              if (eventType === 'INSERT') {
+                get().addDelivery(newRecord);
+              } else if (eventType === 'UPDATE') {
+                get().updateDelivery(newRecord.id, newRecord);
+              }
+              break;
+              
+            case 'task_change_proposals':
+              if (eventType === 'INSERT') {
+                get().addTaskChangeProposal(newRecord);
+              }
+              break;
+          }
+          
+          // Update dashboard stats after any change
+          get().updateDashboardStats();
+        });
+        
+        // Store the channel reference for cleanup
+        set({ realtimeChannel: channel });
+      },
+
+      unsubscribeFromRealTimeUpdates: () => {
+        const { realtimeChannel } = get();
+        if (realtimeChannel) {
+          realtimeChannel.unsubscribe();
+          set({ realtimeChannel: null });
+        }
+      },
+
+      // Authentication Methods
+      signIn: async (email, password) => {
+        try {
+          set({ loading: true, error: null });
+          const result = await SupabaseService.signInWithEmail(email, password);
+          
+          if (result.user) {
+            await get().initializeUserSession();
+            toast.success('Successfully signed in!');
+          }
+        } catch (error: any) {
+          console.error('Sign in error:', error);
+          set({ error: error.message || 'Failed to sign in', loading: false });
+          toast.error(error.message || 'Failed to sign in');
+        }
+      },
+
+      signUp: async (email, password, userData) => {
+        try {
+          set({ loading: true, error: null });
+          const result = await SupabaseService.signUp(email, password, userData);
+          
+          if (result.user) {
+            toast.success('Account created successfully! Please check your email to verify your account.');
+          }
+          
+          set({ loading: false });
+        } catch (error: any) {
+          console.error('Sign up error:', error);
+          set({ error: error.message || 'Failed to create account', loading: false });
+          toast.error(error.message || 'Failed to create account');
+        }
+      },
+
+      signOut: async () => {
+        try {
+          set({ loading: true, error: null });
+          await SupabaseService.signOut();
+          
+          // Clear all user data
+          set({
+            currentUser: null,
+            currentProject: null,
+            tasks: [],
+            deliveries: [],
+            taskChangeProposals: [],
+            qaAlerts: [],
+            suppliers: [],
+            notifications: [],
+            unreadCount: 0,
+            loading: false
+          });
+          
+          // Unsubscribe from real-time updates
+          get().unsubscribeFromRealTimeUpdates();
+          
+          toast.success('Successfully signed out!');
+        } catch (error: any) {
+          console.error('Sign out error:', error);
+          set({ error: error.message || 'Failed to sign out', loading: false });
+          toast.error(error.message || 'Failed to sign out');
+        }
       },
     }),
     {
