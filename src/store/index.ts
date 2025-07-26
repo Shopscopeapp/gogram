@@ -222,7 +222,7 @@ export const useAppStore = create<AppStore>()(
       
       removeTask: (id) => set((state) => ({
         tasks: state.tasks.filter(task => task.id !== id),
-        qaAlerts: state.qaAlerts.filter(alert => alert.taskId !== id)
+        qaAlerts: state.qaAlerts.filter(alert => alert.task_id !== id)
       })),
       
       moveTask: async (id, newStartDate, newEndDate) => {

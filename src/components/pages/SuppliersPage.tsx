@@ -158,7 +158,7 @@ export default function SuppliersPage() {
         <div className="card p-6">
           <div className="text-center">
             <div className="text-3xl font-bold text-success-600">
-              {deliveries.filter(d => d.confirmationStatus === 'confirmed').length}
+              {deliveries.filter(d => d.confirmation_status === 'confirmed').length}
             </div>
             <div className="text-sm text-gray-600 mt-1">Confirmed</div>
           </div>
@@ -167,7 +167,7 @@ export default function SuppliersPage() {
         <div className="card p-6">
           <div className="text-center">
             <div className="text-3xl font-bold text-warning-600">
-              {deliveries.filter(d => d.confirmationStatus === 'pending').length}
+              {deliveries.filter(d => d.confirmation_status === 'pending').length}
             </div>
             <div className="text-sm text-gray-600 mt-1">Pending</div>
           </div>
@@ -176,7 +176,7 @@ export default function SuppliersPage() {
         <div className="card p-6">
           <div className="text-center">
             <div className="text-3xl font-bold text-danger-600">
-              {deliveries.filter(d => d.confirmationStatus === 'rejected').length}
+              {deliveries.filter(d => d.confirmation_status === 'rejected').length}
             </div>
             <div className="text-sm text-gray-600 mt-1">Rejected</div>
           </div>
@@ -214,7 +214,7 @@ export default function SuppliersPage() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {deliveries.map((delivery) => {
-                const supplier = suppliers.find(s => s.id === delivery.supplierId);
+                const supplier = suppliers.find(s => s.id === delivery.supplier_id);
                 
                 return (
                   <tr key={delivery.id} className="hover:bg-gray-50">
@@ -236,7 +236,7 @@ export default function SuppliersPage() {
                       <div className="text-sm text-gray-500">{supplier?.company}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{getTaskTitle(delivery.taskId)}</div>
+                      <div className="text-sm text-gray-900">{getTaskTitle(delivery.task_id)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
@@ -245,14 +245,14 @@ export default function SuppliersPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {format(delivery.plannedDate, 'MMM dd, yyyy')}
+                        {format(delivery.planned_date, 'MMM dd, yyyy')}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        {getDeliveryStatusIcon(delivery.confirmationStatus)}
-                        <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(delivery.confirmationStatus)}`}>
-                          {delivery.confirmationStatus}
+                        {getDeliveryStatusIcon(delivery.confirmation_status)}
+                        <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(delivery.confirmation_status)}`}>
+                          {delivery.confirmation_status}
                         </span>
                       </div>
                     </td>

@@ -85,7 +85,7 @@ function TaskItem({ task, showDate = false }: TaskItemProps) {
           </span>
           {showDate && (
             <span className="text-sm text-gray-500">
-              {format(task.endDate, 'MMM dd')}
+                                {format(task.end_date, 'MMM dd')}
             </span>
           )}
         </div>
