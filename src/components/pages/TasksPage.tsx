@@ -15,7 +15,7 @@ import { useAppStore } from '../../store';
 import { format } from 'date-fns';
 
 export default function TasksPage() {
-  const { tasks, currentUser, updateTask } = useAppStore();
+  const { tasks, currentUser, updateTask, suppliers } = useAppStore();
   const [filter, setFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -159,6 +159,21 @@ export default function TasksPage() {
                           <div className="flex items-center">
                             <User className="w-4 h-4 mr-1" />
                             {task.location}
+                          </div>
+                        )}
+                        {task.primary_supplier_id && (() => {
+                          const supplier = suppliers.find(s => s.id === task.primary_supplier_id);
+                          return supplier ? (
+                            <div className="flex items-center">
+                              <span className="w-4 h-4 mr-1">🚚</span>
+                              {supplier.name}
+                            </div>
+                          ) : null;
+                        })()}
+                        {task.requires_materials && (
+                          <div className="flex items-center">
+                            <span className="w-4 h-4 mr-1">📦</span>
+                            Requires Materials
                           </div>
                         )}
                       </div>

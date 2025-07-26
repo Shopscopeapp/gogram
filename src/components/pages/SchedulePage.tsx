@@ -14,7 +14,7 @@ interface AddTaskModalProps {
 }
 
 function AddTaskModal({ isOpen, onClose, onAddTask }: AddTaskModalProps) {
-  const { currentProject, currentUser } = useAppStore();
+  const { currentProject, currentUser, suppliers, users } = useAppStore();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -25,7 +25,12 @@ function AddTaskModal({ isOpen, onClose, onAddTask }: AddTaskModalProps) {
     planned_duration: 1,
     color: '#3b82f6',
     assigned_to: currentUser?.id || '',
-    dependencies: [] as string[]
+    dependencies: [] as string[],
+    // Supplier/Procurement fields
+    primary_supplier_id: '',
+    requires_materials: false,
+    material_delivery_date: '',
+    procurement_notes: ''
   });
 
   React.useEffect(() => {
@@ -40,7 +45,12 @@ function AddTaskModal({ isOpen, onClose, onAddTask }: AddTaskModalProps) {
         planned_duration: 1,
         color: '#3b82f6',
         assigned_to: currentUser?.id || '',
-        dependencies: []
+        dependencies: [],
+        // Supplier/Procurement fields
+        primary_supplier_id: '',
+        requires_materials: false,
+        material_delivery_date: '',
+        procurement_notes: ''
       });
     }
   }, [isOpen, currentUser]);
@@ -68,6 +78,11 @@ function AddTaskModal({ isOpen, onClose, onAddTask }: AddTaskModalProps) {
       progress_percentage: 0,
       color: formData.color,
       dependencies: formData.dependencies,
+      // Supplier/Procurement fields
+      primary_supplier_id: formData.primary_supplier_id || undefined,
+      requires_materials: formData.requires_materials,
+      material_delivery_date: formData.material_delivery_date ? new Date(formData.material_delivery_date) : undefined,
+      procurement_notes: formData.procurement_notes || undefined,
       created_by: currentUser?.id || ''
     };
 
@@ -222,6 +237,77 @@ function AddTaskModal({ isOpen, onClose, onAddTask }: AddTaskModalProps) {
                   title={color.name}
                 />
               ))}
+            </div>
+          </div>
+
+          {/* Supplier/Procurement Section */}
+          <div className="border-t border-gray-200 pt-4">
+            <h4 className="font-medium text-gray-900 mb-3 flex items-center">
+              <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+              Material & Supplier Management
+            </h4>
+            
+            <div className="space-y-4">
+              {/* Requires Materials Toggle */}
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="requires_materials"
+                  className="mr-3 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  checked={formData.requires_materials}
+                  onChange={(e) => setFormData({ ...formData, requires_materials: e.target.checked })}
+                />
+                <label htmlFor="requires_materials" className="text-sm font-medium text-gray-700">
+                  This task requires material deliveries
+                </label>
+              </div>
+
+              {/* Supplier Selection - Only show if materials required */}
+              {formData.requires_materials && (
+                <>
+                  <div>
+                    <label className="label">Primary Supplier</label>
+                    <select
+                      className="input"
+                      value={formData.primary_supplier_id}
+                      onChange={(e) => setFormData({ ...formData, primary_supplier_id: e.target.value })}
+                    >
+                      <option value="">Select a supplier...</option>
+                      {suppliers.map(supplier => (
+                        <option key={supplier.id} value={supplier.id}>
+                          {supplier.name} {supplier.company ? `(${supplier.company})` : ''} 
+                          {supplier.specialties.length > 0 ? ` - ${supplier.specialties.slice(0, 2).join(', ')}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="label">Material Delivery Date</label>
+                    <input
+                      type="date"
+                      className="input"
+                      value={formData.material_delivery_date}
+                      onChange={(e) => setFormData({ ...formData, material_delivery_date: e.target.value })}
+                      min={formData.start_date}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Leave empty to auto-calculate based on task start date
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="label">Procurement Notes</label>
+                    <textarea
+                      className="input"
+                      rows={3}
+                      placeholder="Material specifications, delivery requirements, special instructions..."
+                      value={formData.procurement_notes}
+                      onChange={(e) => setFormData({ ...formData, procurement_notes: e.target.value })}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
 

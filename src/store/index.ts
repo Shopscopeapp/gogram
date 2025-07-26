@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import toast from 'react-hot-toast';
+import { addDays, format } from 'date-fns';
 import procurementService from '../services/procurementService';
 import qaService from '../services/qaService';
 import { SupabaseService } from '../lib/supabase';
@@ -216,11 +217,47 @@ export const useAppStore = create<AppStore>()(
 
       // Task Actions
       addTask: (task) => {
-        const { currentProject, users } = get();
+        const { currentProject, users, suppliers } = get();
         
         set((state) => ({ 
           tasks: [...state.tasks, task] 
         }));
+
+        // Auto-create delivery if task has supplier and requires materials
+        if (task.requires_materials && task.primary_supplier_id) {
+          const supplier = suppliers.find(s => s.id === task.primary_supplier_id);
+          if (supplier) {
+            const deliveryDate = task.material_delivery_date || addDays(task.start_date, -2); // Default 2 days before task start
+            
+            const delivery = {
+              id: `delivery_${task.id}_${Date.now()}`,
+              project_id: task.project_id,
+              task_id: task.id,
+              supplier_id: task.primary_supplier_id,
+              item: `Materials for ${task.title}`,
+              quantity: 1,
+              unit: 'lot',
+              planned_date: deliveryDate,
+              confirmation_status: 'pending' as const,
+              delivery_address: currentProject?.location || '',
+              notes: task.procurement_notes || '',
+              created_at: new Date(),
+              updated_at: new Date()
+            };
+
+            set((state) => ({
+              deliveries: [...state.deliveries, delivery]
+            }));
+
+            toast.success(`📦 Delivery scheduled with ${supplier.name} for ${format(deliveryDate, 'MMM dd')}`, {
+              duration: 5000,
+              style: {
+                background: '#10b981',
+                color: 'white'
+              }
+            });
+          }
+        }
         
         // Check if this task category requires QA
         if (qaService.requiresQA(task.category)) {
@@ -233,6 +270,20 @@ export const useAppStore = create<AppStore>()(
               color: 'white'
             }
           });
+        }
+
+        // Show supplier integration success
+        if (task.primary_supplier_id) {
+          const supplier = suppliers.find(s => s.id === task.primary_supplier_id);
+          if (supplier) {
+            toast(`🤝 Task linked to ${supplier.name} for procurement automation`, {
+              duration: 4000,
+              style: {
+                background: '#8b5cf6',
+                color: 'white'
+              }
+            });
+          }
         }
         
         // Generate scheduled QA alerts for new task  

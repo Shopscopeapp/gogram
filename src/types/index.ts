@@ -34,6 +34,11 @@ export interface Task {
   dependencies: string[];
   notes?: string;
   attachments?: any[];
+  // Supplier/Procurement fields
+  primary_supplier_id?: string;
+  requires_materials?: boolean;
+  material_delivery_date?: Date;
+  procurement_notes?: string;
   created_by?: string;
   created_at: Date;
   updated_at: Date;
