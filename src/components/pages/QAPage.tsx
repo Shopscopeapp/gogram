@@ -13,7 +13,7 @@ import {
   XCircle
 } from 'lucide-react';
 import { useAppStore } from '../../store';
-import { format } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 import qaService, { type QAAlert, type QAChecklistItem } from '../../services/qaService';
 
 interface QAAlertCardProps {
@@ -27,7 +27,26 @@ function QAAlertCard({ alert, task, onStatusUpdate, onChecklistComplete }: QAAle
   const [expandedChecklist, setExpandedChecklist] = useState(false);
   const [checklistNotes, setChecklistNotes] = useState<Record<string, string>>({});
 
-  const displayInfo = qaService.formatAlertForDisplay(alert, task);
+  // Format alert for display directly
+  const getAlertTypeIcon = (type: string) => {
+    switch (type) {
+      case 'itp_required': return '📋';
+      case 'pre_pour_checklist': return '✅';
+      case 'engineer_inspection': return '👷';
+      case 'quality_checkpoint': return '⚠️';
+      case 'compliance_check': return '🔍';
+      default: return '🔍';
+    }
+  };
+
+  const displayInfo = {
+    icon: getAlertTypeIcon(alert.type),
+    title: alert.title,
+    subtitle: task ? `${task.title} • ${alert.due_date ? format(alert.due_date, 'MMM dd') : 'No due date'}` : (alert.due_date ? format(alert.due_date, 'MMM dd') : 'No due date'),
+    priority: alert.priority.toUpperCase(),
+    colorClass: `text-${alert.priority === 'critical' ? 'danger' : alert.priority === 'high' ? 'warning' : alert.priority === 'medium' ? 'primary' : 'gray'}-600 bg-${alert.priority === 'critical' ? 'danger' : alert.priority === 'high' ? 'warning' : alert.priority === 'medium' ? 'primary' : 'gray'}-100`,
+    daysUntilDue: alert.due_date ? differenceInDays(alert.due_date, new Date()) : 0
+  };
   const priorityColors = {
     critical: 'bg-danger-50 border-danger-200',
     high: 'bg-warning-50 border-warning-200',
@@ -73,7 +92,7 @@ function QAAlertCard({ alert, task, onStatusUpdate, onChecklistComplete }: QAAle
               <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
                 <span className="flex items-center">
                   <Calendar className="w-4 h-4 mr-1" />
-                  Due {format(alert.scheduledDate, 'MMM dd')}
+                  {alert.due_date ? `Due ${format(alert.due_date, 'MMM dd')}` : 'No due date'}
                 </span>
                 {task && (
                   <span className="flex items-center">
@@ -104,15 +123,10 @@ function QAAlertCard({ alert, task, onStatusUpdate, onChecklistComplete }: QAAle
           </div>
         </div>
 
-        {/* Requirements */}
-        {alert.requirements.length > 0 && (
+        {/* Description */}
+        {alert.description && (
           <div className="mb-4">
-            <h4 className="font-medium text-gray-900 mb-2">Requirements:</h4>
-            <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
-              {alert.requirements.map((requirement, index) => (
-                <li key={index}>{requirement}</li>
-              ))}
-            </ul>
+            <p className="text-sm text-gray-600">{alert.description}</p>
           </div>
         )}
 
@@ -170,7 +184,7 @@ function QAAlertCard({ alert, task, onStatusUpdate, onChecklistComplete }: QAAle
                           <p className={`font-medium ${
                             item.completed ? 'text-success-700' : 'text-gray-900'
                           }`}>
-                            {item.description}
+                            {item.text}
                           </p>
                           {item.required && !item.completed && (
                             <span className="text-xs px-2 py-1 bg-danger-100 text-danger-700 rounded-full">
@@ -181,8 +195,8 @@ function QAAlertCard({ alert, task, onStatusUpdate, onChecklistComplete }: QAAle
                         
                         {item.completed ? (
                           <div className="mt-1 text-sm text-success-600">
-                            ✓ Completed {item.completedAt && format(item.completedAt, 'MMM dd, HH:mm')}
-                            {item.completedBy && ` by ${item.completedBy}`}
+                            ✓ Completed {item.completed_at && format(item.completed_at, 'MMM dd, HH:mm')}
+                            {item.completed_by && ` by ${item.completed_by}`}
                             {item.notes && (
                               <div className="mt-1 text-success-700 italic">
                                 "{item.notes}"
@@ -263,7 +277,7 @@ export default function QAPage() {
   const filteredAlerts = qaAlerts.filter(alert => {
     // Search filter
     if (searchQuery) {
-      const task = tasks.find(t => t.id === alert.taskId);
+      const task = tasks.find(t => t.id === alert.task_id);
       const searchText = `${alert.title} ${alert.description} ${task?.title || ''}`.toLowerCase();
       if (!searchText.includes(searchQuery.toLowerCase())) {
         return false;
@@ -275,15 +289,29 @@ export default function QAPage() {
       case 'pending':
         return alert.status === 'pending';
       case 'overdue':
-        return qaService.getOverdueAlerts([alert]).length > 0;
+        return alert.status !== 'completed' && alert.due_date && alert.due_date < new Date();
       case 'critical':
-        return qaService.getCriticalAlerts([alert]).length > 0;
+        return (alert.priority === 'high' || alert.priority === 'critical') && alert.status !== 'completed';
       default:
         return true;
     }
   });
 
-  const alertSummary = qaService.getQAAlertSummary(qaAlerts);
+  // Calculate alert summary directly
+  const now = new Date();
+  const alertSummary = {
+    total: qaAlerts.length,
+    pending: qaAlerts.filter(alert => alert.status === 'pending').length,
+    overdue: qaAlerts.filter(alert => {
+      if (alert.status === 'completed' || !alert.due_date) return false;
+      return alert.due_date < now;
+    }).length,
+    critical: qaAlerts.filter(alert => 
+      (alert.priority === 'high' || alert.priority === 'critical') && 
+      alert.status !== 'completed'
+    ).length,
+    completed: qaAlerts.filter(alert => alert.status === 'completed').length
+  };
 
   return (
     <div className="space-y-6">
@@ -363,7 +391,7 @@ export default function QAPage() {
       <div className="space-y-4">
         {filteredAlerts.length > 0 ? (
           filteredAlerts.map((alert) => {
-            const task = tasks.find(t => t.id === alert.taskId);
+            const task = tasks.find(t => t.id === alert.task_id);
             return (
               <QAAlertCard
                 key={alert.id}
