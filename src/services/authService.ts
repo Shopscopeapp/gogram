@@ -104,6 +104,48 @@ class AuthService {
 
         if (profileError) {
           console.error('Profile fetch error:', profileError);
+          
+          // If profile doesn't exist, create it automatically
+          if (profileError.code === 'PGRST116') { // No rows returned
+            console.log('Profile not found during signin, creating automatically...');
+            
+            const newProfile = {
+              auth_user_id: data.user.id,
+              email: data.user.email || '',
+              full_name: data.user.user_metadata?.full_name || data.user.email || 'New User',
+              role: (data.user.user_metadata?.role || 'viewer') as any,
+              company: data.user.user_metadata?.company || '',
+              phone: data.user.user_metadata?.phone || '',
+              specialties: [],
+            };
+
+            const { data: createdProfile, error: createError } = await supabase
+              .from('users')
+              .insert(newProfile)
+              .select()
+              .single();
+
+            if (createError) {
+              console.error('Failed to create profile during signin:', createError);
+              return { success: false, error: 'Failed to create user profile' };
+            }
+
+            const user: User = {
+              id: data.user.id,
+              email: createdProfile.email,
+              full_name: createdProfile.full_name,
+              company: createdProfile.company,
+              phone: createdProfile.phone,
+              role: createdProfile.role,
+              avatar_url: createdProfile.avatar_url,
+              specialties: createdProfile.specialties || [],
+              created_at: new Date(createdProfile.created_at),
+              updated_at: new Date(createdProfile.updated_at),
+            };
+
+            return { success: true, user };
+          }
+          
           return { success: false, error: 'Failed to fetch user profile' };
         }
 
@@ -168,6 +210,46 @@ class AuthService {
 
       if (error) {
         console.error('Profile fetch error:', error);
+        
+        // If profile doesn't exist, create it automatically
+        if (error.code === 'PGRST116') { // No rows returned
+          console.log('Profile not found, creating automatically...');
+          
+          const newProfile = {
+            auth_user_id: session.user.id,
+            email: session.user.email || '',
+            full_name: session.user.user_metadata?.full_name || session.user.email || 'New User',
+            role: (session.user.user_metadata?.role || 'viewer') as any,
+            company: session.user.user_metadata?.company || '',
+            phone: session.user.user_metadata?.phone || '',
+            specialties: [],
+          };
+
+          const { data: createdProfile, error: createError } = await supabase
+            .from('users')
+            .insert(newProfile)
+            .select()
+            .single();
+
+          if (createError) {
+            console.error('Failed to create profile:', createError);
+            return null;
+          }
+
+          return {
+            id: session.user.id,
+            email: createdProfile.email,
+            full_name: createdProfile.full_name,
+            company: createdProfile.company,
+            phone: createdProfile.phone,
+            role: createdProfile.role,
+            avatar_url: createdProfile.avatar_url,
+            specialties: createdProfile.specialties || [],
+            created_at: new Date(createdProfile.created_at),
+            updated_at: new Date(createdProfile.updated_at),
+          };
+        }
+        
         return null;
       }
 
