@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Calendar, 
@@ -107,12 +107,27 @@ export default function Dashboard() {
     isProjectManager 
   } = useAppStore();
 
+  useEffect(() => {
+    console.log('Dashboard useEffect - currentUser:', !!currentUser, 'currentProject:', !!currentProject);
+    if (currentUser && currentProject) {
+      console.log('Dashboard ready - User:', currentUser.full_name, 'Project:', currentProject.name);
+    }
+  }, [currentUser, currentProject]);
+
   if (!currentUser || !currentProject) {
+    console.log('Dashboard loading state - currentUser:', !!currentUser, 'currentProject:', !!currentProject);
+    console.log('Current user details:', currentUser?.full_name);
+    console.log('Current project details:', currentProject?.name);
+    
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <Activity className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">Loading dashboard...</p>
+          <p className="text-gray-600">
+            Loading dashboard... 
+            {!currentUser && ' (waiting for user)'}
+            {!currentProject && ' (waiting for project)'}
+          </p>
         </div>
       </div>
     );

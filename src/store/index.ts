@@ -612,17 +612,18 @@ export const useAppStore = create<AppStore>()(
           
           console.log('Setting demo project and data...');
           
-          // Set the demo project first
-          set({ currentProject: mockProject });
-          
-          // Load all mock data
+          // Set all demo data in a single atomic update
           set({
+            currentProject: mockProject,
             tasks: mockTasks,
             deliveries: mockDeliveries, 
             suppliers: mockSuppliers,
             taskChangeProposals: mockTaskChangeProposals || [],
             qaAlerts: [], // Start with empty QA alerts, they'll be generated
           });
+
+          console.log('Demo data set successfully, current project:', get().currentProject?.name);
+          console.log('Current user:', get().currentUser?.full_name);
 
           console.log('Demo data set successfully, generating QA alerts...');
 

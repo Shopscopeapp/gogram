@@ -49,7 +49,7 @@ class AuthService {
         const { error: profileError } = await supabase
           .from('users')
           .insert({
-            id: data.user.id,
+            auth_user_id: data.user.id, // Link to Supabase auth user
             email: userData.email,
             full_name: userData.full_name,
             company: userData.company,
@@ -57,7 +57,6 @@ class AuthService {
             role: userData.role,
             avatar_url: undefined,
             specialties: [],
-            is_active: true,
           });
 
         if (profileError) {
@@ -107,7 +106,7 @@ class AuthService {
         const { data: profile, error: profileError } = await supabase
           .from('users')
           .select('*')
-          .eq('id', data.user.id)
+          .eq('auth_user_id', data.user.id)
           .single();
 
         if (profileError) {
@@ -116,7 +115,7 @@ class AuthService {
         }
 
         const user: User = {
-          id: profile.id,
+          id: data.user.id, // Use auth user ID for consistency
           email: profile.email,
           full_name: profile.full_name,
           company: profile.company,
@@ -171,7 +170,7 @@ class AuthService {
       const { data: profile, error } = await supabase
         .from('users')
         .select('*')
-        .eq('id', session.user.id)
+        .eq('auth_user_id', session.user.id)
         .single();
 
       if (error) {
@@ -180,7 +179,7 @@ class AuthService {
       }
 
       return {
-        id: profile.id,
+        id: session.user.id, // Use auth user ID for consistency  
         email: profile.email,
         full_name: profile.full_name,
         company: profile.company,
