@@ -45,25 +45,9 @@ class AuthService {
       }
 
       if (data.user) {
-        // Create user profile in our users table
-        const { error: profileError } = await supabase
-          .from('users')
-          .insert({
-            auth_user_id: data.user.id, // Link to Supabase auth user
-            email: userData.email,
-            full_name: userData.full_name,
-            company: userData.company,
-            phone: userData.phone,
-            role: userData.role,
-            avatar_url: undefined,
-            specialties: [],
-          });
-
-        if (profileError) {
-          console.error('Profile creation error:', profileError);
-          return { success: false, error: 'Failed to create user profile' };
-        }
-
+        // Profile will be created automatically by database trigger
+        // No need for manual profile creation
+        
         const user: User = {
           id: data.user.id,
           email: userData.email,

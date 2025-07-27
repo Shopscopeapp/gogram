@@ -152,7 +152,7 @@ function App() {
     window.location.href = '/auth';
   };
 
-  const handleDemoLogin = (demoUser: User) => {
+  const handleDemoLogin = async (demoUser: User) => {
     console.log('Demo login initiated for user:', demoUser);
     
     // Set demo user and state immediately - no authentication needed
@@ -160,32 +160,53 @@ function App() {
     setIsDemoMode(true);
     setAppState('demo-active');
     
-    // Load demo data directly in the store
-    const mockData = require('./utils/mockData');
-    const { mockProject, mockTasks, mockDeliveries, mockSuppliers, mockTaskChangeProposals } = mockData;
-    
-    // Set all demo data immediately
-    const store = useAppStore.getState();
-    store.setCurrentUser(demoUser);
-    
-    // Use setState to update the store
-    useAppStore.setState({
-      currentProject: mockProject,
-      tasks: mockTasks,
-      deliveries: mockDeliveries, 
-      suppliers: mockSuppliers,
-      taskChangeProposals: mockTaskChangeProposals || [],
-      qaAlerts: [],
-    });
-    
-    // Generate QA alerts
-    setTimeout(() => {
-      const qaService = require('./services/qaService').default;
-      const qaAlerts = qaService.generateQAAlerts(mockProject.id);
-      useAppStore.setState({ qaAlerts });
-    }, 100);
-    
-    console.log('Demo mode activated with mock data');
+    try {
+      // Load demo data using dynamic imports (browser-compatible)
+      const mockData = await import('./utils/mockData');
+      const { mockProject, mockTasks, mockDeliveries, mockSuppliers, mockTaskChangeProposals } = mockData;
+      
+      console.log('Mock data loaded:', { mockProject: !!mockProject, mockTasks: !!mockTasks });
+      
+      // Set all demo data immediately using proper Zustand setState
+      const store = useAppStore.getState();
+      store.setCurrentUser(demoUser);
+      
+      useAppStore.setState({
+        currentProject: mockProject,
+        tasks: mockTasks,
+        deliveries: mockDeliveries, 
+        suppliers: mockSuppliers,
+        taskChangeProposals: mockTaskChangeProposals || [],
+        qaAlerts: [],
+      });
+      
+      console.log('Demo data set in store');
+      
+      // Generate QA alerts using dynamic import
+      setTimeout(async () => {
+        try {
+          const qaModule = await import('./services/qaService');
+          const qaAlerts = qaModule.default.generateQAAlerts(mockProject.id);
+          useAppStore.setState({ qaAlerts });
+          console.log('QA alerts generated:', qaAlerts.length);
+        } catch (error) {
+          console.error('Failed to generate QA alerts:', error);
+        }
+      }, 100);
+      
+      console.log('Demo mode activated with mock data');
+    } catch (error) {
+      console.error('Failed to load demo data:', error);
+      // Fallback to ensure user doesn't get stuck
+      useAppStore.setState({
+        currentProject: null,
+        tasks: [],
+        deliveries: [], 
+        suppliers: [],
+        taskChangeProposals: [],
+        qaAlerts: [],
+      });
+    }
   };
 
   const handleForgotPassword = () => {
