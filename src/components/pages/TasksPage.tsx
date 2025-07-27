@@ -9,15 +9,398 @@ import {
   Clock,
   User,
   AlertTriangle,
-  MoreHorizontal
+  MoreHorizontal,
+  X
 } from 'lucide-react';
 import { useAppStore } from '../../store';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
+import toast from 'react-hot-toast';
+import type { Task } from '../../types';
+
+interface AddTaskModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onAddTask: (taskData: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => void;
+}
+
+function AddTaskModal({ isOpen, onClose, onAddTask }: AddTaskModalProps) {
+  const { currentProject, currentUser, suppliers, users } = useAppStore();
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    category: 'General',
+    priority: 'medium' as const,
+    status: 'pending' as const,
+    start_date: format(new Date(), 'yyyy-MM-dd'),
+    planned_duration: 1,
+    color: '#3b82f6',
+    assigned_to: currentUser?.id || '',
+    dependencies: [] as string[],
+    // Supplier/Procurement fields
+    primary_supplier_id: '',
+    requires_materials: false,
+    material_delivery_date: '',
+    procurement_notes: ''
+  });
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        title: '',
+        description: '',
+        category: 'General',
+        priority: 'medium',
+        status: 'pending',
+        start_date: format(new Date(), 'yyyy-MM-dd'),
+        planned_duration: 1,
+        color: '#3b82f6',
+        assigned_to: currentUser?.id || '',
+        dependencies: [],
+        // Supplier/Procurement fields
+        primary_supplier_id: '',
+        requires_materials: false,
+        material_delivery_date: '',
+        procurement_notes: ''
+      });
+    }
+  }, [isOpen, currentUser]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const startDate = new Date(formData.start_date);
+    const endDate = addDays(startDate, formData.planned_duration - 1);
+    
+    const taskData: Omit<Task, 'id' | 'created_at' | 'updated_at'> = {
+      project_id: currentProject?.id || '',
+      title: formData.title,
+      description: formData.description,
+      category: formData.category,
+      location: '',
+      status: formData.status,
+      priority: formData.priority,
+      assigned_to: formData.assigned_to,
+      start_date: startDate,
+      end_date: endDate,
+      planned_duration: formData.planned_duration,
+      progress_percentage: 0,
+      color: formData.color,
+      dependencies: formData.dependencies,
+      // Supplier/Procurement fields
+      primary_supplier_id: formData.primary_supplier_id || undefined,
+      requires_materials: formData.requires_materials,
+      material_delivery_date: formData.material_delivery_date ? new Date(formData.material_delivery_date) : undefined,
+      procurement_notes: formData.procurement_notes || undefined,
+      created_by: currentUser?.id || ''
+    };
+
+    onAddTask(taskData);
+    onClose();
+    toast.success('Task added successfully!');
+  };
+
+  const categoryOptions = [
+    'General',
+    'Site Work',
+    'Foundation',
+    'Structural',
+    'Concrete',
+    'Masonry',
+    'Steel',
+    'Roofing',
+    'Electrical',
+    'Plumbing',
+    'HVAC',
+    'Insulation',
+    'Drywall',
+    'Flooring',
+    'Paint',
+    'Landscaping'
+  ];
+
+  const colorOptions = [
+    { name: 'Blue', value: '#3b82f6' },
+    { name: 'Green', value: '#10b981' },
+    { name: 'Yellow', value: '#f59e0b' },
+    { name: 'Red', value: '#ef4444' },
+    { name: 'Purple', value: '#8b5cf6' },
+    { name: 'Pink', value: '#ec4899' },
+    { name: 'Indigo', value: '#6366f1' },
+    { name: 'Gray', value: '#6b7280' }
+  ];
+
+  return (
+    <motion.div
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+      >
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center">
+                <Plus className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">Add New Task</h2>
+                <p className="text-sm text-gray-600">Create a new task for your construction project</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5 text-gray-400" />
+            </button>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Basic Information */}
+          <div className="space-y-4">
+            <h3 className="font-medium text-gray-900 flex items-center">
+              <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+              Basic Information
+            </h3>
+
+            <div>
+              <label className="label">Task Title *</label>
+              <input
+                type="text"
+                required
+                className="input"
+                placeholder="Enter task title..."
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="label">Description</label>
+              <textarea
+                className="input"
+                rows={3}
+                placeholder="Task description..."
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="label">Category</label>
+                <select
+                  className="input"
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                >
+                  {categoryOptions.map(category => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="label">Assigned To</label>
+                <select
+                  className="input"
+                  value={formData.assigned_to}
+                  onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
+                >
+                  <option value="">Unassigned</option>
+                  {users.map(user => (
+                    <option key={user.id} value={user.id}>
+                      {user.full_name} ({user.role})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="label">Status</label>
+                <select
+                  className="input"
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                >
+                  <option value="pending">Pending</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="completed">Completed</option>
+                  <option value="delayed">Delayed</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="label">Priority</label>
+                <select
+                  className="input"
+                  value={formData.priority}
+                  onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })}
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="label">Start Date *</label>
+                <input
+                  type="date"
+                  required
+                  className="input"
+                  value={formData.start_date}
+                  onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="label">Duration (days) *</label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  max="365"
+                  className="input"
+                  value={formData.planned_duration}
+                  onChange={(e) => setFormData({ ...formData, planned_duration: parseInt(e.target.value) || 1 })}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="label">Task Color</label>
+              <div className="grid grid-cols-4 gap-2 mt-2">
+                {colorOptions.map(color => (
+                  <button
+                    key={color.value}
+                    type="button"
+                    className={`p-3 rounded-lg border-2 transition-all ${
+                      formData.color === color.value
+                        ? 'border-gray-900 scale-105'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    style={{ backgroundColor: color.value }}
+                    onClick={() => setFormData({ ...formData, color: color.value })}
+                    title={color.name}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Supplier/Procurement Section */}
+          <div className="border-t border-gray-200 pt-4">
+            <h4 className="font-medium text-gray-900 mb-3 flex items-center">
+              <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+              Material & Supplier Management
+            </h4>
+            
+            <div className="space-y-4">
+              {/* Requires Materials Toggle */}
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="requires_materials"
+                  className="mr-3 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  checked={formData.requires_materials}
+                  onChange={(e) => setFormData({ ...formData, requires_materials: e.target.checked })}
+                />
+                <label htmlFor="requires_materials" className="text-sm font-medium text-gray-700">
+                  This task requires material deliveries
+                </label>
+              </div>
+
+              {/* Supplier Selection - Only show if materials required */}
+              {formData.requires_materials && (
+                <>
+                  <div>
+                    <label className="label">Primary Supplier</label>
+                    <select
+                      className="input"
+                      value={formData.primary_supplier_id}
+                      onChange={(e) => setFormData({ ...formData, primary_supplier_id: e.target.value })}
+                    >
+                      <option value="">Select a supplier...</option>
+                      {suppliers.map(supplier => (
+                        <option key={supplier.id} value={supplier.id}>
+                          {supplier.name} {supplier.company ? `(${supplier.company})` : ''} 
+                          {supplier.specialties.length > 0 ? ` - ${supplier.specialties.slice(0, 2).join(', ')}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="label">Material Delivery Date</label>
+                    <input
+                      type="date"
+                      className="input"
+                      value={formData.material_delivery_date}
+                      onChange={(e) => setFormData({ ...formData, material_delivery_date: e.target.value })}
+                      min={formData.start_date}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Leave empty to auto-calculate based on task start date
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="label">Procurement Notes</label>
+                    <textarea
+                      className="input"
+                      rows={3}
+                      placeholder="Material specifications, delivery requirements, special instructions..."
+                      value={formData.procurement_notes}
+                      onChange={(e) => setFormData({ ...formData, procurement_notes: e.target.value })}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn btn-outline"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Task
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </motion.div>
+  );
+}
 
 export default function TasksPage() {
-  const { tasks, currentUser, updateTask, suppliers } = useAppStore();
+  const { tasks, currentUser, updateTask, suppliers, addTask } = useAppStore();
   const [filter, setFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const filteredTasks = tasks.filter(task => {
     const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -72,7 +455,10 @@ export default function TasksPage() {
             <Filter className="w-4 h-4 mr-2" />
             Filter
           </button>
-          <button className="btn btn-primary btn-md">
+          <button 
+            onClick={() => setShowAddModal(true)}
+            className="btn btn-primary btn-md"
+          >
             <Plus className="w-4 h-4 mr-2" />
             Add Task
           </button>
@@ -280,6 +666,21 @@ export default function TasksPage() {
           </div>
         </div>
       )}
+
+      {/* Add Task Modal */}
+      <AddTaskModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onAddTask={(taskData) => {
+          const newTask = {
+            id: `task_${Date.now()}`,
+            ...taskData,
+            created_at: new Date(),
+            updated_at: new Date()
+          };
+          addTask(newTask);
+        }}
+      />
     </div>
   );
 } 
