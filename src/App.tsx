@@ -20,6 +20,7 @@ import SuppliersPage from './components/pages/SuppliersPage';
 import ReportsPage from './components/pages/ReportsPage';
 import SharePage from './components/pages/SharePage';
 import SupplierConfirmationPage from './components/pages/SupplierConfirmationPage';
+import PublicProjectPage from './components/pages/PublicProjectPage';
 
 // Import the complete Team Management page
 import TeamPage from './components/pages/TeamPage';
@@ -85,6 +86,7 @@ function App() {
       <Routes>
         {/* Public routes (no authentication required) */}
         <Route path="/confirm-delivery/:deliveryId" element={<SupplierConfirmationPage />} />
+        <Route path="/public/project/:shareToken" element={<PublicProjectPage />} />
         
         {/* Main application routes */}
         <Route path="/*" element={

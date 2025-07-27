@@ -316,8 +316,22 @@ function GanttRow({ task, startDate, dayWidth, onTaskMove, onTaskClick }: GanttR
   );
 }
 
-export default function GanttChart() {
-  const { tasks, moveTask, updateTask } = useAppStore();
+interface GanttChartProps {
+  tasks?: Task[];
+  onTaskMove?: (taskId: string, newStartDate: Date, newEndDate: Date) => void;
+  readOnly?: boolean;
+}
+
+export default function GanttChart({ 
+  tasks: propTasks, 
+  onTaskMove: propOnTaskMove, 
+  readOnly = false 
+}: GanttChartProps = {}) {
+  const { tasks: storeTasks, moveTask: storeMoveTask, updateTask } = useAppStore();
+  
+  // Use props if provided, otherwise use store
+  const tasks = propTasks || storeTasks;
+  const moveTask = propOnTaskMove || storeMoveTask;
   const [viewStartDate, setViewStartDate] = useState(startOfWeek(new Date()));
   const [zoomLevel, setZoomLevel] = useState(40); // pixels per day
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
@@ -343,6 +357,8 @@ export default function GanttChart() {
   );
 
   const handleDragEnd = (event: DragEndEvent) => {
+    if (readOnly) return; // No drag and drop in read-only mode
+    
     const { active, delta } = event;
     
     if (!delta) return;
@@ -376,11 +392,13 @@ export default function GanttChart() {
   };
 
   const handleTaskClick = (task: Task) => {
+    if (readOnly) return; // No interaction in read-only mode
     setSelectedTask(task);
     setShowTaskModal(true);
   };
 
   const handleTaskSave = (taskId: string, updates: Partial<Task>) => {
+    if (readOnly) return; // No editing in read-only mode
     updateTask(taskId, updates);
   };
 
