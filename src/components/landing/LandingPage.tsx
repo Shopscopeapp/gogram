@@ -198,38 +198,37 @@ export default function LandingPage({ onGetStarted, onStartDemo, onCreateAccount
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <button
-                  onClick={onStartDemo}
+                  onClick={onCreateAccount}
                   className="btn btn-white btn-lg flex items-center justify-center space-x-2 hover:bg-gray-50"
                 >
-                  <Play className="w-5 h-5" />
-                  <span>Try Interactive Demo</span>
+                  <span>Get Started Free</span>
                   <ArrowRight className="w-5 h-5" />
                 </button>
                 <button 
-                  onClick={onCreateAccount}
+                  onClick={onStartDemo}
                   className="btn btn-outline btn-lg border-white text-white hover:bg-white hover:text-primary-600 flex items-center justify-center space-x-2"
                 >
-                  <span>Create Free Account</span>
-                  <ArrowRight className="w-5 h-5" />
+                  <Play className="w-5 h-5" />
+                  <span>Try Demo First</span>
                 </button>
               </div>
               
               {/* Demo vs Real Account Benefits */}
               <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                 <div className="bg-white bg-opacity-10 rounded-lg p-4">
-                  <h4 className="font-semibold text-white mb-2">🎮 Interactive Demo</h4>
+                  <h4 className="font-semibold text-white mb-2">🚀 Get Started</h4>
                   <ul className="text-primary-100 space-y-1">
-                    <li>• Explore all features instantly</li>
-                    <li>• No signup required</li>
-                    <li>• Pre-loaded construction project</li>
+                    <li>• Create your free account</li>
+                    <li>• Manage real construction projects</li>
+                    <li>• Invite your team members</li>
                   </ul>
                 </div>
                 <div className="bg-white bg-opacity-10 rounded-lg p-4">
-                  <h4 className="font-semibold text-white mb-2">🏗️ Real Account</h4>
+                  <h4 className="font-semibold text-white mb-2">🎮 Try Demo</h4>
                   <ul className="text-primary-100 space-y-1">
-                    <li>• Manage your actual projects</li>
-                    <li>• Invite team members</li>
-                    <li>• Persistent data & collaboration</li>
+                    <li>• Explore features instantly</li>
+                    <li>• No signup required</li>
+                    <li>• Pre-loaded construction project</li>
                   </ul>
                 </div>
               </div>
@@ -455,23 +454,22 @@ export default function LandingPage({ onGetStarted, onStartDemo, onCreateAccount
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
-                onClick={onStartDemo}
+                onClick={onCreateAccount}
                 className="btn btn-white btn-lg flex items-center justify-center space-x-2 hover:bg-gray-50"
               >
-                <Play className="w-5 h-5" />
-                <span>Try Demo Now</span>
+                <span>Get Started Free</span>
                 <ArrowRight className="w-5 h-5" />
               </button>
               <button 
-                onClick={onCreateAccount}
+                onClick={onStartDemo}
                 className="btn btn-outline btn-lg border-white text-white hover:bg-white hover:text-primary-600 flex items-center justify-center space-x-2"
               >
-                <span>Create Account</span>
-                <ArrowRight className="w-5 h-5" />
+                <Play className="w-5 h-5" />
+                <span>Try Demo</span>
               </button>
             </div>
             <p className="text-primary-200 mt-6">
-              Demo: Instant access • Account: Full team collaboration • Both completely free
+              Start managing your construction projects today • Demo available for instant preview
             </p>
           </motion.div>
         </div>

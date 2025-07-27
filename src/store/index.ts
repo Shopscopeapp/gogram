@@ -597,11 +597,22 @@ export const useAppStore = create<AppStore>()(
       },
 
       initializeDemoData: () => {
+        console.log('Starting demo data initialization...');
+        
         // Load mock data for demo mode using ES6 imports
         import('../utils/mockData').then((mockData) => {
+          console.log('Mock data imported:', mockData);
+          
           const { mockProject, mockTasks, mockDeliveries, mockSuppliers, mockTaskChangeProposals } = mockData;
           
-          // Set the demo project
+          if (!mockProject || !mockTasks || !mockDeliveries || !mockSuppliers) {
+            console.error('Missing required mock data exports');
+            return;
+          }
+          
+          console.log('Setting demo project and data...');
+          
+          // Set the demo project first
           set({ currentProject: mockProject });
           
           // Load all mock data
@@ -609,24 +620,43 @@ export const useAppStore = create<AppStore>()(
             tasks: mockTasks,
             deliveries: mockDeliveries, 
             suppliers: mockSuppliers,
-            taskChangeProposals: mockTaskChangeProposals,
+            taskChangeProposals: mockTaskChangeProposals || [],
             qaAlerts: [], // Start with empty QA alerts, they'll be generated
           });
+
+          console.log('Demo data set successfully, generating QA alerts...');
 
           // Generate QA alerts for demo
           setTimeout(() => {
             import('../services/qaService').then((qaModule) => {
+              console.log('QA service imported:', qaModule);
               const qaAlerts = qaModule.default.generateQAAlerts(mockProject.id);
+              console.log('Generated QA alerts:', qaAlerts);
               set({ qaAlerts });
+              
+              // Update dashboard stats after everything is loaded
+              console.log('Updating dashboard stats...');
+              get().updateDashboardStats();
+              
+              console.log('Demo data initialization complete!');
+            }).catch((error) => {
+              console.error('Failed to load QA service:', error);
+              // Continue without QA alerts
+              get().updateDashboardStats();
             });
           }, 100);
-
-          // Update dashboard stats
-          get().updateDashboardStats();
           
-          console.log('Demo data loaded successfully');
         }).catch((error) => {
           console.error('Failed to load demo data:', error);
+          // Set fallback empty state so app doesn't get stuck
+          set({
+            currentProject: null,
+            tasks: [],
+            deliveries: [], 
+            suppliers: [],
+            taskChangeProposals: [],
+            qaAlerts: [],
+          });
         });
       },
 

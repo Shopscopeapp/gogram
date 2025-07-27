@@ -148,13 +148,22 @@ function App() {
   const handleCreateAccount = () => {
     setAuthMode('signup');
     setAppState('unauthenticated');
+    // Force navigation to auth route
+    window.location.href = '/auth';
   };
 
   const handleDemoLogin = (demoUser: User) => {
+    console.log('Demo login initiated for user:', demoUser);
     setCurrentUser(demoUser);
     setIsDemoMode(true);
+    
+    // Initialize demo data immediately
+    console.log('Initializing demo data...');
     initializeDemoData();
+    
+    // Set app state to active demo mode
     setAppState('demo-active');
+    console.log('Demo mode activated');
   };
 
   const handleForgotPassword = () => {
