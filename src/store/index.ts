@@ -597,32 +597,37 @@ export const useAppStore = create<AppStore>()(
       },
 
       initializeDemoData: () => {
-        // Load mock data for demo mode
-        const { mockProject, mockTasks, mockDeliveries, mockSuppliers, mockTaskChangeProposals } = require('../utils/mockData');
-        
-        // Set the demo project
-        set({ currentProject: mockProject });
-        
-        // Load all mock data
-        set({
-          tasks: mockTasks,
-          deliveries: mockDeliveries, 
-          suppliers: mockSuppliers,
-          taskChangeProposals: mockTaskChangeProposals,
-          qaAlerts: [], // Start with empty QA alerts, they'll be generated
+        // Load mock data for demo mode using ES6 imports
+        import('../utils/mockData').then((mockData) => {
+          const { mockProject, mockTasks, mockDeliveries, mockSuppliers, mockTaskChangeProposals } = mockData;
+          
+          // Set the demo project
+          set({ currentProject: mockProject });
+          
+          // Load all mock data
+          set({
+            tasks: mockTasks,
+            deliveries: mockDeliveries, 
+            suppliers: mockSuppliers,
+            taskChangeProposals: mockTaskChangeProposals,
+            qaAlerts: [], // Start with empty QA alerts, they'll be generated
+          });
+
+          // Generate QA alerts for demo
+          setTimeout(() => {
+            import('../services/qaService').then((qaModule) => {
+              const qaAlerts = qaModule.default.generateQAAlerts(mockProject.id);
+              set({ qaAlerts });
+            });
+          }, 100);
+
+          // Update dashboard stats
+          get().updateDashboardStats();
+          
+          console.log('Demo data loaded successfully');
+        }).catch((error) => {
+          console.error('Failed to load demo data:', error);
         });
-
-        // Generate QA alerts for demo
-        setTimeout(() => {
-          const qaService = require('../services/qaService').default;
-          const qaAlerts = qaService.generateQAAlerts(mockProject.id);
-          set({ qaAlerts });
-        }, 100);
-
-        // Update dashboard stats
-        get().updateDashboardStats();
-        
-        console.log('Demo data loaded successfully');
       },
 
       // Real task management methods
