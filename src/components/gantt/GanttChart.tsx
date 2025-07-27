@@ -35,6 +35,107 @@ import { useAppStore } from '../../store';
 import { format, addDays, startOfWeek, endOfWeek, differenceInDays, isSameDay, isToday, isWeekend } from 'date-fns';
 import type { Task } from '../../types';
 
+// Dependency line component
+interface DependencyLinesProps {
+  tasks: Task[];
+  taskRows: { [taskId: string]: number };
+  dayWidth: number;
+  startDate: Date;
+  rowHeight: number;
+}
+
+function DependencyLines({ tasks, taskRows, dayWidth, startDate, rowHeight }: DependencyLinesProps) {
+  const lines = useMemo(() => {
+    const dependencyLines: Array<{
+      id: string;
+      x1: number;
+      y1: number;
+      x2: number;
+      y2: number;
+      path: string;
+    }> = [];
+
+    tasks.forEach((task) => {
+      if (task.dependencies && task.dependencies.length > 0) {
+        task.dependencies.forEach((depId) => {
+          const dependentTask = tasks.find(t => t.id === depId);
+          if (!dependentTask) return;
+
+          const dependentRow = taskRows[depId];
+          const currentRow = taskRows[task.id];
+          
+          if (dependentRow === undefined || currentRow === undefined) return;
+
+          // Calculate positions
+          const depEndDays = differenceInDays(dependentTask.end_date, startDate);
+          const taskStartDays = differenceInDays(task.start_date, startDate);
+          
+          const x1 = Math.max(0, depEndDays * dayWidth + dayWidth); // End of dependency task
+          const y1 = dependentRow * rowHeight + rowHeight / 2 + 40; // Middle of dependency task row (40px offset for header)
+          const x2 = Math.max(0, taskStartDays * dayWidth); // Start of current task
+          const y2 = currentRow * rowHeight + rowHeight / 2 + 40; // Middle of current task row
+
+          // Create curved path for better visualization
+          const midX = x1 + (x2 - x1) * 0.5;
+          const curveOffset = Math.abs(y2 - y1) * 0.3;
+          const path = `M ${x1} ${y1} Q ${x1 + curveOffset} ${y1} ${midX} ${y1 + (y2 - y1) * 0.5} Q ${x2 - curveOffset} ${y2} ${x2} ${y2}`;
+
+          dependencyLines.push({
+            id: `${depId}-${task.id}`,
+            x1,
+            y1,
+            x2,
+            y2,
+            path
+          });
+        });
+      }
+    });
+
+    return dependencyLines;
+  }, [tasks, taskRows, dayWidth, startDate, rowHeight]);
+
+  if (lines.length === 0) return null;
+
+  return (
+    <svg
+      className="absolute inset-0 pointer-events-none"
+      style={{ zIndex: 1 }}
+    >
+      <defs>
+        <marker
+          id="arrowhead"
+          markerWidth="8"
+          markerHeight="6"
+          refX="7"
+          refY="3"
+          orient="auto"
+          markerUnits="strokeWidth"
+        >
+          <polygon
+            points="0 0, 8 3, 0 6"
+            fill="#6366f1"
+          />
+        </marker>
+      </defs>
+      {lines.map((line) => (
+        <g key={line.id}>
+          <path
+            d={line.path}
+            stroke="#6366f1"
+            strokeWidth="2"
+            fill="none"
+            strokeDasharray="5,3"
+            markerEnd="url(#arrowhead)"
+            opacity="0.8"
+            className="hover:opacity-100 transition-opacity"
+          />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 interface TaskEditModalProps {
   task: Task | null;
   isOpen: boolean;
@@ -182,7 +283,7 @@ function GanttTask({ task, startDate, dayWidth, onTaskMove, onTaskClick }: Gantt
   const taskStartDays = differenceInDays(task.start_date, startDate);
   const taskDuration = differenceInDays(task.end_date, task.start_date) + 1;
   const taskX = Math.max(0, taskStartDays * dayWidth);
-  const taskWidth = taskDuration * dayWidth;
+  const taskWidth = Math.max(dayWidth * 0.5, taskDuration * dayWidth); // Minimum width for visibility
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -213,7 +314,7 @@ function GanttTask({ task, startDate, dayWidth, onTaskMove, onTaskClick }: Gantt
     <div
       ref={setNodeRef}
       style={{ ...style, left: taskX, width: taskWidth }}
-      className={`absolute h-8 rounded-md shadow-sm cursor-pointer group hover:shadow-md transition-all ${getStatusColor(task.status)} ${getPriorityBorder(task.priority)}`}
+      className={`absolute h-8 rounded-lg shadow-sm cursor-pointer group hover:shadow-lg transition-all duration-200 ${getStatusColor(task.status)} ${getPriorityBorder(task.priority)} hover:scale-105 hover:z-10`}
       {...attributes}
       {...listeners}
       onClick={(e) => {
@@ -221,26 +322,50 @@ function GanttTask({ task, startDate, dayWidth, onTaskMove, onTaskClick }: Gantt
         onTaskClick(task);
       }}
     >
-      <div className="h-full flex items-center justify-between px-2 text-white text-xs font-medium">
+      {/* Progress bar inside task */}
+      <div 
+        className="absolute top-0 left-0 h-full bg-white bg-opacity-20 rounded-lg transition-all duration-300"
+        style={{ width: `${task.progress_percentage}%` }}
+      />
+      
+      <div className="h-full flex items-center justify-between px-3 text-white text-xs font-medium relative z-10">
         <div className="flex items-center space-x-1 min-w-0">
           {task.dependencies.length > 0 && (
-            <Link className="w-3 h-3 flex-shrink-0" />
+            <Link className="w-3 h-3 flex-shrink-0 opacity-75" />
           )}
-          <span className="truncate">{task.title}</span>
+          <span className="truncate font-semibold">{task.title}</span>
         </div>
-        <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center space-x-1 opacity-75 group-hover:opacity-100 transition-opacity">
+          <span className="text-xs hidden sm:inline">{task.progress_percentage}%</span>
           <Edit3 className="w-3 h-3" />
-          <Move className="w-3 h-3" />
         </div>
       </div>
       
-      {/* Task tooltip */}
-      <div className="absolute top-full left-0 mt-1 bg-gray-900 text-white text-xs rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap">
-        <div><strong>{task.title}</strong></div>
-        <div>Duration: {taskDuration} days</div>
-        <div>Status: {task.status}</div>
-        <div>Priority: {task.priority}</div>
-        {task.description && <div className="mt-1 max-w-xs">{task.description}</div>}
+      {/* Enhanced Task tooltip */}
+      <div className="absolute top-full left-0 mt-2 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-20 shadow-xl min-w-max">
+        <div className="font-semibold text-sm mb-1">{task.title}</div>
+        <div className="space-y-1 text-gray-300">
+          <div>📅 {format(task.start_date, 'MMM dd')} - {format(task.end_date, 'MMM dd')}</div>
+          <div>⏱️ Duration: {taskDuration} days</div>
+          <div>📊 Progress: {task.progress_percentage}%</div>
+          <div>🎯 Status: <span className="capitalize">{task.status.replace('_', ' ')}</span></div>
+          <div>⚡ Priority: <span className="capitalize">{task.priority}</span></div>
+          <div>🏗️ Category: {task.category}</div>
+          {task.dependencies.length > 0 && (
+            <div>🔗 Dependencies: {task.dependencies.length}</div>
+          )}
+          {task.primary_supplier_id && (
+            <div>🚚 Has supplier assigned</div>
+          )}
+          {task.requires_materials && (
+            <div>📦 Requires materials</div>
+          )}
+        </div>
+        {task.description && (
+          <div className="mt-2 pt-2 border-t border-gray-700 text-gray-300 max-w-xs">
+            {task.description}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -356,6 +481,15 @@ export default function GanttChart({
     [tasks]
   );
 
+  // Create task row mapping for dependency lines
+  const taskRows = useMemo(() => {
+    const rows: { [taskId: string]: number } = {};
+    sortedTasks.forEach((task, index) => {
+      rows[task.id] = index;
+    });
+    return rows;
+  }, [sortedTasks]);
+
   const handleDragEnd = (event: DragEndEvent) => {
     if (readOnly) return; // No drag and drop in read-only mode
     
@@ -368,11 +502,19 @@ export default function GanttChart({
 
     // Calculate new dates based on drag distance
     const daysMoved = Math.round(delta.x / zoomLevel);
+    if (daysMoved === 0) return; // No actual movement
+
     const newStartDate = addDays(task.start_date, daysMoved);
     const newEndDate = addDays(task.end_date, daysMoved);
 
     // Update task and dependencies
     moveTask(task.id, newStartDate, newEndDate);
+    
+    // Force immediate visual update
+    setTimeout(() => {
+      // Trigger a re-render by updating the component state
+      setViewStartDate(prev => prev);
+    }, 10);
   };
 
   const handleTimelineNavigation = (direction: 'prev' | 'next') => {
@@ -535,6 +677,15 @@ export default function GanttChart({
                     </div>
                   </div>
                 </div>
+
+                {/* Dependency Lines */}
+                <DependencyLines
+                  tasks={sortedTasks}
+                  taskRows={taskRows}
+                  dayWidth={zoomLevel}
+                  startDate={viewStartDate}
+                  rowHeight={48}
+                />
 
                 {/* Task Rows */}
                 {sortedTasks.map((task) => (

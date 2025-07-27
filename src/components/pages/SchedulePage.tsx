@@ -574,6 +574,17 @@ export default function SchedulePage() {
         </div>
       </div>
 
+      {/* Quick Add Task Button */}
+      <div className="fixed bottom-8 right-8 z-40">
+        <button
+          onClick={() => setShowAddTaskModal(true)}
+          className="bg-primary-600 hover:bg-primary-700 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 group"
+          title="Quick Add Task"
+        >
+          <Plus className="w-6 h-6 group-hover:scale-110 transition-transform" />
+        </button>
+      </div>
+
       {/* Add Task Modal */}
       <AddTaskModal
         isOpen={showAddTaskModal}
