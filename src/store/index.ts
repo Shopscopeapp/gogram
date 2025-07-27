@@ -4,6 +4,8 @@ import toast from 'react-hot-toast';
 import { addDays, format } from 'date-fns';
 import procurementService from '../services/procurementService';
 import qaService from '../services/qaService';
+import taskService from '../services/taskService';
+import supplierService from '../services/supplierService';
 import { SupabaseService } from '../lib/supabase';
 import type { 
   User, 
@@ -216,223 +218,6 @@ export const useAppStore = create<AppStore>()(
       })),
 
       // Task Actions
-      addTask: (task) => {
-        const { currentProject, users, suppliers } = get();
-        
-        set((state) => ({ 
-          tasks: [...state.tasks, task] 
-        }));
-
-        // Auto-create delivery if task has supplier and requires materials
-        if (task.requires_materials && task.primary_supplier_id) {
-          const supplier = suppliers.find(s => s.id === task.primary_supplier_id);
-          if (supplier) {
-            const deliveryDate = task.material_delivery_date || addDays(task.start_date, -2); // Default 2 days before task start
-            
-            const delivery = {
-              id: `delivery_${task.id}_${Date.now()}`,
-              project_id: task.project_id,
-              task_id: task.id,
-              supplier_id: task.primary_supplier_id,
-              item: `Materials for ${task.title}`,
-              quantity: 1,
-              unit: 'lot',
-              planned_date: deliveryDate,
-              confirmation_status: 'pending' as const,
-              delivery_address: currentProject?.location || '',
-              notes: task.procurement_notes || '',
-              created_at: new Date(),
-              updated_at: new Date()
-            };
-
-            set((state) => ({
-              deliveries: [...state.deliveries, delivery]
-            }));
-
-            toast.success(`📦 Delivery scheduled with ${supplier.name} for ${format(deliveryDate, 'MMM dd')}`, {
-              duration: 5000,
-              style: {
-                background: '#10b981',
-                color: 'white'
-              }
-            });
-          }
-        }
-        
-        // Check if this task category requires QA
-        if (qaService.requiresQA(task.category)) {
-          // Show info about QA requirements
-          const requirements = qaService.getQARequirements(task.category);
-          toast(`📋 QA Required: ${task.category} work requires quality checks: ${requirements.slice(0,2).join(', ')}${requirements.length > 2 ? '...' : ''}`, {
-            duration: 6000,
-            style: {
-              background: '#3b82f6',
-              color: 'white'
-            }
-          });
-        }
-
-        // Show supplier integration success
-        if (task.primary_supplier_id) {
-          const supplier = suppliers.find(s => s.id === task.primary_supplier_id);
-          if (supplier) {
-            toast(`🤝 Task linked to ${supplier.name} for procurement automation`, {
-              duration: 4000,
-              style: {
-                background: '#8b5cf6',
-                color: 'white'
-              }
-            });
-          }
-        }
-        
-        // Generate scheduled QA alerts for new task  
-        setTimeout(() => get().generateQAAlerts(), 100);
-      },
-      
-      updateTask: (id, updates) => {
-        const { tasks, currentProject } = get();
-        const previousTask = tasks.find(t => t.id === id);
-        
-        // Update the task
-        set((state) => ({
-          tasks: state.tasks.map(task => 
-            task.id === id ? { ...task, ...updates, updatedAt: new Date() } : task
-          )
-        }));
-
-        // Auto-trigger QA checks if status changed or progress updated
-        if (previousTask && (updates.status || updates.progress_percentage)) {
-          const updatedTask = { ...previousTask, ...updates };
-          const newQAAlerts = qaService.autoTriggerQAChecks(
-            updatedTask, 
-            previousTask.status,
-            currentProject?.id || ''
-          );
-
-          if (newQAAlerts.length > 0) {
-            set((state) => ({
-              qaAlerts: [...state.qaAlerts, ...newQAAlerts]
-            }));
-
-            // Show notification for critical QA alerts
-            newQAAlerts.forEach(alert => {
-              if (alert.priority === 'critical') {
-                toast.error(`🚨 CRITICAL QA ALERT: ${alert.title}`, {
-                  duration: 8000,
-                  style: {
-                    background: '#dc2626',
-                    color: 'white',
-                    fontWeight: 'bold'
-                  }
-                });
-              } else if (alert.priority === 'high') {
-                toast(`⚠️ QA Alert: ${alert.title}`, {
-                  duration: 5000,
-                  style: {
-                    background: '#f59e0b',
-                    color: 'white'
-                  }
-                });
-              }
-            });
-          }
-        }
-
-        // Regenerate scheduled QA alerts if task dates changed
-        if (updates.start_date || updates.end_date) {
-          setTimeout(() => get().generateQAAlerts(), 100);
-        }
-
-        // Update dashboard stats
-        get().updateDashboardStats();
-      },
-      
-      removeTask: (id) => set((state) => ({
-        tasks: state.tasks.filter(task => task.id !== id),
-        qaAlerts: state.qaAlerts.filter(alert => alert.task_id !== id)
-      })),
-      
-      moveTask: async (id, newStartDate, newEndDate) => {
-        const { tasks, deliveries, suppliers, currentProject } = get();
-        const task = tasks.find(t => t.id === id);
-        if (!task || !currentProject) return;
-
-        // Show loading toast
-        const loadingToast = toast.loading('Updating task schedule...');
-
-        try {
-          // Check if task has linked deliveries
-          const hasLinkedDeliveries = procurementService.hasLinkedDeliveries(id, deliveries);
-          
-          // Update the task first
-          set((state) => ({
-            tasks: state.tasks.map(t => {
-              if (t.id === id) {
-                return { ...t, startDate: newStartDate, endDate: newEndDate, updatedAt: new Date() };
-              }
-              
-              // Update dependent tasks
-              if (t.dependencies.includes(id)) {
-                const timeDiff = newEndDate.getTime() - task.end_date.getTime();
-                const newTaskStart = new Date(t.start_date.getTime() + timeDiff);
-                const newTaskEnd = new Date(t.end_date.getTime() + timeDiff);
-                return { ...t, startDate: newTaskStart, endDate: newTaskEnd, updatedAt: new Date() };
-              }
-              
-              return t;
-            })
-          }));
-
-          // Regenerate QA alerts for task date changes
-          get().generateQAAlerts();
-
-          // Process procurement notifications if needed
-          if (hasLinkedDeliveries) {
-            const result = await procurementService.processTaskDateChange(
-              task,
-              newStartDate,
-              newEndDate,
-              deliveries,
-              suppliers,
-              currentProject.name
-            );
-
-            if (result.notificationsSent > 0) {
-              toast.success(
-                `Task updated! ${result.notificationsSent} supplier notification${result.notificationsSent > 1 ? 's' : ''} sent.`,
-                { id: loadingToast }
-              );
-
-              // Add notification to the system
-              get().addNotification({
-                id: `task-move-${id}-${Date.now()}`,
-                user_id: get().currentUser?.id || '',
-                type: 'task_update',
-                title: 'Task Rescheduled',
-                message: `${task.title} moved to ${newStartDate.toLocaleDateString()}. Suppliers notified.`,
-                data: { taskId: id, notificationsSent: result.notificationsSent },
-                read: false,
-                                  created_at: new Date()
-              });
-            } else {
-              toast.success('Task schedule updated successfully!', { id: loadingToast });
-            }
-
-            if (result.errors.length > 0) {
-              console.warn('Supplier notification errors:', result.errors);
-              toast.error('Some supplier notifications failed. Check console for details.');
-            }
-          } else {
-            toast.success('Task schedule updated successfully!', { id: loadingToast });
-          }
-
-        } catch (error) {
-          console.error('Error updating task:', error);
-          toast.error('Failed to update task schedule', { id: loadingToast });
-        }
-      },
-      
       updateTaskDependencies: (taskId, dependentTaskIds) => set((state) => ({
         tasks: state.tasks.map(task => 
           dependentTaskIds.includes(task.id) 
@@ -761,18 +546,18 @@ export const useAppStore = create<AppStore>()(
           // Fetch all project data in parallel
           const [
             projectData,
-            tasksData,
-            deliveriesData,
+            tasksResult,
+            deliveriesResult,
             taskChangeProposalsData,
             qaAlertsData,
-            suppliersData
+            suppliersResult
           ] = await Promise.all([
             SupabaseService.getProjectWithMembers(projectId),
-            SupabaseService.getProjectTasks(projectId),
-            SupabaseService.getProjectDeliveries(projectId),
+            taskService.getProjectTasks(projectId),
+            supplierService.getProjectDeliveries(projectId),
             SupabaseService.getTaskChangeProposals(projectId),
             SupabaseService.getProjectQAAlerts(projectId),
-            SupabaseService.getSuppliers()
+            supplierService.getSuppliers()
           ]);
 
           // Update store with fetched data
@@ -780,12 +565,12 @@ export const useAppStore = create<AppStore>()(
             set({ currentProject: projectData });
           }
           
-          if (tasksData) {
-            set({ tasks: tasksData });
+          if (tasksResult.success && tasksResult.tasks) {
+            set({ tasks: tasksResult.tasks });
           }
           
-          if (deliveriesData) {
-            set({ deliveries: deliveriesData });
+          if (deliveriesResult.success && deliveriesResult.deliveries) {
+            set({ deliveries: deliveriesResult.deliveries });
           }
           
           if (taskChangeProposalsData) {
@@ -796,17 +581,235 @@ export const useAppStore = create<AppStore>()(
             set({ qaAlerts: qaAlertsData });
           }
           
-          if (suppliersData) {
-            set({ suppliers: suppliersData });
+          if (suppliersResult.success && suppliersResult.suppliers) {
+            set({ suppliers: suppliersResult.suppliers });
           }
 
-          // Update dashboard stats after loading data
+          // Update dashboard stats
           get().updateDashboardStats();
-          
+
           set({ loading: false });
         } catch (error) {
           console.error('Error initializing project data:', error);
-          set({ error: 'Failed to load project data', loading: false });
+          set({ error: 'Failed to initialize project data', loading: false });
+        }
+      },
+
+      // Real task management methods
+      addTask: async (task) => {
+        const { currentUser, currentProject } = get();
+        if (!currentUser || !currentProject) {
+          toast.error('User or project not found');
+          return;
+        }
+
+        try {
+          const result = await taskService.createTask({
+            project_id: currentProject.id,
+            title: task.title,
+            description: task.description,
+            category: task.category,
+            location: task.location,
+            status: task.status,
+            priority: task.priority,
+            assigned_to: task.assigned_to,
+            start_date: task.start_date,
+            end_date: task.end_date,
+            planned_duration: task.planned_duration,
+            color: task.color,
+            dependencies: task.dependencies,
+            notes: task.notes,
+            primary_supplier_id: task.primary_supplier_id,
+            requires_materials: task.requires_materials,
+            material_delivery_date: task.material_delivery_date,
+            procurement_notes: task.procurement_notes,
+          }, currentUser.id);
+
+          if (result.success && result.task) {
+            // Add to local state
+            set(state => ({
+              tasks: [...state.tasks, result.task!]
+            }));
+
+            // Auto-create delivery if materials required
+            if (task.requires_materials && task.primary_supplier_id) {
+              const { suppliers, deliveries } = get();
+              const supplier = suppliers.find(s => s.id === task.primary_supplier_id);
+              
+              const plannedDate = task.material_delivery_date || addDays(task.start_date, -2);
+              
+              const newDelivery = {
+                id: Date.now().toString(),
+                task_id: result.task.id,
+                supplier_id: task.primary_supplier_id,
+                planned_date: plannedDate,
+                confirmation_status: 'pending' as const,
+                notes: task.procurement_notes,
+                created_at: new Date(),
+                updated_at: new Date(),
+              };
+
+              set(state => ({
+                deliveries: [...state.deliveries, newDelivery]
+              }));
+
+              toast.success(`Task created and delivery scheduled for ${format(plannedDate, 'MMM dd, yyyy')}`);
+              if (supplier) {
+                toast.success(`Supplier ${supplier.name} linked to task`);
+              }
+            } else {
+              toast.success('Task created successfully');
+            }
+
+            // Check for QA requirements
+            if (qaService.requiresQA(task.category)) {
+              const requirements = qaService.getQARequirements(task.category);
+              toast(`⚠️ QA Required: ${requirements.join(', ')}`, {
+                duration: 6000,
+                style: { background: '#f59e0b', color: 'white' }
+              });
+            }
+
+            // Trigger QA checks for status changes
+            const newAlerts = await qaService.autoTriggerQAChecks(result.task, currentProject.id);
+            if (newAlerts.length > 0) {
+              set(state => ({
+                qaAlerts: [...state.qaAlerts, ...newAlerts]
+              }));
+
+              // Show toast for critical/high priority alerts
+              newAlerts.forEach(alert => {
+                if (alert.priority === 'critical' || alert.priority === 'high') {
+                  toast.error(`QA Alert: ${alert.type.replace('_', ' ').toUpperCase()}`);
+                }
+              });
+            }
+
+            get().updateDashboardStats();
+          } else {
+            toast.error(result.error || 'Failed to create task');
+          }
+        } catch (error) {
+          console.error('Error creating task:', error);
+          toast.error('Failed to create task');
+        }
+      },
+
+      updateTask: async (taskId, updates) => {
+        const { currentUser, tasks } = get();
+        if (!currentUser) {
+          toast.error('User not found');
+          return;
+        }
+
+        const originalTask = tasks.find(t => t.id === taskId);
+        if (!originalTask) {
+          toast.error('Task not found');
+          return;
+        }
+
+        try {
+          const result = await taskService.updateTask(taskId, updates, currentUser.id);
+
+          if (result.success && result.task) {
+            // Update local state
+            set(state => ({
+              tasks: state.tasks.map(task => 
+                task.id === taskId ? result.task! : task
+              )
+            }));
+
+            // Trigger QA checks for status or progress changes
+            if (updates.status || updates.progress_percentage !== undefined) {
+              const { currentProject, qaAlerts } = get();
+              if (currentProject) {
+                const newAlerts = await qaService.autoTriggerQAChecks(result.task, currentProject.id);
+                if (newAlerts.length > 0) {
+                  set(state => ({
+                    qaAlerts: [...state.qaAlerts, ...newAlerts]
+                  }));
+
+                  // Show toast for critical/high priority alerts
+                  newAlerts.forEach(alert => {
+                    if (alert.priority === 'critical' || alert.priority === 'high') {
+                      toast.error(`QA Alert: ${alert.type.replace('_', ' ').toUpperCase()}`);
+                    }
+                  });
+                }
+              }
+            }
+
+            get().updateDashboardStats();
+            toast.success('Task updated successfully');
+          } else {
+            toast.error(result.error || 'Failed to update task');
+          }
+        } catch (error) {
+          console.error('Error updating task:', error);
+          toast.error('Failed to update task');
+        }
+      },
+
+      moveTask: async (taskId, newStartDate, newEndDate) => {
+        const { currentUser } = get();
+        if (!currentUser) {
+          toast.error('User not found');
+          return;
+        }
+
+        try {
+          const result = await taskService.moveTask(taskId, newStartDate, newEndDate, currentUser.id);
+
+          if (result.success) {
+            // Fetch updated task data
+            const taskResult = await taskService.getTaskById(taskId);
+            if (taskResult.success && taskResult.task) {
+              set(state => ({
+                tasks: state.tasks.map(task => 
+                  task.id === taskId ? taskResult.task! : task
+                )
+              }));
+              
+              toast.success('Task moved successfully');
+              get().updateDashboardStats();
+            }
+          } else {
+            toast.error(result.error || 'Failed to move task');
+          }
+        } catch (error) {
+          console.error('Error moving task:', error);
+          toast.error('Failed to move task');
+        }
+      },
+
+      deleteTask: async (taskId) => {
+        const { currentUser } = get();
+        if (!currentUser) {
+          toast.error('User not found');
+          return;
+        }
+
+        try {
+          const result = await taskService.deleteTask(taskId, currentUser.id);
+
+          if (result.success) {
+            // Remove from local state
+            set(state => ({
+              tasks: state.tasks.filter(task => task.id !== taskId),
+              // Also remove related deliveries
+              deliveries: state.deliveries.filter(delivery => delivery.task_id !== taskId),
+              // Remove related QA alerts
+              qaAlerts: state.qaAlerts.filter(alert => alert.task_id !== taskId),
+            }));
+
+            get().updateDashboardStats();
+            toast.success('Task deleted successfully');
+          } else {
+            toast.error(result.error || 'Failed to delete task');
+          }
+        } catch (error) {
+          console.error('Error deleting task:', error);
+          toast.error('Failed to delete task');
         }
       },
 
@@ -824,7 +827,7 @@ export const useAppStore = create<AppStore>()(
               } else if (eventType === 'UPDATE') {
                 get().updateTask(newRecord.id, newRecord);
               } else if (eventType === 'DELETE') {
-                get().removeTask(oldRecord.id);
+                get().deleteTask(oldRecord.id);
               }
               break;
               
@@ -920,6 +923,67 @@ export const useAppStore = create<AppStore>()(
           console.error('Sign out error:', error);
           set({ error: error.message || 'Failed to sign out', loading: false });
           toast.error(error.message || 'Failed to sign out');
+        }
+      },
+
+      // Real supplier management methods
+      addSupplier: async (supplier) => {
+        try {
+          const result = await supplierService.createSupplier(supplier);
+
+          if (result.success && result.supplier) {
+            set(state => ({
+              suppliers: [...state.suppliers, result.supplier!]
+            }));
+            toast.success('Supplier added successfully');
+          } else {
+            toast.error(result.error || 'Failed to add supplier');
+          }
+        } catch (error) {
+          console.error('Error adding supplier:', error);
+          toast.error('Failed to add supplier');
+        }
+      },
+
+      updateSupplier: async (supplierId, updates) => {
+        try {
+          const result = await supplierService.updateSupplier(supplierId, updates);
+
+          if (result.success && result.supplier) {
+            set(state => ({
+              suppliers: state.suppliers.map(supplier => 
+                supplier.id === supplierId ? result.supplier! : supplier
+              )
+            }));
+            toast.success('Supplier updated successfully');
+          } else {
+            toast.error(result.error || 'Failed to update supplier');
+          }
+        } catch (error) {
+          console.error('Error updating supplier:', error);
+          toast.error('Failed to update supplier');
+        }
+      },
+
+      updateDelivery: async (deliveryId, updates) => {
+        try {
+          const result = await supplierService.updateDelivery(deliveryId, updates);
+
+          if (result.success && result.delivery) {
+            set(state => ({
+              deliveries: state.deliveries.map(delivery => 
+                delivery.id === deliveryId ? result.delivery! : delivery
+              )
+            }));
+            
+            get().updateDashboardStats();
+            toast.success('Delivery updated successfully');
+          } else {
+            toast.error(result.error || 'Failed to update delivery');
+          }
+        } catch (error) {
+          console.error('Error updating delivery:', error);
+          toast.error('Failed to update delivery');
         }
       },
     }),

@@ -199,7 +199,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                   onClick={onGetStarted}
                   className="btn btn-white btn-lg flex items-center justify-center space-x-2 hover:bg-gray-50"
                 >
-                  <span>Start Free Demo</span>
+                  <span>Get Started Free</span>
                   <ArrowRight className="w-5 h-5" />
                 </button>
                 <button className="btn btn-outline btn-lg border-white text-white hover:bg-white hover:text-primary-600 flex items-center justify-center space-x-2">
@@ -425,14 +425,14 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
               Ready to Transform Your Construction Projects?
             </h2>
             <p className="text-xl text-primary-100 mb-8">
-              Join thousands of construction professionals who trust Gogram to manage their projects efficiently.
+              Join construction professionals who use Gogram to manage their projects efficiently and professionally.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
                 onClick={onGetStarted}
                 className="btn btn-white btn-lg flex items-center justify-center space-x-2 hover:bg-gray-50"
               >
-                <span>Start Your Free Demo</span>
+                <span>Get Started Free</span>
                 <ArrowRight className="w-5 h-5" />
               </button>
               <button className="btn btn-outline btn-lg border-white text-white hover:bg-white hover:text-primary-600">

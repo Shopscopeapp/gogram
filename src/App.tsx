@@ -109,6 +109,12 @@ function App() {
     // User will be set via the auth state listener
   };
 
+  const handleGetStarted = () => {
+    setAuthMode('signup');
+    // Force navigation to auth route
+    window.location.href = '/auth';
+  };
+
   const handleProjectSelect = (project: Project) => {
     setSelectedProject(project);
   };
@@ -150,7 +156,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           {/* Public routes */}
-          <Route path="/" element={<LandingPage onGetStarted={() => setAuthMode('signup')} />} />
+          <Route path="/" element={<LandingPage onGetStarted={handleGetStarted} />} />
           <Route path="/confirm-delivery/:deliveryId" element={<SupplierConfirmationPage />} />
           <Route path="/public/project/:shareToken" element={<PublicProjectPage />} />
           
