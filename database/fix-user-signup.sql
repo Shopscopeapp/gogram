@@ -1,65 +1,56 @@
--- Fix User Signup and Project Creation RLS Policies
--- This drops existing policies and recreates them to avoid conflicts
+-- COMPREHENSIVE RLS POLICY FIX FOR USER SIGNUP
+-- Debug and fix all authentication issues
 -- Run this in your Supabase SQL Editor
 
--- Drop existing policies if they exist (ignore errors if they don't exist)
-DROP POLICY IF EXISTS "Users can insert their own profile" ON public.users;
-DROP POLICY IF EXISTS "Authenticated users can create projects" ON public.projects;
-DROP POLICY IF EXISTS "Project managers can add project members" ON public.project_members;
-DROP POLICY IF EXISTS "Project members can create tasks" ON public.tasks;
-DROP POLICY IF EXISTS "Project members can create suppliers" ON public.suppliers;
-DROP POLICY IF EXISTS "Project members can create deliveries" ON public.deliveries;
+-- First, let's see what policies currently exist
+SELECT schemaname, tablename, policyname, cmd, permissive, roles, qual, with_check
+FROM pg_policies 
+WHERE tablename = 'users' AND schemaname = 'public'
+ORDER BY policyname;
 
--- 1. Users can insert their own profile
-CREATE POLICY "Users can insert their own profile"
+-- Drop ALL existing policies on users table to start fresh
+DROP POLICY IF EXISTS "Users can view their own profile" ON public.users;
+DROP POLICY IF EXISTS "Users can insert their own profile" ON public.users;  
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.users;
+DROP POLICY IF EXISTS "Users can delete their own profile" ON public.users;
+
+-- Create comprehensive policies for users table
+-- 1. Allow users to insert their own profile (CRITICAL for signup)
+CREATE POLICY "authenticated_users_can_insert_profile"
     ON public.users FOR INSERT
+    TO authenticated
     WITH CHECK (auth.uid() = auth_user_id);
 
--- 2. Users can create projects (they become project manager)
-CREATE POLICY "Authenticated users can create projects"
-    ON public.projects FOR INSERT
-    WITH CHECK (
-        auth.uid() IS NOT NULL AND
-        project_manager_id = (SELECT id FROM public.users WHERE auth_user_id = auth.uid())
-    );
+-- 2. Allow users to view their own profile
+CREATE POLICY "users_can_view_own_profile"
+    ON public.users FOR SELECT
+    TO authenticated
+    USING (auth.uid() = auth_user_id);
 
--- 3. Project managers can add project members
-CREATE POLICY "Project managers can add project members"
-    ON public.project_members FOR INSERT
-    WITH CHECK (
-        project_id IN (
-            SELECT id FROM public.projects 
-            WHERE project_manager_id = (SELECT id FROM public.users WHERE auth_user_id = auth.uid())
-        )
-    );
+-- 3. Allow users to update their own profile
+CREATE POLICY "users_can_update_own_profile"
+    ON public.users FOR UPDATE
+    TO authenticated
+    USING (auth.uid() = auth_user_id)
+    WITH CHECK (auth.uid() = auth_user_id);
 
--- 4. Project members can create tasks
-CREATE POLICY "Project members can create tasks"
-    ON public.tasks FOR INSERT
-    WITH CHECK (
-        project_id IN (
-            SELECT project_id FROM public.project_members 
-            WHERE user_id = (SELECT id FROM public.users WHERE auth_user_id = auth.uid())
-        )
-    );
+-- Verify RLS is enabled on users table
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
--- 5. Project members can create suppliers
-CREATE POLICY "Project members can create suppliers"
-    ON public.suppliers FOR INSERT
-    WITH CHECK (auth.uid() IS NOT NULL);
+-- Test the auth context (this should show your current auth state)
+SELECT 
+    auth.uid() as current_auth_uid,
+    auth.role() as current_auth_role,
+    current_user as current_db_user;
 
--- 6. Project members can create deliveries
-CREATE POLICY "Project members can create deliveries"
-    ON public.deliveries FOR INSERT
-    WITH CHECK (
-        project_id IN (
-            SELECT project_id FROM public.project_members 
-            WHERE user_id = (SELECT id FROM public.users WHERE auth_user_id = auth.uid())
-        )
-    );
-
--- Verify all policies were created
-SELECT tablename, policyname, cmd 
+-- Verify the new policies were created
+SELECT policyname, cmd, with_check, qual
 FROM pg_policies 
-WHERE cmd = 'INSERT' AND schemaname = 'public'
-ORDER BY tablename, policyname; 
+WHERE tablename = 'users' AND schemaname = 'public'
+ORDER BY policyname;
+
+-- Test policy with a sample insert (this will show if the policy works)
+-- NOTE: This will only work if you're authenticated in the SQL editor
+-- INSERT INTO public.users (auth_user_id, email, full_name, role) 
+-- VALUES (auth.uid(), 'test@example.com', 'Test User', 'viewer');
+-- (Don't actually run this - it's just to show the syntax) 

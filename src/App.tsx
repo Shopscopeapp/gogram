@@ -154,16 +154,38 @@ function App() {
 
   const handleDemoLogin = (demoUser: User) => {
     console.log('Demo login initiated for user:', demoUser);
+    
+    // Set demo user and state immediately - no authentication needed
     setCurrentUser(demoUser);
     setIsDemoMode(true);
-    
-    // Initialize demo data immediately
-    console.log('Initializing demo data...');
-    initializeDemoData();
-    
-    // Set app state to active demo mode
     setAppState('demo-active');
-    console.log('Demo mode activated');
+    
+    // Load demo data directly in the store
+    const mockData = require('./utils/mockData');
+    const { mockProject, mockTasks, mockDeliveries, mockSuppliers, mockTaskChangeProposals } = mockData;
+    
+    // Set all demo data immediately
+    const store = useAppStore.getState();
+    store.setCurrentUser(demoUser);
+    
+    // Use setState to update the store
+    useAppStore.setState({
+      currentProject: mockProject,
+      tasks: mockTasks,
+      deliveries: mockDeliveries, 
+      suppliers: mockSuppliers,
+      taskChangeProposals: mockTaskChangeProposals || [],
+      qaAlerts: [],
+    });
+    
+    // Generate QA alerts
+    setTimeout(() => {
+      const qaService = require('./services/qaService').default;
+      const qaAlerts = qaService.generateQAAlerts(mockProject.id);
+      useAppStore.setState({ qaAlerts });
+    }, 100);
+    
+    console.log('Demo mode activated with mock data');
   };
 
   const handleForgotPassword = () => {
