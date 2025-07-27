@@ -340,33 +340,6 @@ function GanttTask({ task, startDate, dayWidth, onTaskMove, onTaskClick }: Gantt
           <Edit3 className="w-3 h-3" />
         </div>
       </div>
-      
-      {/* Enhanced Task tooltip */}
-      <div className="absolute top-full left-0 mt-2 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-20 shadow-xl min-w-max">
-        <div className="font-semibold text-sm mb-1">{task.title}</div>
-        <div className="space-y-1 text-gray-300">
-          <div>📅 {format(task.start_date, 'MMM dd')} - {format(task.end_date, 'MMM dd')}</div>
-          <div>⏱️ Duration: {taskDuration} days</div>
-          <div>📊 Progress: {task.progress_percentage}%</div>
-          <div>🎯 Status: <span className="capitalize">{task.status.replace('_', ' ')}</span></div>
-          <div>⚡ Priority: <span className="capitalize">{task.priority}</span></div>
-          <div>🏗️ Category: {task.category}</div>
-          {task.dependencies.length > 0 && (
-            <div>🔗 Dependencies: {task.dependencies.length}</div>
-          )}
-          {task.primary_supplier_id && (
-            <div>🚚 Has supplier assigned</div>
-          )}
-          {task.requires_materials && (
-            <div>📦 Requires materials</div>
-          )}
-        </div>
-        {task.description && (
-          <div className="mt-2 pt-2 border-t border-gray-700 text-gray-300 max-w-xs">
-            {task.description}
-          </div>
-        )}
-      </div>
     </div>
   );
 }
