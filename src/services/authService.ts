@@ -36,7 +36,9 @@ class AuthService {
             company: userData.company,
             phone: userData.phone,
             role: userData.role,
-          }
+          },
+          // Skip email confirmation if disabled in Supabase settings
+          emailRedirectTo: undefined
         }
       });
 
@@ -45,23 +47,30 @@ class AuthService {
       }
 
       if (data.user) {
-        // Profile will be created automatically by database trigger
-        // No need for manual profile creation
-        
-        const user: User = {
-          id: data.user.id,
-          email: userData.email,
-          full_name: userData.full_name,
-          company: userData.company,
-          phone: userData.phone,
-          role: userData.role,
-          avatar_url: undefined,
-          specialties: [],
-          created_at: new Date(),
-          updated_at: new Date(),
-        };
+        // Check if user is immediately confirmed (email verification disabled)
+        if (data.user.email_confirmed_at || !data.user.confirmation_sent_at) {
+          // User is confirmed, create user object
+          const user: User = {
+            id: data.user.id,
+            email: userData.email,
+            full_name: userData.full_name,
+            company: userData.company,
+            phone: userData.phone,
+            role: userData.role,
+            avatar_url: undefined,
+            specialties: [],
+            created_at: new Date(),
+            updated_at: new Date(),
+          };
 
-        return { success: true, user };
+          return { success: true, user };
+        } else {
+          // Email verification required
+          return { 
+            success: false, 
+            error: 'Please check your email and click the verification link to continue.' 
+          };
+        }
       }
 
       return { success: false, error: 'Failed to create user' };

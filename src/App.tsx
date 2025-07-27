@@ -111,7 +111,9 @@ function App() {
   };
 
   const handleAuthSuccess = () => {
-    // User will be set via the auth state listener
+    // After successful auth, go directly to project selection
+    // No need to wait for email verification if disabled
+    console.log('Authentication successful, redirecting to project selection');
   };
 
   const handleProjectSelect = (project: Project) => {
