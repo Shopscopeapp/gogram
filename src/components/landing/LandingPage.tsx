@@ -20,6 +20,8 @@ import {
 
 interface LandingPageProps {
   onGetStarted: () => void;
+  onStartDemo: () => void;
+  onCreateAccount: () => void;
 }
 
 interface FeatureCardProps {
@@ -55,7 +57,7 @@ function FeatureCard({ icon: Icon, title, description, benefits }: FeatureCardPr
   );
 }
 
-export default function LandingPage({ onGetStarted }: LandingPageProps) {
+export default function LandingPage({ onGetStarted, onStartDemo, onCreateAccount }: LandingPageProps) {
   const features = [
     {
       icon: Calendar,
@@ -196,16 +198,40 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <button
-                  onClick={onGetStarted}
+                  onClick={onStartDemo}
                   className="btn btn-white btn-lg flex items-center justify-center space-x-2 hover:bg-gray-50"
                 >
-                  <span>Get Started Free</span>
+                  <Play className="w-5 h-5" />
+                  <span>Try Interactive Demo</span>
                   <ArrowRight className="w-5 h-5" />
                 </button>
-                <button className="btn btn-outline btn-lg border-white text-white hover:bg-white hover:text-primary-600 flex items-center justify-center space-x-2">
-                  <Play className="w-5 h-5" />
-                  <span>Watch Demo</span>
+                <button 
+                  onClick={onCreateAccount}
+                  className="btn btn-outline btn-lg border-white text-white hover:bg-white hover:text-primary-600 flex items-center justify-center space-x-2"
+                >
+                  <span>Create Free Account</span>
+                  <ArrowRight className="w-5 h-5" />
                 </button>
+              </div>
+              
+              {/* Demo vs Real Account Benefits */}
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                <div className="bg-white bg-opacity-10 rounded-lg p-4">
+                  <h4 className="font-semibold text-white mb-2">🎮 Interactive Demo</h4>
+                  <ul className="text-primary-100 space-y-1">
+                    <li>• Explore all features instantly</li>
+                    <li>• No signup required</li>
+                    <li>• Pre-loaded construction project</li>
+                  </ul>
+                </div>
+                <div className="bg-white bg-opacity-10 rounded-lg p-4">
+                  <h4 className="font-semibold text-white mb-2">🏗️ Real Account</h4>
+                  <ul className="text-primary-100 space-y-1">
+                    <li>• Manage your actual projects</li>
+                    <li>• Invite team members</li>
+                    <li>• Persistent data & collaboration</li>
+                  </ul>
+                </div>
               </div>
               <div className="mt-8 pt-8 border-t border-primary-500">
                 <div className="flex items-center space-x-6 text-primary-200">
@@ -429,18 +455,23 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
-                onClick={onGetStarted}
+                onClick={onStartDemo}
                 className="btn btn-white btn-lg flex items-center justify-center space-x-2 hover:bg-gray-50"
               >
-                <span>Get Started Free</span>
+                <Play className="w-5 h-5" />
+                <span>Try Demo Now</span>
                 <ArrowRight className="w-5 h-5" />
               </button>
-              <button className="btn btn-outline btn-lg border-white text-white hover:bg-white hover:text-primary-600">
-                Schedule a Demo Call
+              <button 
+                onClick={onCreateAccount}
+                className="btn btn-outline btn-lg border-white text-white hover:bg-white hover:text-primary-600 flex items-center justify-center space-x-2"
+              >
+                <span>Create Account</span>
+                <ArrowRight className="w-5 h-5" />
               </button>
             </div>
             <p className="text-primary-200 mt-6">
-              No credit card required • Full feature access • Setup in under 5 minutes
+              Demo: Instant access • Account: Full team collaboration • Both completely free
             </p>
           </motion.div>
         </div>

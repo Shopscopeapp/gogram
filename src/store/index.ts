@@ -127,6 +127,7 @@ interface AppActions {
   initializeProjectData: (projectId: string) => Promise<void>;
   subscribeToRealTimeUpdates: (projectId: string) => void;
   unsubscribeFromRealTimeUpdates: () => void;
+  initializeDemoData: () => void;
   
   // Authentication Actions
   signIn: (email: string, password: string) => Promise<void>;
@@ -593,6 +594,35 @@ export const useAppStore = create<AppStore>()(
           console.error('Error initializing project data:', error);
           set({ error: 'Failed to initialize project data', loading: false });
         }
+      },
+
+      initializeDemoData: () => {
+        // Load mock data for demo mode
+        const { mockProject, mockTasks, mockDeliveries, mockSuppliers, mockTaskChangeProposals } = require('../utils/mockData');
+        
+        // Set the demo project
+        set({ currentProject: mockProject });
+        
+        // Load all mock data
+        set({
+          tasks: mockTasks,
+          deliveries: mockDeliveries, 
+          suppliers: mockSuppliers,
+          taskChangeProposals: mockTaskChangeProposals,
+          qaAlerts: [], // Start with empty QA alerts, they'll be generated
+        });
+
+        // Generate QA alerts for demo
+        setTimeout(() => {
+          const qaService = require('../services/qaService').default;
+          const qaAlerts = qaService.generateQAAlerts(mockProject.id);
+          set({ qaAlerts });
+        }, 100);
+
+        // Update dashboard stats
+        get().updateDashboardStats();
+        
+        console.log('Demo data loaded successfully');
       },
 
       // Real task management methods

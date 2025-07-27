@@ -6,13 +6,14 @@ import { mockUsers, getCurrentUser } from '../../utils/mockData';
 import type { UserRole } from '../../types';
 
 interface LoginScreenProps {
+  onLogin: (user: any) => void;
   onBack?: () => void;
+  isDemo?: boolean;
 }
 
-export default function LoginScreen({ onBack }: LoginScreenProps) {
+export default function LoginScreen({ onLogin, onBack, isDemo = false }: LoginScreenProps) {
   const [selectedRole, setSelectedRole] = useState<UserRole>('project_manager');
   const [loading, setLoading] = useState(false);
-  const { setCurrentUser } = useAppStore();
 
   const handleLogin = async () => {
     setLoading(true);
@@ -22,7 +23,7 @@ export default function LoginScreen({ onBack }: LoginScreenProps) {
     
     // Find user with selected role
     const user = getCurrentUser(selectedRole);
-    setCurrentUser(user);
+    onLogin(user);
     
     setLoading(false);
   };
@@ -77,20 +78,27 @@ export default function LoginScreen({ onBack }: LoginScreenProps) {
         {onBack && (
           <button
             onClick={onBack}
-            className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 mb-6 transition-colors"
+            className="flex items-center text-gray-600 hover:text-gray-800 mb-4 transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" />
-            <span className="text-sm">Back to Home</span>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Home
           </button>
         )}
 
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 bg-primary-600 rounded-xl flex items-center justify-center mx-auto mb-4">
             <HardHat className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome to Gogram</h1>
-          <p className="text-gray-600">Choose your role to explore the demo</p>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {isDemo ? 'Try Gogram Demo' : 'Welcome to Gogram'}
+          </h1>
+          <p className="text-gray-600 mt-2">
+            {isDemo 
+              ? 'Select your role to explore our construction management platform'
+              : 'Select your role to get started'
+            }
+          </p>
         </div>
 
         {/* Role Selection */}
@@ -103,13 +111,13 @@ export default function LoginScreen({ onBack }: LoginScreenProps) {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => setSelectedRole(role.id)}
-                className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
+                className={`w-full p-4 rounded-xl border-2 transition-all ${
                   selectedRole === role.id
                     ? 'border-primary-500 bg-primary-50'
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
               >
-                <div className="flex items-start space-x-3">
+                <div className="flex items-center space-x-3">
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                     selectedRole === role.id ? role.color : 'bg-gray-100'
                   }`}>
@@ -142,22 +150,29 @@ export default function LoginScreen({ onBack }: LoginScreenProps) {
           {loading ? (
             <div className="flex items-center justify-center space-x-2">
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              <span>Setting up your demo...</span>
+              <span>{isDemo ? 'Setting up your demo...' : 'Logging in...'}</span>
             </div>
           ) : (
             <div className="flex items-center justify-center space-x-2">
-              <span>Enter Demo as {roles.find(r => r.id === selectedRole)?.name}</span>
+              <span>
+                {isDemo 
+                  ? `Enter Demo as ${roles.find(r => r.id === selectedRole)?.name}`
+                  : `Continue as ${roles.find(r => r.id === selectedRole)?.name}`
+                }
+              </span>
             </div>
           )}
         </motion.button>
 
         {/* Demo Notice */}
-        <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-          <p className="text-sm text-blue-800">
-            <strong>Demo Mode:</strong> This is a fully functional demo with sample construction project data. 
-            Explore all features without any limitations.
-          </p>
-        </div>
+        {isDemo && (
+          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <strong>Demo Mode:</strong> This is a fully functional demo with sample construction project data. 
+              Explore all features without any limitations.
+            </p>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="mt-6 text-center">
@@ -168,4 +183,4 @@ export default function LoginScreen({ onBack }: LoginScreenProps) {
       </motion.div>
     </div>
   );
-} 
+}
