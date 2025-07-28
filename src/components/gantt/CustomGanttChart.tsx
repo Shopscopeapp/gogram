@@ -144,6 +144,15 @@ export default function CustomGanttChart({
 
   const totalTimelineWidth = timelineDays.length * GANTT_CONFIG.dayWidth;
 
+  // Cleanup event listeners on unmount
+  useEffect(() => {
+    return () => {
+      // Clean up any remaining event listeners
+      document.removeEventListener('mousemove', () => {});
+      document.removeEventListener('mouseup', () => {});
+    };
+  }, []);
+
   // Handle task click
   const handleTaskClick = (task: GanttTask, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -155,23 +164,28 @@ export default function CustomGanttChart({
   const handleTaskDragStart = (e: React.MouseEvent, task: GanttTask) => {
     if (readOnly) return;
     e.preventDefault();
+    e.stopPropagation();
     
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
+    // Store initial values locally to avoid stale state issues
+    const initialX = e.clientX - rect.left;
+    const initialDate = new Date(task.start_date);
+    
     setDragState({
       isDragging: true,
       dragTaskId: task.id,
-      dragStartX: e.clientX - rect.left,
-      dragStartDate: new Date(task.start_date)
+      dragStartX: initialX,
+      dragStartDate: initialDate
     });
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current) return;
+      const currentRect = containerRef.current?.getBoundingClientRect();
+      if (!currentRect) return;
       
-      const rect = containerRef.current.getBoundingClientRect();
-      const currentX = e.clientX - rect.left;
-      const deltaX = currentX - dragState.dragStartX;
+      const currentX = e.clientX - currentRect.left;
+      const deltaX = currentX - initialX; // Use local variable, not state
       
       // Visual feedback during drag
       const taskElement = document.querySelector(`[data-task-id="${task.id}"] .gantt-task-bar`) as HTMLElement;
@@ -179,15 +193,16 @@ export default function CustomGanttChart({
         taskElement.style.transform = `translateX(${deltaX}px)`;
         taskElement.style.opacity = '0.8';
         taskElement.style.zIndex = '100';
+        taskElement.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.3)';
       }
     };
 
     const handleMouseUp = (e: MouseEvent) => {
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
+      const currentRect = containerRef.current?.getBoundingClientRect();
+      if (!currentRect) return;
       
-      const currentX = e.clientX - rect.left;
-      const deltaX = currentX - dragState.dragStartX;
+      const currentX = e.clientX - currentRect.left;
+      const deltaX = currentX - initialX; // Use local variable, not state
       const daysDelta = Math.round(deltaX / GANTT_CONFIG.dayWidth);
       
       // Reset visual feedback
@@ -196,12 +211,16 @@ export default function CustomGanttChart({
         taskElement.style.transform = '';
         taskElement.style.opacity = '';
         taskElement.style.zIndex = '';
+        taskElement.style.boxShadow = '';
       }
       
-      if (daysDelta !== 0 && dragState.dragStartDate) {
-        const newStartDate = addDays(dragState.dragStartDate, daysDelta);
+      // Update task dates if moved significantly
+      if (Math.abs(daysDelta) >= 1) {
+        const newStartDate = addDays(initialDate, daysDelta);
         const taskDuration = differenceInDays(new Date(task.end_date), new Date(task.start_date));
         const newEndDate = addDays(newStartDate, taskDuration);
+        
+        console.log('Updating task:', task.id, 'from', task.start_date, 'to', newStartDate);
         
         onTaskUpdate?.(task.id, {
           start_date: newStartDate,
@@ -209,6 +228,7 @@ export default function CustomGanttChart({
         });
       }
       
+      // Clean up
       setDragState({
         isDragging: false,
         dragTaskId: null,
@@ -216,10 +236,12 @@ export default function CustomGanttChart({
         dragStartDate: null
       });
       
+      // Remove event listeners
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
 
+    // Add event listeners
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
   };
@@ -333,7 +355,7 @@ export default function CustomGanttChart({
                 height: 20,
                 backgroundColor: getTaskColor(),
                 transform: 'rotate(45deg)',
-                cursor: readOnly ? 'default' : 'move'
+                cursor: readOnly ? 'pointer' : 'move'
               }}
               onMouseDown={(e) => !readOnly && handleTaskDragStart(e, task)}
               onClick={(e) => handleTaskClick(task, e)}
@@ -352,7 +374,8 @@ export default function CustomGanttChart({
                 cursor: readOnly ? 'pointer' : 'move',
                 borderRadius: '4px',
                 border: isSelected ? '2px solid #1d4ed8' : task.isCritical ? '2px solid #dc2626' : '1px solid rgba(0,0,0,0.1)',
-                zIndex: isSelected ? 20 : task.isCritical ? 15 : 10
+                zIndex: isSelected ? 20 : task.isCritical ? 15 : 10,
+                userSelect: 'none'
               }}
               onMouseDown={(e) => !readOnly && handleTaskDragStart(e, task)}
               onClick={(e) => handleTaskClick(task, e)}

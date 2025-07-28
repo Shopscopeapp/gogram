@@ -215,12 +215,19 @@
   color: white;
   font-weight: 500;
   overflow: hidden;
+  cursor: move; /* Show move cursor */
+  user-select: none; /* Prevent text selection during drag */
 }
 
 .gantt-task-bar:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 30 !important;
+  cursor: move; /* Ensure move cursor on hover */
+}
+
+.gantt-task-bar:active {
+  cursor: grabbing; /* Show grabbing cursor when dragging */
 }
 
 .gantt-task-bar.critical {
@@ -248,11 +255,18 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   transition: all 0.2s ease;
   border: 2px solid rgba(0, 0, 0, 0.1);
+  cursor: move; /* Show move cursor for milestones too */
+  user-select: none;
 }
 
 .gantt-milestone:hover {
   transform: rotate(45deg) scale(1.1);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  cursor: move;
+}
+
+.gantt-milestone:active {
+  cursor: grabbing;
 }
 
 .gantt-milestone.critical {
