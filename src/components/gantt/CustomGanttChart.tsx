@@ -550,6 +550,26 @@ export default function CustomGanttChart({
 
       {/* Main Content */}
       <div className="gantt-content">
+        {/* Today Line */}
+        {(() => {
+          const today = new Date();
+          const todayPosition = differenceInDays(today, timelineBounds.start) * GANTT_CONFIG.dayWidth;
+          
+          // Only show today line if today is within the timeline bounds
+          if (today >= timelineBounds.start && today <= timelineBounds.end) {
+            return (
+              <div 
+                className="gantt-today-line"
+                style={{
+                  left: 320 + todayPosition, // 320px for task name column
+                  zIndex: 30
+                }}
+              />
+            );
+          }
+          return null;
+        })()}
+        
         {processedTasks.map((task, index) => renderTaskRow(task, index))}
       </div>
     </div>
