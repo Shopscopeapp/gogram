@@ -2,8 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../../database/types';
 
 // Supabase configuration
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://vcjotjqqbldtibajujac.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZjam90anFxYmxkdGliYWp1amFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM1MTU0ODksImV4cCI6MjA2OTA5MTQ4OX0.0w1IJW2ED88tpmBEIYpNz24e5oCsCwaGUphv9ijFeQU';
+const supabaseUrl = import.meta.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vcjotjqqbldtibajujac.supabase.co';
+const supabaseAnonKey = import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZjam90anFxYmxkdGliYWp1amFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM1MTU0ODksImV4cCI6MjA2OTA5MTQ4OX0.0w1IJW2ED88tpmBEIYpNz24e5oCsCwaGUphv9ijFeQU';
 
 // Create Supabase client with TypeScript support
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {

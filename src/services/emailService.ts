@@ -230,10 +230,10 @@ interface EmailTemplate {
 }
 
 class EmailService {
-  private readonly FROM_EMAIL = process.env.VITE_FROM_EMAIL || 'notifications@gogram.app';
-  private readonly API_KEY = process.env.VITE_EMAIL_API_KEY;
-  private readonly EMAIL_PROVIDER = process.env.VITE_EMAIL_PROVIDER || 'simulation'; // 'sendgrid', 'mailgun', 'resend', 'simulation'
-  private readonly APP_URL = process.env.VITE_APP_URL || 'http://localhost:3000';
+  private readonly FROM_EMAIL = import.meta.env.NEXT_PUBLIC_FROM_EMAIL || 'notifications@gogram.app';
+  private readonly API_KEY = import.meta.env.NEXT_PUBLIC_EMAIL_API_KEY;
+  private readonly EMAIL_PROVIDER = import.meta.env.NEXT_PUBLIC_EMAIL_PROVIDER || 'simulation'; // 'sendgrid', 'mailgun', 'resend', 'simulation'
+  private readonly APP_URL = import.meta.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
   /**
    * Send email using configured provider
@@ -339,7 +339,7 @@ class EmailService {
    * Send email via Mailgun
    */
   private async sendViaMailgun(emailData: EmailData): Promise<{ success: boolean; error?: string }> {
-    const domain = process.env.VITE_MAILGUN_DOMAIN;
+    const domain = import.meta.env.NEXT_PUBLIC_MAILGUN_DOMAIN;
     const formData = new FormData();
     formData.append('from', emailData.from || this.FROM_EMAIL);
     formData.append('to', emailData.to);
