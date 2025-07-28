@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, ChevronDown, User, Calendar, Clock } from 'lucide-react';
-import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, differenceInDays } from 'date-fns';
+import { ChevronRight, ChevronDown, User, Calendar, Clock, Settings } from 'lucide-react';
+import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, differenceInDays, parseISO, isValid } from 'date-fns';
 import type { Task } from '../../types';
 import { safeDateFormat } from '../../utils/dateHelpers';
 import './CustomGantt.css';
@@ -21,7 +21,6 @@ interface GanttTask extends Task {
   isExpanded?: boolean;
   hasChildren?: boolean;
   children?: GanttTask[];
-  // Construction-specific properties
   isCritical?: boolean;
   resourceNames?: string[];
   actualProgress?: number;
@@ -31,31 +30,24 @@ interface GanttTask extends Task {
 }
 
 const GANTT_CONFIG = {
-  rowHeight: 80,          // Much larger for construction visibility
-  taskBarHeight: 48,      // Bigger task bars for better interaction
-  timelineHeaderHeight: 120, // More space for timeline headers
-  taskNameWidth: 400,     // Wider for detailed construction task names
-  dayWidth: 45,           // Better day visibility
-  minChartHeight: 600,    // Minimum chart height
+  rowHeight: 60,
+  taskBarHeight: 32,
+  timelineHeaderHeight: 80,
+  taskNameWidth: 320,
+  dayWidth: 30,
+  minChartHeight: 400,
   colors: {
-    primary: '#2563eb',     // Blue for main tasks
-    secondary: '#059669',   // Green for subtasks  
-    tertiary: '#7c3aed',    // Purple for milestones
-    completed: '#10b981',   // Green for completed
-    overdue: '#ef4444',     // Red for overdue
-    critical: '#dc2626',    // Red for critical path
-    dependency: '#6b7280',  // Gray for dependency lines
+    primary: '#3b82f6',
+    secondary: '#10b981', 
+    tertiary: '#8b5cf6',
+    completed: '#22c55e',
+    overdue: '#ef4444',
+    critical: '#dc2626',
+    dependency: '#6b7280',
     background: '#f8fafc',
     grid: '#e2e8f0',
     text: '#334155',
     textMuted: '#64748b'
-  },
-  construction: {
-    showResources: true,
-    showProgress: true,
-    showCriticalPath: true,
-    enableDragDrop: true,
-    showDependencies: true
   }
 };
 
@@ -68,96 +60,39 @@ export default function CustomGanttChart({
   timelineStart,
   timelineEnd
 }: CustomGanttChartProps) {
-  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragTaskId, setDragTaskId] = useState<string | null>(null);
-  
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [dragState, setDragState] = useState({
+    isDragging: false,
+    dragTaskId: null as string | null,
+    dragStartX: 0,
+    dragStartDate: null as Date | null
+  });
+
   const containerRef = useRef<HTMLDivElement>(null);
-  const timelineRef = useRef<HTMLDivElement>(null);
-  const tasksRef = useRef<HTMLDivElement>(null);
 
-  // Helper functions for construction features - moved above useMemo to fix hoisting
-  const calculateCriticalPath = (task: Task, allTasks: Task[]): boolean => {
-    // Simplified critical path detection - tasks with no float time
-    const taskDuration = differenceInDays(new Date(task.end_date), new Date(task.start_date));
-    const projectEnd = Math.max(...allTasks.map(t => new Date(t.end_date).getTime()));
-    const taskEnd = new Date(task.end_date).getTime();
-    
-    // If task ends close to project end and has dependencies, likely critical
-    return (projectEnd - taskEnd) <= (7 * 24 * 60 * 60 * 1000) && (task.dependencies?.length || 0) > 0;
-  };
-
-  const getResourceNames = (task: Task): string[] => {
-    // Extract resource names from assigned_to or other fields
-    const resources: string[] = [];
-    if (task.assigned_to) {
-      resources.push(task.assigned_to);
-    }
-    // Add more resource extraction logic as needed
-    return resources;
-  };
-
-  const getTaskSuccessors = (taskId: string, allTasks: Task[]): string[] => {
-    return allTasks
-      .filter(task => task.dependencies?.includes(taskId))
-      .map(task => task.id);
-  };
-
-  const calculateFloatDays = (task: Task, allTasks: Task[]): number => {
-    // Simplified float calculation - in real implementation this would be more complex
-    const successors = getTaskSuccessors(task.id, allTasks);
-    if (successors.length === 0) return 0; // No successors, likely critical
-    
-    // Calculate based on successor start dates
-    const taskEnd = new Date(task.end_date);
-    const earliestSuccessorStart = Math.min(
-      ...successors.map(id => {
-        const successor = allTasks.find(t => t.id === id);
-        return successor ? new Date(successor.start_date).getTime() : Infinity;
-      })
-    );
-    
-    if (earliestSuccessorStart === Infinity) return 0;
-    
-    const floatMs = earliestSuccessorStart - taskEnd.getTime();
-    return Math.max(0, Math.floor(floatMs / (24 * 60 * 60 * 1000)));
-  };
-
-  // Process tasks for construction project management
-  const processConstructionTasks = useMemo(() => {
-    const processedTasks: GanttTask[] = tasks.map(task => ({
+  // Process tasks with construction-specific enhancements
+  const processedTasks = useMemo(() => {
+    return tasks.map(task => ({
       ...task,
       level: 0,
-      isExpanded: true,
       hasChildren: false,
-      children: [],
-      // Construction-specific calculations
-      isCritical: calculateCriticalPath(task, tasks),
-      resourceNames: getResourceNames(task),
+      isExpanded: true,
+      isCritical: task.priority === 'critical' || task.title.toLowerCase().includes('critical'),
+      resourceNames: task.assigned_to ? [task.assigned_to] : [],
       actualProgress: task.progress_percentage || 0,
       predecessors: task.dependencies || [],
-      successors: getTaskSuccessors(task.id, tasks),
-      floatDays: calculateFloatDays(task, tasks)
+      successors: [],
+      floatDays: 0
     }));
-
-    return processedTasks.sort((a, b) => {
-      // Critical path tasks first, then by start date
-      if (a.isCritical && !b.isCritical) return -1;
-      if (!a.isCritical && b.isCritical) return 1;
-      return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
-    });
   }, [tasks]);
 
-  // Build task hierarchy
-  const hierarchicalTasks = processConstructionTasks;
-
-  // Calculate timeline bounds
+  // Calculate timeline bounds with proper date handling
   const timelineBounds = useMemo(() => {
     if (timelineStart && timelineEnd) {
       return { start: timelineStart, end: timelineEnd };
     }
 
-    if (tasks.length === 0) {
+    if (processedTasks.length === 0) {
       const today = new Date();
       return {
         start: startOfMonth(today),
@@ -165,15 +100,39 @@ export default function CustomGanttChart({
       };
     }
 
-    let minDate = new Date(Math.min(...tasks.map(t => new Date(t.start_date).getTime())));
-    let maxDate = new Date(Math.max(...tasks.map(t => new Date(t.end_date).getTime())));
+    // Parse dates safely
+    const validTasks = processedTasks.filter(task => {
+      const startDate = typeof task.start_date === 'string' ? parseISO(task.start_date) : new Date(task.start_date);
+      const endDate = typeof task.end_date === 'string' ? parseISO(task.end_date) : new Date(task.end_date);
+      return isValid(startDate) && isValid(endDate);
+    });
+
+    if (validTasks.length === 0) {
+      const today = new Date();
+      return {
+        start: startOfMonth(today),
+        end: endOfMonth(addDays(today, 90))
+      };
+    }
+
+    const startDates = validTasks.map(t => {
+      const date = typeof t.start_date === 'string' ? parseISO(t.start_date) : new Date(t.start_date);
+      return date.getTime();
+    });
+    const endDates = validTasks.map(t => {
+      const date = typeof t.end_date === 'string' ? parseISO(t.end_date) : new Date(t.end_date);
+      return date.getTime();
+    });
+
+    const minDate = new Date(Math.min(...startDates));
+    const maxDate = new Date(Math.max(...endDates));
     
     // Add padding
-    minDate = startOfMonth(addDays(minDate, -30));
-    maxDate = endOfMonth(addDays(maxDate, 30));
-
-    return { start: minDate, end: maxDate };
-  }, [tasks, timelineStart, timelineEnd]);
+    return {
+      start: startOfMonth(addDays(minDate, -7)),
+      end: endOfMonth(addDays(maxDate, 14))
+    };
+  }, [processedTasks, timelineStart, timelineEnd]);
 
   // Generate timeline days
   const timelineDays = useMemo(() => {
@@ -183,298 +142,289 @@ export default function CustomGanttChart({
     });
   }, [timelineBounds]);
 
-  const totalWidth = timelineDays.length * GANTT_CONFIG.dayWidth;
+  const totalTimelineWidth = timelineDays.length * GANTT_CONFIG.dayWidth;
 
-  // Toggle task expansion
-  const toggleTaskExpansion = (taskId: string) => {
-    setExpandedTasks(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(taskId)) {
-        newSet.delete(taskId);
-      } else {
-        newSet.add(taskId);
-      }
-      return newSet;
-    });
-  };
-
-  // Get task bar style
-  const getTaskBarStyle = (task: GanttTask) => {
-    const startDate = new Date(task.start_date);
-    const endDate = new Date(task.end_date);
-    
-    const startOffset = differenceInDays(startDate, timelineBounds.start) * GANTT_CONFIG.dayWidth;
-    const width = differenceInDays(endDate, startDate) * GANTT_CONFIG.dayWidth;
-    
-    // Determine color based on task type and status
-    let backgroundColor = GANTT_CONFIG.colors.primary;
-    if (task.level > 0) {
-      backgroundColor = GANTT_CONFIG.colors.secondary;
-    }
-    if (task.progress === 100) {
-      backgroundColor = GANTT_CONFIG.colors.completed;
-    }
-    if (new Date(task.end_date) < new Date() && task.progress < 100) {
-      backgroundColor = GANTT_CONFIG.colors.overdue;
-    }
-
-    return {
-      left: startOffset,
-      width: Math.max(width, 10), // Minimum width
-      backgroundColor,
-      progress: task.progress || 0
-    };
+  // Handle task click
+  const handleTaskClick = (task: GanttTask, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedTaskId(task.id);
+    onTaskClick?.(task);
   };
 
   // Handle task drag
-  const handleTaskDragStart = (taskId: string) => {
+  const handleTaskDragStart = (e: React.MouseEvent, task: GanttTask) => {
     if (readOnly) return;
-    setIsDragging(true);
-    setDragTaskId(taskId);
-  };
+    e.preventDefault();
+    
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
 
-  const handleTaskDragEnd = () => {
-    setIsDragging(false);
-    setDragTaskId(null);
+    setDragState({
+      isDragging: true,
+      dragTaskId: task.id,
+      dragStartX: e.clientX - rect.left,
+      dragStartDate: new Date(task.start_date)
+    });
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!containerRef.current) return;
+      
+      const rect = containerRef.current.getBoundingClientRect();
+      const currentX = e.clientX - rect.left;
+      const deltaX = currentX - dragState.dragStartX;
+      
+      // Visual feedback during drag
+      const taskElement = document.querySelector(`[data-task-id="${task.id}"] .gantt-task-bar`) as HTMLElement;
+      if (taskElement) {
+        taskElement.style.transform = `translateX(${deltaX}px)`;
+        taskElement.style.opacity = '0.8';
+        taskElement.style.zIndex = '100';
+      }
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      
+      const currentX = e.clientX - rect.left;
+      const deltaX = currentX - dragState.dragStartX;
+      const daysDelta = Math.round(deltaX / GANTT_CONFIG.dayWidth);
+      
+      // Reset visual feedback
+      const taskElement = document.querySelector(`[data-task-id="${task.id}"] .gantt-task-bar`) as HTMLElement;
+      if (taskElement) {
+        taskElement.style.transform = '';
+        taskElement.style.opacity = '';
+        taskElement.style.zIndex = '';
+      }
+      
+      if (daysDelta !== 0 && dragState.dragStartDate) {
+        const newStartDate = addDays(dragState.dragStartDate, daysDelta);
+        const taskDuration = differenceInDays(new Date(task.end_date), new Date(task.start_date));
+        const newEndDate = addDays(newStartDate, taskDuration);
+        
+        onTaskUpdate?.(task.id, {
+          start_date: newStartDate,
+          end_date: newEndDate
+        });
+      }
+      
+      setDragState({
+        isDragging: false,
+        dragTaskId: null,
+        dragStartX: 0,
+        dragStartDate: null
+      });
+      
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
   };
 
   // Render timeline header
   const renderTimelineHeader = () => {
-    const months = Array.from(new Set(timelineDays.map(day => format(day, 'yyyy-MM'))));
-    
     return (
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
+      <div className="gantt-timeline-header" style={{ height: GANTT_CONFIG.timelineHeaderHeight }}>
         {/* Month header */}
-        <div className="flex h-10 bg-gray-50">
-          <div className="w-80 border-r border-gray-200 flex items-center px-4 font-semibold text-gray-700">
-            Task Name
-          </div>
-          <div className="flex-1 flex">
-            {months.map(month => {
-              const monthDays = timelineDays.filter(day => format(day, 'yyyy-MM') === month);
-              const monthWidth = monthDays.length * GANTT_CONFIG.dayWidth;
-              
-              return (
-                <div
-                  key={month}
-                  className="border-r border-gray-200 flex items-center justify-center font-medium text-sm text-gray-600"
-                  style={{ width: monthWidth, minWidth: monthWidth }}
-                >
-                  {format(new Date(month), 'MMM yyyy')}
-                </div>
-              );
-            })}
-          </div>
+        <div className="gantt-month-header" style={{ height: 40 }}>
+          {Array.from(new Set(timelineDays.map(day => format(day, 'MMM yyyy')))).map(month => {
+            const monthDays = timelineDays.filter(day => format(day, 'MMM yyyy') === month);
+            const monthWidth = monthDays.length * GANTT_CONFIG.dayWidth;
+            
+            return (
+              <div
+                key={month}
+                className="gantt-month-cell"
+                style={{ width: monthWidth, minWidth: monthWidth }}
+              >
+                {month}
+              </div>
+            );
+          })}
         </div>
         
-        {/* Week/Day header */}
-        <div className="flex h-10">
-          <div className="w-80 border-r border-gray-200 flex items-center px-4 text-sm text-gray-500">
-            Progress
-          </div>
-          <div className="flex-1 flex">
-            {timelineDays.map((day, index) => (
+        {/* Day header */}
+        <div className="gantt-day-header" style={{ height: 40 }}>
+          {timelineDays.map((day, index) => {
+            const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+            const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+            
+            return (
               <div
                 key={day.toISOString()}
-                className={`border-r border-gray-100 flex items-center justify-center text-xs ${
-                  isSameMonth(day, new Date()) ? 'bg-blue-50' : ''
-                }`}
+                className={`gantt-day-cell ${isToday ? 'today' : ''} ${isWeekend ? 'weekend' : ''}`}
                 style={{ width: GANTT_CONFIG.dayWidth, minWidth: GANTT_CONFIG.dayWidth }}
               >
-                <div className="text-center">
-                  <div className="font-medium">{format(day, 'd')}</div>
-                  <div className="text-gray-400">{format(day, 'E')}</div>
-                </div>
+                <div className="gantt-day-number">{format(day, 'd')}</div>
+                <div className="gantt-day-name">{format(day, 'EEE')}</div>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </div>
     );
   };
 
-  // Render individual task row with construction features
+  // Render individual task row
   const renderTaskRow = (task: GanttTask, index: number) => {
-    const taskStartPosition = differenceInDays(new Date(task.start_date), timelineStart) * GANTT_CONFIG.dayWidth;
-    const taskDuration = differenceInDays(new Date(task.end_date), new Date(task.start_date)) + 1;
-    const taskWidth = taskDuration * GANTT_CONFIG.dayWidth;
+    const startDate = typeof task.start_date === 'string' ? parseISO(task.start_date) : new Date(task.start_date);
+    const endDate = typeof task.end_date === 'string' ? parseISO(task.end_date) : new Date(task.end_date);
+    
+    if (!isValid(startDate) || !isValid(endDate)) {
+      return null; // Skip invalid tasks
+    }
+
+    const taskStartPosition = differenceInDays(startDate, timelineBounds.start) * GANTT_CONFIG.dayWidth;
+    const taskDuration = differenceInDays(endDate, startDate) + 1;
+    const taskWidth = Math.max(taskDuration * GANTT_CONFIG.dayWidth, 20); // Minimum width
 
     const getTaskColor = () => {
       if (task.isCritical) return GANTT_CONFIG.colors.critical;
-      if (task.status === 'completed') return GANTT_CONFIG.colors.completed;
-      if (new Date(task.end_date) < new Date() && task.status !== 'completed') {
-        return GANTT_CONFIG.colors.overdue;
-      }
-      return task.color || GANTT_CONFIG.colors.primary;
+      if (task.status === 'in_progress' && task.progress_percentage === 100) return GANTT_CONFIG.colors.completed;
+      if (endDate < new Date() && task.status !== 'in_progress') return GANTT_CONFIG.colors.overdue;
+      return GANTT_CONFIG.colors.primary;
     };
 
-    const progressWidth = ((task.actualProgress || task.progress_percentage || 0) / 100) * taskWidth;
+    const progressWidth = ((task.actualProgress || 0) / 100) * taskWidth;
+    const isMilestone = task.category === 'milestone' || taskDuration <= 1;
+    const isSelected = selectedTaskId === task.id;
+    const isDragging = dragState.dragTaskId === task.id;
 
     return (
       <div
         key={task.id}
-        className="gantt-task-row"
+        data-task-id={task.id}
+        className={`gantt-task-row ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''}`}
         style={{ height: GANTT_CONFIG.rowHeight }}
-        onClick={() => onTaskClick?.(task)}
       >
         {/* Task Name Column */}
         <div 
-          className="gantt-task-name"
-          style={{ 
-            width: GANTT_CONFIG.taskNameWidth,
-            minHeight: GANTT_CONFIG.rowHeight,
-            padding: '12px 16px'
-          }}
+          className="gantt-task-name-cell"
+          style={{ width: GANTT_CONFIG.taskNameWidth }}
+          onClick={(e) => handleTaskClick(task, e)}
         >
-          <div className="flex items-center gap-3">
-            {task.hasChildren && (
-              <button className="w-4 h-4 flex items-center justify-center">
-                {task.isExpanded ? 
-                  <ChevronDown className="w-3 h-3" /> : 
-                  <ChevronRight className="w-3 h-3" />
-                }
-              </button>
-            )}
-            
-            <div className="flex-1 min-w-0">
-              <div className="font-semibold text-gray-900 truncate">
-                {task.title}
-              </div>
-              
-              {/* Construction-specific details */}
-              <div className="text-xs text-gray-500 mt-1 space-y-1">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-3 h-3" />
-                  <span>{safeDateFormat(task.start_date, 'MMM dd')} - {safeDateFormat(task.end_date, 'MMM dd')}</span>
-                  {task.floatDays !== undefined && task.floatDays > 0 && (
-                    <span className="bg-yellow-100 text-yellow-800 px-1 rounded text-xs">
-                      {task.floatDays}d float
-                    </span>
-                  )}
-                </div>
-                
-                {task.resourceNames && task.resourceNames.length > 0 && (
-                  <div className="flex items-center gap-1">
-                    <User className="w-3 h-3" />
-                    <span className="truncate">
-                      {task.resourceNames.join(', ')}
-                    </span>
-                  </div>
-                )}
-                
-                {task.isCritical && (
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-red-600" />
-                    <span className="text-red-600 font-medium">Critical Path</span>
-                  </div>
-                )}
-              </div>
+          <div className="gantt-task-info">
+            <div className="gantt-task-title">
+              {task.title}
+              {task.isCritical && <span className="critical-badge">CRITICAL</span>}
+              {isMilestone && <span className="milestone-badge">MILESTONE</span>}
+            </div>
+            <div className="gantt-task-details">
+              <span>{safeDateFormat(startDate, 'MMM dd')} - {safeDateFormat(endDate, 'MMM dd')}</span>
+              <span>({taskDuration}d)</span>
+              {(task.actualProgress || 0) > 0 && <span>{task.actualProgress || 0}%</span>}
             </div>
           </div>
         </div>
 
-        {/* Task Bar in Timeline */}
-        <div className="gantt-timeline-content flex-1 relative">
-          <div
-            className="gantt-task-bar"
-            style={{
-              position: 'absolute',
-              left: taskStartPosition,
-              width: taskWidth,
-              height: GANTT_CONFIG.taskBarHeight,
-              top: (GANTT_CONFIG.rowHeight - GANTT_CONFIG.taskBarHeight) / 2,
-              backgroundColor: getTaskColor(),
-              border: task.isCritical ? '2px solid #dc2626' : '1px solid rgba(0,0,0,0.1)',
-              borderRadius: '6px',
-              boxShadow: task.isCritical ? '0 2px 8px rgba(220, 38, 38, 0.3)' : '0 2px 4px rgba(0,0,0,0.1)',
-              cursor: readOnly ? 'default' : 'move',
-              zIndex: task.isCritical ? 20 : 10
-            }}
-          >
-            {/* Progress bar */}
-            {progressWidth > 0 && (
-              <div
-                className="gantt-task-progress"
-                style={{
-                  width: progressWidth,
-                  height: '100%',
-                  backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                  borderRadius: '4px 0 0 4px'
-                }}
-              />
-            )}
-            
-            {/* Task label */}
-            <div className="gantt-task-label flex items-center justify-center h-full px-2">
-              <span className="text-white font-medium text-sm truncate">
-                {task.title}
-              </span>
-              {task.actualProgress !== undefined && (
-                <span className="ml-2 text-white text-xs">
-                  {task.actualProgress}%
-                </span>
+        {/* Task Timeline */}
+        <div className="gantt-task-timeline" style={{ width: totalTimelineWidth }}>
+          {isMilestone ? (
+            <div
+              className={`gantt-milestone ${task.isCritical ? 'critical' : ''}`}
+              style={{
+                position: 'absolute',
+                left: taskStartPosition,
+                top: (GANTT_CONFIG.rowHeight - 20) / 2,
+                width: 20,
+                height: 20,
+                backgroundColor: getTaskColor(),
+                transform: 'rotate(45deg)',
+                cursor: readOnly ? 'default' : 'move'
+              }}
+              onMouseDown={(e) => !readOnly && handleTaskDragStart(e, task)}
+              onClick={(e) => handleTaskClick(task, e)}
+              title={`Milestone: ${task.title}`}
+            />
+          ) : (
+            <div
+              className={`gantt-task-bar ${task.isCritical ? 'critical' : ''} ${isSelected ? 'selected' : ''}`}
+              style={{
+                position: 'absolute',
+                left: taskStartPosition,
+                width: taskWidth,
+                height: GANTT_CONFIG.taskBarHeight,
+                top: (GANTT_CONFIG.rowHeight - GANTT_CONFIG.taskBarHeight) / 2,
+                backgroundColor: getTaskColor(),
+                cursor: readOnly ? 'pointer' : 'move',
+                borderRadius: '4px',
+                border: isSelected ? '2px solid #1d4ed8' : task.isCritical ? '2px solid #dc2626' : '1px solid rgba(0,0,0,0.1)',
+                zIndex: isSelected ? 20 : task.isCritical ? 15 : 10
+              }}
+              onMouseDown={(e) => !readOnly && handleTaskDragStart(e, task)}
+              onClick={(e) => handleTaskClick(task, e)}
+              title={`${task.title} (${taskDuration} days)`}
+            >
+              {/* Progress bar */}
+              {progressWidth > 0 && (
+                <div
+                  className="gantt-task-progress"
+                  style={{
+                    width: progressWidth,
+                    height: '100%',
+                    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                    borderRadius: '2px 0 0 2px'
+                  }}
+                />
+              )}
+              
+              {/* Task label */}
+              {taskWidth > 60 && (
+                <div className="gantt-task-label">
+                  <span>{task.title}</span>
+                  {(task.actualProgress || 0) > 0 && <span className="progress-text">{task.actualProgress || 0}%</span>}
+                </div>
               )}
             </div>
-          </div>
+          )}
         </div>
       </div>
     );
   };
 
   return (
-    <div className="custom-gantt-container" style={{ minHeight: GANTT_CONFIG.minChartHeight }}>
+    <div className="custom-gantt-container" ref={containerRef}>
       {/* Header */}
-      <div className="gantt-header flex border-b-2 border-gray-200 bg-white sticky top-0 z-50">
-        <div 
-          className="gantt-task-names-header bg-gray-50 border-r-2 border-gray-300 flex items-center px-4 font-semibold text-gray-700"
-          style={{ width: GANTT_CONFIG.taskNameWidth, minHeight: GANTT_CONFIG.timelineHeaderHeight }}
-        >
-          <div>
-            <div className="text-lg font-semibold">Construction Tasks</div>
-            <div className="text-sm text-gray-500 mt-1">
-              {hierarchicalTasks.length} tasks • Critical Path: {hierarchicalTasks.filter(t => t.isCritical).length}
+      <div className="gantt-header">
+        <div className="gantt-header-left" style={{ width: GANTT_CONFIG.taskNameWidth }}>
+          <div className="gantt-header-title">
+            <Settings className="w-5 h-5 mr-2" />
+            <div>
+              <h3 className="font-semibold">Construction Schedule</h3>
+              <p className="text-sm text-gray-500">{processedTasks.length} tasks • {processedTasks.filter(t => t.isCritical).length} critical</p>
             </div>
           </div>
         </div>
-        
-        <div className="gantt-timeline-header flex-1 overflow-x-auto">
+        <div className="gantt-header-right" style={{ width: totalTimelineWidth }}>
           {renderTimelineHeader()}
         </div>
       </div>
 
       {/* Task Rows */}
-      <div className="gantt-body bg-white" style={{ minHeight: hierarchicalTasks.length * GANTT_CONFIG.rowHeight }}>
-        {hierarchicalTasks.map((task, index) => renderTaskRow(task, index))}
-        
-        {/* Empty state for construction projects */}
-        {hierarchicalTasks.length === 0 && (
-          <div className="flex items-center justify-center p-16 text-center bg-gray-50">
-            <div>
-              <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Construction Tasks</h3>
-              <p className="text-gray-500 mb-4">Add your first construction task to start building your project timeline.</p>
-              <button 
-                onClick={() => {/* Add task handler */}}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Add First Task
-              </button>
-            </div>
+      <div className="gantt-body" style={{ minHeight: processedTasks.length * GANTT_CONFIG.rowHeight }}>
+        {processedTasks.length === 0 ? (
+          <div className="gantt-empty-state">
+            <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Tasks Available</h3>
+            <p className="text-gray-500">Add tasks to see them on the construction timeline.</p>
           </div>
+        ) : (
+          processedTasks.map((task, index) => renderTaskRow(task, index))
         )}
       </div>
 
-      {/* Construction Project Summary */}
-      <div className="gantt-footer bg-gray-50 border-t-2 border-gray-200 p-4">
-        <div className="flex items-center justify-between text-sm text-gray-600">
-          <div className="flex items-center gap-6">
-            <span>Project Duration: {differenceInDays(timelineEnd, timelineStart)} days</span>
-            <span>Critical Tasks: {hierarchicalTasks.filter(t => t.isCritical).length}</span>
-            <span>Completed: {hierarchicalTasks.filter(t => t.status === 'completed').length}</span>
-          </div>
-          <div className="text-xs">
-            Drag tasks to reschedule • Click for details • Red = Critical Path
-          </div>
+      {/* Footer */}
+      <div className="gantt-footer">
+        <div className="gantt-stats">
+          <span>Duration: {differenceInDays(timelineBounds.end, timelineBounds.start)} days</span>
+          <span>Critical: {processedTasks.filter(t => t.isCritical).length}</span>
+          <span>Completed: {processedTasks.filter(t => (t.progress_percentage || 0) >= 100).length}</span>
+        </div>
+        <div className="gantt-help">
+          {readOnly ? 'Read-only view' : 'Click tasks for details • Drag to reschedule'}
         </div>
       </div>
     </div>

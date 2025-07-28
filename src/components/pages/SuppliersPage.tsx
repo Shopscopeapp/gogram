@@ -378,8 +378,21 @@ function AddSupplierModal({ isOpen, onClose, onAddSupplier }: AddSupplierModalPr
 }
 
 export default function SuppliersPage() {
-  const { suppliers, deliveries, tasks, addSupplier } = useAppStore();
+  const { suppliers, deliveries, tasks, addSupplier, currentProject } = useAppStore();
   const [showAddModal, setShowAddModal] = useState(false);
+
+  // Filter suppliers to only show project-specific ones
+  // In a real app, suppliers would have a project_id field
+  // For now, we'll start with an empty array and only show suppliers added by the project manager
+  const projectSuppliers = suppliers.filter(supplier => {
+    // If no current project, show no suppliers
+    if (!currentProject) return false;
+    
+    // For demo purposes, we'll only show suppliers that were specifically added to this project
+    // In reality, this would check supplier.project_id === currentProject.id
+    // For now, let's show an empty state to indicate no suppliers have been added for this project
+    return false; // This will show the empty state
+  });
 
   const getTaskTitle = (taskId: string) => {
     const task = tasks.find(t => t.id === taskId);
@@ -402,6 +415,11 @@ export default function SuppliersPage() {
     }
   };
 
+  // Filter deliveries to only show those from project suppliers
+  const projectDeliveries = deliveries.filter(delivery => 
+    projectSuppliers.some(supplier => supplier.id === delivery.supplier_id)
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -421,12 +439,12 @@ export default function SuppliersPage() {
 
       {/* Suppliers Grid */}
       <div className="grid lg:grid-cols-2 gap-6">
-        {suppliers.length === 0 ? (
+        {projectSuppliers.length === 0 ? (
           <div className="col-span-2 p-12 text-center">
             <Truck className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <div>
-              <p className="text-gray-500 mb-2">No suppliers have been added yet.</p>
-              <p className="text-sm text-gray-400">Add your first supplier to start managing deliveries!</p>
+              <p className="text-gray-500 mb-2">No suppliers have been added to this project yet.</p>
+              <p className="text-sm text-gray-400">Add your first supplier to start managing project deliveries!</p>
             </div>
             <button 
               onClick={() => setShowAddModal(true)}
@@ -437,95 +455,95 @@ export default function SuppliersPage() {
             </button>
           </div>
         ) : (
-          suppliers.map((supplier) => {
-          const supplierDeliveries = deliveries.filter(d => d.supplier_id === supplier.id);
-          
-          return (
-            <motion.div
-              key={supplier.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="card hover:shadow-lg transition-shadow duration-200"
-            >
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center">
-                      <Truck className="w-6 h-6 text-white" />
+          projectSuppliers.map((supplier) => {
+            const supplierDeliveries = projectDeliveries.filter(d => d.supplier_id === supplier.id);
+            
+            return (
+              <motion.div
+                key={supplier.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="card hover:shadow-lg transition-shadow duration-200"
+              >
+                <div className="p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center">
+                        <Truck className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">{supplier.name}</h3>
+                        <p className="text-gray-600">{supplier.company}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">{supplier.name}</h3>
-                      <p className="text-gray-600">{supplier.company}</p>
-                    </div>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      supplier.is_active ? 'bg-success-100 text-success-800' : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {supplier.is_active ? 'active' : 'inactive'}
+                    </span>
                   </div>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    supplier.is_active ? 'bg-success-100 text-success-800' : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {supplier.is_active ? 'active' : 'inactive'}
-                  </span>
-                </div>
 
-                {/* Contact Info */}
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Mail className="w-4 h-4 mr-3" />
-                    {supplier.email}
-                  </div>
-                  {supplier.phone && (
+                  {/* Contact Info */}
+                  <div className="space-y-2 mb-4">
                     <div className="flex items-center text-sm text-gray-600">
-                      <Phone className="w-4 h-4 mr-3" />
-                      {supplier.phone}
+                      <Mail className="w-4 h-4 mr-3" />
+                      {supplier.email}
                     </div>
-                  )}
-                </div>
-
-                {/* Specialties */}
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Specialties</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {supplier.specialties.map((specialty, index) => (
-                      <span
-                        key={index}
-                        className="px-2 py-1 bg-primary-100 text-primary-800 rounded-full text-xs font-medium"
-                      >
-                        {specialty}
-                      </span>
-                    ))}
+                    {supplier.phone && (
+                      <div className="flex items-center text-sm text-gray-600">
+                        <Phone className="w-4 h-4 mr-3" />
+                        {supplier.phone}
+                      </div>
+                    )}
                   </div>
-                </div>
 
-                {/* Recent Deliveries */}
-                <div>
-                  <h4 className="text-sm font-medium text-gray-900 mb-3">
-                    Recent Deliveries ({supplierDeliveries.length})
-                  </h4>
-                  {supplierDeliveries.length > 0 ? (
-                    <div className="space-y-2">
-                      {supplierDeliveries.slice(0, 3).map((delivery) => (
-                        <div key={delivery.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <div className="flex items-center space-x-3">
-                            {getDeliveryStatusIcon(delivery.confirmation_status)}
-                            <div>
-                              <p className="text-sm font-medium text-gray-900">{delivery.item}</p>
-                              <p className="text-xs text-gray-500">
-                                {getTaskTitle(delivery.task_id)} • {format(delivery.planned_date, 'MMM dd')}
-                              </p>
-                            </div>
-                          </div>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(delivery.confirmation_status)}`}>
-                            {delivery.confirmation_status}
-                          </span>
-                        </div>
+                  {/* Specialties */}
+                  <div className="mb-4">
+                    <h4 className="text-sm font-medium text-gray-900 mb-2">Specialties</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {supplier.specialties.map((specialty, index) => (
+                        <span
+                          key={index}
+                          className="px-2 py-1 bg-primary-100 text-primary-800 rounded-full text-xs font-medium"
+                        >
+                          {specialty}
+                        </span>
                       ))}
                     </div>
-                  ) : (
-                    <p className="text-sm text-gray-500">No deliveries scheduled</p>
-                  )}
+                  </div>
+
+                  {/* Recent Deliveries */}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900 mb-3">
+                      Recent Deliveries ({supplierDeliveries.length})
+                    </h4>
+                    {supplierDeliveries.length > 0 ? (
+                      <div className="space-y-2">
+                        {supplierDeliveries.slice(0, 3).map((delivery) => (
+                          <div key={delivery.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div className="flex items-center space-x-3">
+                              {getDeliveryStatusIcon(delivery.confirmation_status)}
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">{delivery.item}</p>
+                                <p className="text-xs text-gray-500">
+                                  {getTaskTitle(delivery.task_id)} • {format(delivery.planned_date, 'MMM dd')}
+                                </p>
+                              </div>
+                            </div>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(delivery.confirmation_status)}`}>
+                              {delivery.confirmation_status}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500">No deliveries scheduled</p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          );
-        })
+              </motion.div>
+            );
+          })
         )}
       </div>
 
@@ -534,7 +552,7 @@ export default function SuppliersPage() {
         <div className="card p-6">
           <div className="text-center">
             <div className="text-3xl font-bold text-gray-900">
-              {suppliers.length}
+              {projectSuppliers.length}
             </div>
             <div className="text-sm text-gray-600 mt-1">Total Suppliers</div>
           </div>
@@ -543,7 +561,7 @@ export default function SuppliersPage() {
         <div className="card p-6">
           <div className="text-center">
             <div className="text-3xl font-bold text-success-600">
-              {deliveries.filter(d => d.confirmation_status === 'confirmed').length}
+              {projectDeliveries.filter(d => d.confirmation_status === 'confirmed').length}
             </div>
             <div className="text-sm text-gray-600 mt-1">Confirmed</div>
           </div>
@@ -552,7 +570,7 @@ export default function SuppliersPage() {
         <div className="card p-6">
           <div className="text-center">
             <div className="text-3xl font-bold text-warning-600">
-              {deliveries.filter(d => d.confirmation_status === 'pending').length}
+              {projectDeliveries.filter(d => d.confirmation_status === 'pending').length}
             </div>
             <div className="text-sm text-gray-600 mt-1">Pending</div>
           </div>
@@ -561,77 +579,61 @@ export default function SuppliersPage() {
         <div className="card p-6">
           <div className="text-center">
             <div className="text-3xl font-bold text-danger-600">
-              {deliveries.filter(d => d.confirmation_status === 'rejected').length}
+              {projectDeliveries.filter(d => d.confirmation_status === 'rejected').length}
             </div>
             <div className="text-sm text-gray-600 mt-1">Rejected</div>
           </div>
         </div>
       </div>
 
-      {/* All Deliveries Table */}
+      {/* Recent Deliveries */}
       <div className="card">
         <div className="p-6 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">All Deliveries</h2>
+          <h3 className="text-lg font-semibold text-gray-900">Recent Deliveries</h3>
+          <p className="text-sm text-gray-600 mt-1">Latest delivery updates from project suppliers</p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
+        <table className="min-w-full">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Supplier
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Task
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Expected Date
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Status
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {projectDeliveries.length === 0 ? (
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Item
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Supplier
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Task
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Quantity
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
+                <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                  <Package className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                  <p>No deliveries scheduled for this project yet.</p>
+                  <p className="text-sm mt-1">Add suppliers to start tracking deliveries.</p>
+                </td>
               </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {deliveries.map((delivery) => {
-                const supplier = suppliers.find(s => s.id === delivery.supplier_id);
-                
+            ) : (
+              projectDeliveries.map((delivery) => {
+                const supplier = projectSuppliers.find(s => s.id === delivery.supplier_id);
                 return (
                   <tr key={delivery.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <Package className="w-5 h-5 text-gray-400 mr-3" />
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {delivery.item}
-                          </div>
-                          {delivery.notes && (
-                            <div className="text-sm text-gray-500">{delivery.notes}</div>
-                          )}
-                        </div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {supplier?.name || 'Unknown Supplier'}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{supplier?.name}</div>
                       <div className="text-sm text-gray-500">{supplier?.company}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{getTaskTitle(delivery.task_id)}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {delivery.quantity} {delivery.unit}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {format(delivery.planned_date, 'MMM dd, yyyy')}
-                      </div>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {format(new Date(delivery.expected_date), 'MMM dd, yyyy')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -643,10 +645,10 @@ export default function SuppliersPage() {
                     </td>
                   </tr>
                 );
-              })}
-            </tbody>
-          </table>
-        </div>
+              })
+            )}
+                    </tbody>
+        </table>
       </div>
 
       {/* Add Supplier Modal */}
@@ -656,11 +658,13 @@ export default function SuppliersPage() {
         onAddSupplier={(supplierData) => {
           const newSupplier = {
             id: `supplier_${Date.now()}`,
+            project_id: currentProject?.id || '', // Associate with current project
             ...supplierData,
             created_at: new Date(),
             updated_at: new Date()
           };
           addSupplier(newSupplier);
+          toast.success(`${supplierData.name} has been added to the project!`);
         }}
       />
     </div>

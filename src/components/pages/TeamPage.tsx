@@ -189,7 +189,13 @@ export default function TeamPage() {
   });
 
   const handleAddUser = (userData: Omit<User, 'id' | 'created_at' | 'updated_at'>) => {
-    addUser(userData);
+    const newUser: User = {
+      id: `user_${Date.now()}`,
+      ...userData,
+      created_at: new Date(),
+      updated_at: new Date()
+    };
+    addUser(newUser);
     toast.success(`${userData.full_name} has been added to the team!`);
   };
 
@@ -225,10 +231,6 @@ export default function TeamPage() {
     if (diffDays < 7) return `${diffDays}d ago`;
     return format(lastActive, 'MMM dd');
   };
-
-  if (!users.length) { // Check if users are loaded
-    return <div>Loading...</div>;
-  }
 
   return (
     <div className="space-y-6">
@@ -274,8 +276,8 @@ export default function TeamPage() {
             <div className="ml-4">
               <p className="text-sm text-gray-600">Active Today</p>
               <p className="text-2xl font-bold text-gray-900">
-                {users.filter(u => {
-                  const lastActive = u.lastActive;
+                {teamMembers.filter(member => {
+                  const lastActive = member.lastActive;
                   if (!lastActive) return false;
                   const diffHours = (new Date().getTime() - lastActive.getTime()) / (1000 * 60 * 60);
                   return diffHours < 24;
@@ -307,7 +309,7 @@ export default function TeamPage() {
             <div className="ml-4">
               <p className="text-sm text-gray-600">Tasks Completed</p>
               <p className="text-2xl font-bold text-gray-900">
-                {users.reduce((sum, u) => sum + (u.tasksCompleted || 0), 0)}
+                {teamMembers.reduce((sum, member) => sum + (member.tasksCompleted || 0), 0)}
               </p>
             </div>
           </div>
