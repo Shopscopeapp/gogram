@@ -77,6 +77,7 @@ export default function CustomGanttChart({
 
   // Process tasks with construction-specific enhancements
   const processedTasks = useMemo(() => {
+    // Keep the same order as passed from parent (don't sort here)
     return tasks.map(task => ({
       ...task,
       level: 0,
@@ -89,7 +90,7 @@ export default function CustomGanttChart({
       successors: [],
       floatDays: 0
     }));
-  }, [tasks]);
+  }, [tasks]); // Remove any sorting - use tasks as-is
 
   // Calculate timeline bounds with proper date handling
   const timelineBounds = useMemo(() => {
@@ -268,6 +269,7 @@ export default function CustomGanttChart({
     if (!rect) return;
 
     const initialY = e.clientY - rect.top;
+    let currentDropIndex = taskIndex;
     
     setDragState({
       isDragging: true,
@@ -287,8 +289,10 @@ export default function CustomGanttChart({
       const deltaY = currentY - initialY;
       
       // Calculate which row we're hovering over
-      const hoveredRowIndex = Math.floor(currentY / GANTT_CONFIG.rowHeight);
+      const hoveredRowIndex = Math.floor((currentY - 80) / GANTT_CONFIG.rowHeight); // Account for header height
       const clampedIndex = Math.max(0, Math.min(hoveredRowIndex, processedTasks.length - 1));
+      
+      currentDropIndex = clampedIndex;
       
       setDragState(prev => ({ ...prev, dropIndex: clampedIndex }));
       
@@ -300,10 +304,12 @@ export default function CustomGanttChart({
         taskElement.style.zIndex = '100';
         taskElement.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.3)';
       }
+      
+      console.log('Dragging to index:', clampedIndex, 'current Y:', currentY);
     };
 
     const handleMouseUp = () => {
-      console.log('Ending vertical drag for task:', task.title);
+      console.log('Ending vertical drag for task:', task.title, 'from index:', taskIndex, 'to index:', currentDropIndex);
       
       // Reset visual feedback
       const taskElement = document.querySelector(`[data-task-row="${taskIndex}"]`) as HTMLElement;
@@ -314,10 +320,12 @@ export default function CustomGanttChart({
         taskElement.style.boxShadow = '';
       }
       
-      // Execute reorder if position changed
-      if (dragState.dropIndex !== taskIndex && dragState.dropIndex >= 0) {
-        console.log('Reordering task:', task.id, 'from index', taskIndex, 'to', dragState.dropIndex);
-        onTaskReorder?.(task.id, dragState.dropIndex);
+      // Execute reorder if position changed significantly
+      if (Math.abs(currentDropIndex - taskIndex) >= 1 && currentDropIndex !== taskIndex) {
+        console.log('Calling onTaskReorder:', task.id, 'to index:', currentDropIndex);
+        onTaskReorder?.(task.id, currentDropIndex);
+      } else {
+        console.log('No reorder needed - same position or too small change');
       }
       
       // Clean up

@@ -363,8 +363,17 @@ export default function SchedulePage() {
     return <div>Loading...</div>;
   }
 
-  // Sort tasks by start date for list view
-  const sortedTasks = [...tasks].sort((a, b) => a.start_date.getTime() - b.start_date.getTime());
+  // Sort tasks by updated_at (which we use for ordering) then by start date for list view
+  const sortedTasks = [...tasks].sort((a, b) => {
+    // First sort by updated_at for custom ordering (from drag and drop)
+    const aTime = new Date(a.updated_at).getTime();
+    const bTime = new Date(b.updated_at).getTime();
+    if (aTime !== bTime) {
+      return aTime - bTime;
+    }
+    // Then by start date as fallback
+    return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -485,25 +494,34 @@ export default function SchedulePage() {
             onTaskUpdate={(taskId, updates) => updateTask(taskId, updates)}
             onTaskClick={handleTaskClick}
             onTaskReorder={(draggedTaskId, targetIndex) => {
-              // Handle task reordering
-              console.log('Reordering task:', draggedTaskId, 'to index:', targetIndex);
-              // Find the task and update its order/sequence
-              const reorderedTasks = [...tasks];
-              const draggedTaskIndex = reorderedTasks.findIndex(t => t.id === draggedTaskId);
+              console.log('🔄 Reordering task:', draggedTaskId, 'to index:', targetIndex);
               
-              if (draggedTaskIndex !== -1) {
-                const [draggedTask] = reorderedTasks.splice(draggedTaskIndex, 1);
-                reorderedTasks.splice(targetIndex, 0, draggedTask);
+              // Get current tasks array
+              const currentTasks = [...tasks];
+              const draggedTaskIndex = currentTasks.findIndex(t => t.id === draggedTaskId);
+              
+              if (draggedTaskIndex !== -1 && draggedTaskIndex !== targetIndex) {
+                // Remove the dragged task from its current position
+                const [draggedTask] = currentTasks.splice(draggedTaskIndex, 1);
                 
-                // Update task sequence numbers or priorities to reflect new order
-                reorderedTasks.forEach((task, index) => {
+                // Insert it at the new position
+                currentTasks.splice(targetIndex, 0, draggedTask);
+                
+                console.log('✅ Task reordered successfully');
+                
+                // Update all tasks with new order by updating a sequence field
+                // Since we don't have a sequence field in the Task type, we'll use a timestamp hack
+                currentTasks.forEach((task, index) => {
+                  // Use a timestamp-based ordering - this ensures the visual order persists
+                  const orderTimestamp = new Date(Date.now() + index * 1000); // Each task gets +1 second
                   updateTask(task.id, { 
-                    // Using index as a simple ordering mechanism
-                    // In a real app, you might have a sequence_number or priority field
-                    priority: index < reorderedTasks.length / 3 ? 'high' : 
-                             index < (reorderedTasks.length * 2) / 3 ? 'medium' : 'low'
+                    updated_at: orderTimestamp 
                   });
                 });
+                
+                toast.success(`Moved "${draggedTask.title}" to position ${targetIndex + 1}`);
+              } else {
+                console.log('❌ No reorder needed - same position');
               }
             }}
             readOnly={!canEditSchedule}
