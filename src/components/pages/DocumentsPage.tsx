@@ -1,79 +1,416 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  FileText, 
-  Upload, 
-  Search, 
-  Filter,
-  Download,
-  Eye,
-  Share2,
-  Trash2,
-  FolderPlus,
+import {
+  Upload,
   File,
   Folder,
-  Calendar,
-  User,
-  Paperclip,
-  MoreHorizontal,
+  Search,
   Grid,
   List,
-  Star,
+  Filter,
+  Download,
+  Trash2,
+  Eye,
+  FolderPlus,
+  X,
+  Plus,
+  AlertCircle,
+  CheckCircle,
   Clock
 } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { format } from 'date-fns';
+import documentService, { Document, Folder as DocumentFolder, UploadProgress } from '../../services/documentService';
 import toast from 'react-hot-toast';
 
-interface Document {
-  id: string;
-  name: string;
-  type: string;
-  size: number;
-  category: 'drawings' | 'contracts' | 'reports' | 'photos' | 'certificates' | 'other';
-  uploadedBy: string;
-  uploadedAt: Date;
-  lastModified: Date;
-  tags: string[];
-  isStarred: boolean;
-  isShared: boolean;
-  permissions: {
-    canView: string[];
-    canEdit: string[];
-    canDelete: string[];
-  };
-  url?: string;
-  thumbnail?: string;
+interface UploadModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onUpload: (files: File[], options: any) => void;
+  folders: DocumentFolder[];
 }
 
-interface Folder {
-  id: string;
-  name: string;
-  parentId?: string;
-  createdBy: string;
-  createdAt: Date;
-  documentCount: number;
-  color: string;
+function UploadModal({ isOpen, onClose, onUpload, folders }: UploadModalProps) {
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [category, setCategory] = useState('General');
+  const [folderId, setFolderId] = useState('');
+  const [tags, setTags] = useState('');
+  const [description, setDescription] = useState('');
+  const [isPublic, setIsPublic] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+
+  const categories = [
+    'General', 'Plans', 'Specifications', 'Photos', 'Reports',
+    'Contracts', 'Permits', 'Safety', 'Quality', 'Progress'
+  ];
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    setSelectedFiles(prev => [...prev, ...files]);
+  };
+
+  const handleDrop = (event: React.DragEvent) => {
+    event.preventDefault();
+    setDragOver(false);
+    const files = Array.from(event.dataTransfer.files);
+    setSelectedFiles(prev => [...prev, ...files]);
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedFiles.length === 0) {
+      toast.error('Please select at least one file');
+      return;
+    }
+
+    const options = {
+      category,
+      folderId: folderId || undefined,
+      tags: tags.split(',').map(tag => tag.trim()).filter(Boolean),
+      description: description || undefined,
+      isPublic
+    };
+
+    onUpload(selectedFiles, options);
+
+    // Reset form
+    setSelectedFiles([]);
+    setCategory('General');
+    setFolderId('');
+    setTags('');
+    setDescription('');
+    setIsPublic(false);
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+      >
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+              <Upload className="w-5 h-5 mr-2" />
+              Upload Documents
+            </h3>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6">
+          {/* File Drop Zone */}
+          <div
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+              dragOver
+                ? 'border-primary-500 bg-primary-50'
+                : 'border-gray-300 hover:border-gray-400'
+            }`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+          >
+            <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-lg font-medium text-gray-900 mb-2">
+              Drop files here or click to browse
+            </p>
+            <p className="text-sm text-gray-500 mb-4">
+              Support for PDF, DOC, XLS, images, and CAD files
+            </p>
+            <input
+              type="file"
+              multiple
+              onChange={handleFileSelect}
+              className="hidden"
+              id="file-upload"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.dwg,.dxf"
+            />
+            <label
+              htmlFor="file-upload"
+              className="btn btn-outline cursor-pointer"
+            >
+              Browse Files
+            </label>
+          </div>
+
+          {/* Selected Files */}
+          {selectedFiles.length > 0 && (
+            <div className="mt-6">
+              <h4 className="font-medium text-gray-900 mb-3">Selected Files ({selectedFiles.length})</h4>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {selectedFiles.map((file, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center flex-1">
+                      <File className="w-4 h-4 text-gray-500 mr-2" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+                        <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeFile(index)}
+                      className="text-red-500 hover:text-red-700 ml-2"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Upload Options */}
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Category
+              </label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="input w-full"
+              >
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Folder
+              </label>
+              <select
+                value={folderId}
+                onChange={(e) => setFolderId(e.target.value)}
+                className="input w-full"
+              >
+                <option value="">Root Folder</option>
+                {folders.map(folder => (
+                  <option key={folder.id} value={folder.id}>{folder.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tags (comma-separated)
+            </label>
+            <input
+              type="text"
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              placeholder="important, review, final"
+              className="input w-full"
+            />
+          </div>
+
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Description
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Optional description for the documents"
+              rows={3}
+              className="input w-full"
+            />
+          </div>
+
+          <div className="mt-4">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={isPublic}
+                onChange={(e) => setIsPublic(e.target.checked)}
+                className="mr-2"
+              />
+              <span className="text-sm text-gray-700">Make documents publicly accessible</span>
+            </label>
+          </div>
+
+          {/* Actions */}
+          <div className="flex justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn btn-outline"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={selectedFiles.length === 0}
+              className="btn btn-primary"
+            >
+              Upload {selectedFiles.length > 0 && `(${selectedFiles.length})`}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </motion.div>
+  );
 }
 
 export default function DocumentsPage() {
-  const { currentProject } = useAppStore();
+  const { currentProject, currentUser } = useAppStore();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [folders, setFolders] = useState<DocumentFolder[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
-  // TODO: Replace with actual document service/API calls
-  // For now using empty arrays - in production this would connect to:
-  // - File storage service (AWS S3, Azure Blob, etc.)
-  // - Database for document metadata
-  // - Permission management system
-  const [folders] = useState<Folder[]>([]);
-  const [documents] = useState<Document[]>([]);
+  // Load documents and folders on component mount
+  useEffect(() => {
+    if (currentProject) {
+      loadProjectData();
+    }
+  }, [currentProject]);
+
+  const loadProjectData = async () => {
+    if (!currentProject) return;
+
+    setLoading(true);
+    try {
+      const [docsResult, foldersResult] = await Promise.all([
+        documentService.getProjectDocuments(currentProject.id),
+        documentService.getProjectFolders(currentProject.id)
+      ]);
+
+      if (docsResult.success) {
+        setDocuments(docsResult.documents || []);
+      } else {
+        toast.error(docsResult.error || 'Failed to load documents');
+      }
+
+      if (foldersResult.success) {
+        setFolders(foldersResult.folders || []);
+      } else {
+        toast.error(foldersResult.error || 'Failed to load folders');
+      }
+    } catch (error) {
+      console.error('Error loading project data:', error);
+      toast.error('Failed to load project data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpload = async (files: File[], options: any) => {
+    if (!currentProject || !currentUser) {
+      toast.error('Project or user not found');
+      return;
+    }
+
+    setIsUploading(true);
+    toast.success(`Starting upload of ${files.length} file${files.length > 1 ? 's' : ''}...`);
+
+    try {
+      const result = await documentService.uploadMultipleDocuments(
+        files,
+        currentProject.id,
+        currentUser.id,
+        options,
+        setUploadProgress
+      );
+
+      if (result.success) {
+        toast.success(`Successfully uploaded ${result.documents.length} document${result.documents.length > 1 ? 's' : ''}!`);
+
+        // Show errors if any
+        if (result.errors.length > 0) {
+          result.errors.forEach(error => toast.error(error));
+        }
+
+        // Refresh document list
+        await loadProjectData();
+      } else {
+        toast.error('Upload failed');
+        result.errors.forEach(error => toast.error(error));
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Upload failed');
+    } finally {
+      setIsUploading(false);
+      setUploadProgress([]);
+    }
+  };
+
+  const handleDeleteDocument = async (document: Document) => {
+    if (!currentUser) return;
+
+    if (!confirm(`Are you sure you want to delete "${document.name}"?`)) {
+      return;
+    }
+
+    try {
+      const result = await documentService.deleteDocument(document.id, currentUser.id);
+
+      if (result.success) {
+        toast.success('Document deleted successfully');
+        setDocuments(prev => prev.filter(doc => doc.id !== document.id));
+      } else {
+        toast.error(result.error || 'Failed to delete document');
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast.error('Failed to delete document');
+    }
+  };
+
+  const handleDownload = async (document: Document) => {
+    try {
+      const url = await documentService.getDownloadUrl(document.file_path);
+      window.open(url, '_blank');
+      toast.success('Opening document...');
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error('Failed to open document');
+    }
+  };
 
   const filteredDocuments = documents.filter(doc => {
     const matchesSearch = doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         doc.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+                         doc.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                         (doc.description && doc.description.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesCategory = categoryFilter === 'all' || doc.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
@@ -103,57 +440,7 @@ export default function DocumentsPage() {
     }
   };
 
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'drawings': return 'bg-blue-100 text-blue-800';
-      case 'contracts': return 'bg-green-100 text-green-800';
-      case 'reports': return 'bg-purple-100 text-purple-800';
-      case 'photos': return 'bg-orange-100 text-orange-800';
-      case 'certificates': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getFolderColor = (color: string) => {
-    switch (color) {
-      case 'blue': return 'bg-blue-100 text-blue-600';
-      case 'green': return 'bg-green-100 text-green-600';
-      case 'purple': return 'bg-purple-100 text-purple-600';
-      case 'orange': return 'bg-orange-100 text-orange-600';
-      case 'red': return 'bg-red-100 text-red-600';
-      default: return 'bg-gray-100 text-gray-600';
-    }
-  };
-
-  const handleUpload = (files: FileList) => {
-    // TODO: Implement actual file upload
-    // This would typically:
-    // 1. Upload files to cloud storage
-    // 2. Create document metadata in database
-    // 3. Set proper permissions based on user role
-    // 4. Generate thumbnails for images/PDFs
-    // 5. Update document list
-    
-    Array.from(files).forEach(file => {
-      console.log('Would upload file:', file.name);
-      toast.success(`File upload functionality not yet implemented`);
-    });
-  };
-
-  const handleDownload = (doc: Document) => {
-    toast.success(`Downloading ${doc.name}...`);
-  };
-
-  const handleShare = (doc: Document) => {
-    navigator.clipboard.writeText(`${window.location.origin}/documents/${doc.id}`);
-    toast.success('Share link copied to clipboard!');
-  };
-
-  const handleDelete = (docId: string) => {
-    if (window.confirm('Are you sure you want to delete this document?')) {
-      toast.success('Document deleted successfully');
-    }
-  };
+  const categories = ['all', 'General', 'Plans', 'Specifications', 'Photos', 'Reports', 'Contracts', 'Permits', 'Safety', 'Quality', 'Progress'];
 
   if (!currentProject) {
     return <div>Loading...</div>;
@@ -162,370 +449,230 @@ export default function DocumentsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Document Management</h1>
-          <p className="text-gray-600 mt-1">Organize, share, and manage project documents</p>
+          <h1 className="text-2xl font-bold text-gray-900">Project Documents</h1>
+          <p className="text-gray-600">
+            Manage project files, drawings, and documentation
+          </p>
         </div>
-
         <div className="flex items-center space-x-3">
+          <button
+            onClick={() => setShowUploadModal(true)}
+            className="btn btn-primary"
+            disabled={isUploading}
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            {isUploading ? 'Uploading...' : 'Upload Files'}
+          </button>
+        </div>
+      </div>
+
+      {/* Upload Progress */}
+      {uploadProgress.length > 0 && (
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <h3 className="font-medium text-gray-900 mb-3">Upload Progress</h3>
+          <div className="space-y-2">
+            {uploadProgress.map((progress, index) => (
+              <div key={index} className="flex items-center space-x-3">
+                <div className="flex-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="truncate">{progress.file.name}</span>
+                    <div className="flex items-center space-x-2">
+                      {progress.status === 'uploading' && (
+                        <>
+                          <Clock className="w-4 h-4 text-blue-500" />
+                          <span>{progress.progress}%</span>
+                        </>
+                      )}
+                      {progress.status === 'completed' && (
+                        <CheckCircle className="w-4 h-4 text-green-500" />
+                      )}
+                      {progress.status === 'error' && (
+                        <AlertCircle className="w-4 h-4 text-red-500" />
+                      )}
+                    </div>
+                  </div>
+                  {progress.status === 'uploading' && (
+                    <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-200"
+                        style={{ width: `${progress.progress}%` }}
+                      />
+                    </div>
+                  )}
+                  {progress.status === 'error' && progress.error && (
+                    <p className="text-xs text-red-600 mt-1">{progress.error}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Filters and Search */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center space-x-4">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search documents..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+            </div>
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            >
+              {categories.map(category => (
+                <option key={category} value={category}>
+                  {category === 'all' ? 'All Categories' : category}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="flex items-center bg-gray-100 rounded-lg p-1">
             <button
               onClick={() => setViewMode('grid')}
-              className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white shadow-sm' : ''}`}
+              className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white shadow-sm' : 'text-gray-500'}`}
             >
               <Grid className="w-4 h-4" />
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`p-2 rounded ${viewMode === 'list' ? 'bg-white shadow-sm' : ''}`}
+              className={`p-2 rounded ${viewMode === 'list' ? 'bg-white shadow-sm' : 'text-gray-500'}`}
             >
               <List className="w-4 h-4" />
             </button>
           </div>
-
-          <button
-            onClick={() => setShowUploadModal(true)}
-            className="btn btn-primary flex items-center space-x-2"
-          >
-            <Upload className="w-4 h-4" />
-            <span>Upload Files</span>
-          </button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="card p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <FileText className="w-6 h-6 text-blue-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm text-gray-600">Total Documents</p>
-              <p className="text-2xl font-bold text-gray-900">{documents.length}</p>
-            </div>
-          </div>
+      {/* Documents Grid/List */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          <span className="ml-2 text-gray-600">Loading documents...</span>
         </div>
-
-        <div className="card p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Folder className="w-6 h-6 text-purple-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm text-gray-600">Folders</p>
-              <p className="text-2xl font-bold text-gray-900">{folders.length}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <Share2 className="w-6 h-6 text-green-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm text-gray-600">Shared</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {documents.filter(d => d.isShared).length}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <Clock className="w-6 h-6 text-orange-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm text-gray-600">Recent Uploads</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {documents.filter(d => {
-                  const daysSinceUpload = (new Date().getTime() - d.uploadedAt.getTime()) / (1000 * 60 * 60 * 24);
-                  return daysSinceUpload <= 7;
-                }).length}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Search and Filter */}
-      <div className="card p-6">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search documents..."
-              className="input pl-10"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Filter className="w-4 h-4 text-gray-400" />
-            <select
-              className="input w-auto"
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
+      ) : filteredDocuments.length === 0 ? (
+        <div className="text-center py-12">
+          <File className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">No documents found</h3>
+          <p className="text-gray-600 mb-4">
+            {searchQuery || categoryFilter !== 'all'
+              ? 'Try adjusting your search or filters'
+              : 'Upload your first document to get started'
+            }
+          </p>
+          {!searchQuery && categoryFilter === 'all' && (
+            <button
+              onClick={() => setShowUploadModal(true)}
+              className="btn btn-primary"
             >
-              <option value="all">All Categories</option>
-              <option value="drawings">Drawings</option>
-              <option value="contracts">Contracts</option>
-              <option value="reports">Reports</option>
-              <option value="photos">Photos</option>
-              <option value="certificates">Certificates</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Folders Section */}
-      <div className="card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Folders</h3>
-          {/* {isProjectManager && (
-            <button className="btn btn-outline btn-sm flex items-center space-x-2">
-              <FolderPlus className="w-4 h-4" />
-              <span>New Folder</span>
+              <Upload className="w-4 h-4 mr-2" />
+              Upload Documents
             </button>
-          )} */}
+          )}
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {folders.map((folder) => (
+      ) : (
+        <div className={
+          viewMode === 'grid'
+            ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'
+            : 'space-y-2'
+        }>
+          {filteredDocuments.map((document) => (
             <motion.div
-              key={folder.id}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="p-4 border border-gray-200 rounded-lg hover:shadow-md transition-all cursor-pointer"
-              onClick={() => setSelectedFolder(folder.id)}
+              key={document.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={
+                viewMode === 'grid'
+                  ? 'bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow'
+                  : 'bg-white rounded-lg border border-gray-200 p-4 flex items-center justify-between hover:bg-gray-50'
+              }
             >
-              <div className="flex items-center space-x-3">
-                <div className={`p-2 rounded-lg ${getFolderColor(folder.color)}`}>
-                  <Folder className="w-6 h-6" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900 truncate">{folder.name}</p>
-                  <p className="text-sm text-gray-500">{folder.documentCount} files</p>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-
-      {/* Documents Section */}
-      <div className="card overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Documents ({filteredDocuments.length})
-          </h3>
-        </div>
-
-        {viewMode === 'grid' ? (
-          <div className="p-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredDocuments.map((doc) => (
-                <motion.div
-                  key={doc.id}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="text-2xl">{getFileIcon(doc.type)}</div>
-                    <div className="flex items-center space-x-1">
-                      {doc.isStarred && <Star className="w-4 h-4 text-yellow-500 fill-current" />}
-                      {doc.isShared && <Share2 className="w-4 h-4 text-blue-500" />}
-                    </div>
+              {viewMode === 'grid' ? (
+                <>
+                  <div className="text-center mb-3">
+                    <div className="text-3xl mb-2">{getFileIcon(document.file_type)}</div>
+                    <h4 className="font-medium text-gray-900 text-sm truncate" title={document.name}>
+                      {document.name}
+                    </h4>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {formatFileSize(document.file_size)}
+                    </p>
                   </div>
-
-                  <h4 className="font-medium text-gray-900 text-sm mb-2 line-clamp-2">{doc.name}</h4>
-                  
-                  <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-                    <span>{formatFileSize(doc.size)}</span>
-                    <span className={`px-2 py-1 rounded-full ${getCategoryColor(doc.category)}`}>
-                      {doc.category}
+                  <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                    <span className="text-xs px-2 py-1 bg-primary-100 text-primary-800 rounded-full">
+                      {document.category}
                     </span>
-                  </div>
-
-                  <div className="text-xs text-gray-500 mb-3">
-                    <p>By {doc.uploadedBy}</p>
-                    <p>{format(doc.uploadedAt, 'MMM dd, yyyy')}</p>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1">
                       <button
-                        onClick={() => handleDownload(doc)}
+                        onClick={() => handleDownload(document)}
                         className="p-1 text-gray-400 hover:text-blue-600"
+                        title="Download"
                       >
                         <Download className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => handleShare(doc)}
-                        className="p-1 text-gray-400 hover:text-green-600"
-                      >
-                        <Share2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                    {/* {isProjectManager && (
-                      <button
-                        onClick={() => handleDelete(doc.id)}
+                        onClick={() => handleDeleteDocument(document)}
                         className="p-1 text-gray-400 hover:text-red-600"
+                        title="Delete"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
-                    )} */}
+                    </div>
                   </div>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Document</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uploaded</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredDocuments.map((doc) => (
-                  <motion.tr
-                    key={doc.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="hover:bg-gray-50"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="text-xl mr-3">{getFileIcon(doc.type)}</div>
-                        <div>
-                          <div className="text-sm font-medium text-gray-900 flex items-center space-x-2">
-                            <span>{doc.name}</span>
-                            {doc.isStarred && <Star className="w-3 h-3 text-yellow-500 fill-current" />}
-                            {doc.isShared && <Share2 className="w-3 h-3 text-blue-500" />}
-                          </div>
-                          <div className="text-sm text-gray-500">By {doc.uploadedBy}</div>
-                        </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center flex-1 min-w-0">
+                    <div className="text-2xl mr-3">{getFileIcon(document.file_type)}</div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-gray-900 truncate">{document.name}</h4>
+                      <div className="flex items-center space-x-4 text-sm text-gray-500">
+                        <span>{document.category}</span>
+                        <span>{formatFileSize(document.file_size)}</span>
+                        <span>{format(new Date(document.uploaded_at), 'MMM dd, yyyy')}</span>
                       </div>
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getCategoryColor(doc.category)}`}>
-                        {doc.category}
-                      </span>
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatFileSize(doc.size)}
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {format(doc.uploadedAt, 'MMM dd, yyyy')}
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => handleDownload(doc)}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          <Download className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleShare(doc)}
-                          className="text-green-600 hover:text-green-900"
-                        >
-                          <Share2 className="w-4 h-4" />
-                        </button>
-                        {/* {isProjectManager && (
-                          <button
-                            onClick={() => handleDelete(doc.id)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )} */}
-                      </div>
-                    </td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {filteredDocuments.length === 0 && (
-          <div className="p-8 text-center">
-            <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            {documents.length === 0 ? (
-              <div>
-                <p className="text-gray-500 mb-2">No documents have been uploaded yet.</p>
-                <p className="text-sm text-gray-400">Upload your first document to get started!</p>
-              </div>
-            ) : (
-              <p className="text-gray-500">No documents found matching your search criteria.</p>
-            )}
-          </div>
-        )}
-      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleDownload(document)}
+                      className="p-2 text-gray-400 hover:text-blue-600"
+                      title="Download"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteDocument(document)}
+                      className="p-2 text-gray-400 hover:text-red-600"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </>
+              )}
+            </motion.div>
+          ))}
+        </div>
+      )}
 
       {/* Upload Modal */}
-      {showUploadModal && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-        >
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            className="bg-white rounded-lg shadow-xl w-full max-w-md"
-          >
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Upload Documents</h3>
-            </div>
-
-            <div className="p-6">
-              <div className="border-dashed border-2 border-gray-300 rounded-lg p-8 text-center">
-                <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 mb-2">Drag and drop files here, or click to browse</p>
-                <p className="text-sm text-gray-400">Supports PDF, DOC, XLS, images, and CAD files</p>
-                <button className="btn btn-outline mt-4">Choose Files</button>
-              </div>
-
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  onClick={() => setShowUploadModal(false)}
-                  className="btn btn-outline"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => setShowUploadModal(false)}
-                  className="btn btn-primary"
-                >
-                  Upload
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
+      <UploadModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        onUpload={handleUpload}
+        folders={folders}
+      />
     </div>
   );
 } 

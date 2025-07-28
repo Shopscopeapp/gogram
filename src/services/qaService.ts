@@ -1,3 +1,4 @@
+import { supabase } from '../lib/supabase';
 import type { Task, Notification, User, QAAlert, QAChecklistItem } from '../types';
 import { format, addDays, differenceInDays, isBefore, isAfter } from 'date-fns';
 
@@ -12,15 +13,13 @@ interface QATriggerRule {
   checklist?: Omit<QAChecklistItem, 'id' | 'completed' | 'completed_at' | 'completed_by' | 'notes'>[];
 }
 
-interface QAAutoTrigger {
-  category: string;
-  statusTrigger: Task['status'][];
-  progressTrigger?: number; // Percentage
-  alertType: QAAlert['type'];
-  priority: QAAlert['priority'];
-  title: string;
-  description: string;
-  checklist: Omit<QAChecklistItem, 'id' | 'completed' | 'completed_at' | 'completed_by' | 'notes'>[];
+interface QAChecklistCompletion {
+  id: string;
+  qa_alert_id: string;
+  checklist_item_id: string;
+  completed_by: string;
+  completed_at: Date;
+  notes?: string;
 }
 
 class QAService {
@@ -70,69 +69,56 @@ class QAService {
       ]
     },
     {
-      taskCategories: ['Steel', 'Structural', 'Site Work'],
+      taskCategories: ['Steel'],
       triggerDays: 2,
       alertType: 'engineer_inspection',
       priority: 'high',
       title: 'Engineer Inspection Required',
-      description: 'Structural engineer inspection required before proceeding',
+      description: 'Steel work requires engineer inspection before proceeding',
       requirements: [
-        'Schedule engineer site visit',
+        'Schedule engineer visit',
         'Prepare inspection documentation',
-        'Ensure work area is accessible',
-        'Have drawings and specifications available'
+        'Ensure work area is accessible'
       ],
       checklist: [
         { text: 'Engineer inspection scheduled', required: true },
-        { text: 'Work area cleaned and accessible', required: true },
-        { text: 'Drawings and specifications on site', required: true },
-        { text: 'Previous inspection points addressed', required: true }
+        { text: 'Steel placement according to drawings', required: true },
+        { text: 'Welding quality checks completed', required: true },
+        { text: 'Connection details verified', required: true }
       ]
     },
     {
-      taskCategories: ['Masonry', 'Foundation'],
+      taskCategories: ['Foundation'],
       triggerDays: 1,
       alertType: 'quality_checkpoint',
-      priority: 'medium',
-      title: 'Quality Checkpoint Required',
-      description: 'Quality check required before work proceeds',
-      requirements: [
-        'Check material certifications',
-        'Verify work specifications',
-        'Inspect preparation work',
-        'Weather conditions check'
-      ],
-      checklist: [
-        { text: 'Material certificates verified', required: true },
-        { text: 'Work specifications reviewed', required: true },
-        { text: 'Preparation work properly completed', required: true },
-        { text: 'Weather suitable for work', required: true }
-      ]
-    },
-    {
-      taskCategories: ['Electrical', 'Plumbing', 'HVAC'],
-      triggerDays: 1,
-      alertType: 'compliance_check',
       priority: 'high',
-      title: 'Compliance Check Required',
-      description: 'Building code compliance verification required',
+      title: 'Foundation Quality Checkpoint',
+      description: 'Foundation work requires quality checkpoint before backfill',
       requirements: [
-        'Review building code requirements',
-        'Check permit conditions',
-        'Verify installation standards',
-        'Schedule inspection if required'
+        'Dimensional verification',
+        'Surface finish inspection',
+        'Documentation photography'
       ],
       checklist: [
-        { text: 'Building code requirements reviewed', required: true },
-        { text: 'Permit conditions verified', required: true },
-        { text: 'Installation meets standards', required: true },
-        { text: 'Required inspections scheduled', required: true }
+        { text: 'Foundation dimensions verified', required: true },
+        { text: 'Surface finish meets specifications', required: true },
+        { text: 'Waterproofing inspection completed', required: true },
+        { text: 'Documentation photos taken', required: true }
       ]
     }
   ];
 
-  // Auto-trigger rules for status changes and progress milestones
-  private readonly autoTriggerRules: QAAutoTrigger[] = [
+  // Auto-trigger rules for status-based alerts
+  private readonly autoTriggerRules: Array<{
+    category: string;
+    statusTrigger: Task['status'][];
+    progressTrigger?: number;
+    alertType: QAAlert['type'];
+    priority: QAAlert['priority'];
+    title: string;
+    description: string;
+    checklist: Array<{ text: string; required: boolean }>;
+  }> = [
     {
       category: 'Concrete',
       statusTrigger: ['in_progress'],
@@ -177,13 +163,199 @@ class QAService {
   ];
 
   /**
+   * Get all QA alerts for a project from database
+   */
+  async getProjectQAAlerts(projectId: string): Promise<{ success: boolean; alerts?: QAAlert[]; error?: string }> {
+    try {
+      const { data: alerts, error } = await supabase
+        .from('qa_alerts')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Get QA alerts error:', error);
+        return { success: false, error: 'Failed to fetch QA alerts' };
+      }
+
+      // Get checklist completions for each alert
+      const alertsWithCompletions = await Promise.all(
+        (alerts || []).map(async (alert) => {
+          const { data: completions } = await supabase
+            .from('qa_checklist_completions')  
+            .select('*')
+            .eq('qa_alert_id', alert.id);
+
+          // Update checklist items with completion status
+          const updatedChecklist = (alert.checklist || []).map((item: QAChecklistItem) => {
+            const completion = completions?.find(c => c.checklist_item_id === item.id);
+            return {
+              ...item,
+              completed: !!completion,
+              completed_at: completion?.completed_at,
+              completed_by: completion?.completed_by,
+              notes: completion?.notes
+            };
+          });
+
+          return {
+            ...alert,
+            checklist: updatedChecklist,
+            due_date: alert.due_date ? new Date(alert.due_date) : null,
+            created_at: new Date(alert.created_at),
+            updated_at: new Date(alert.updated_at)
+          };
+        })
+      );
+
+      return { success: true, alerts: alertsWithCompletions };
+    } catch (error) {
+      console.error('Get QA alerts error:', error);
+      return { success: false, error: 'Failed to fetch QA alerts' };
+    }
+  }
+
+  /**
+   * Create a new QA alert in the database  
+   */
+  async createQAAlert(alert: Omit<QAAlert, 'created_at' | 'updated_at'>): Promise<{ success: boolean; alert?: QAAlert; error?: string }> {
+    try {
+      const { data: createdAlert, error } = await supabase
+        .from('qa_alerts')
+        .insert({
+          id: alert.id,
+          project_id: alert.project_id,
+          task_id: alert.task_id,
+          type: alert.type,
+          status: alert.status,
+          title: alert.title,
+          description: alert.description,
+          due_date: alert.due_date?.toISOString(),
+          assigned_to: alert.assigned_to,
+          priority: alert.priority,
+          checklist: alert.checklist || []
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Create QA alert error:', error);
+        return { success: false, error: 'Failed to create QA alert' };
+      }
+
+      return { 
+        success: true, 
+        alert: {
+          ...createdAlert,
+          due_date: createdAlert.due_date ? new Date(createdAlert.due_date) : null,
+          created_at: new Date(createdAlert.created_at),
+          updated_at: new Date(createdAlert.updated_at)
+        }
+      };
+    } catch (error) {
+      console.error('Create QA alert error:', error);
+      return { success: false, error: 'Failed to create QA alert' };
+    }
+  }
+
+  /**
+   * Update QA alert status in database
+   */
+  async updateQAAlertStatus(
+    alertId: string, 
+    status: QAAlert['status'], 
+    completedBy?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const updates: any = { status };
+      if (completedBy) {
+        updates.completed_by = completedBy;
+        updates.completed_at = new Date().toISOString();
+      }
+
+      const { error } = await supabase
+        .from('qa_alerts')
+        .update(updates)
+        .eq('id', alertId);
+
+      if (error) {
+        console.error('Update QA alert status error:', error);
+        return { success: false, error: 'Failed to update QA alert status' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Update QA alert status error:', error);
+      return { success: false, error: 'Failed to update QA alert status' };
+    }
+  }
+
+  /**
+   * Complete a checklist item and save to database
+   */
+  async completeChecklistItem(
+    alertId: string,
+    itemId: string, 
+    completedBy: string,
+    notes?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Insert or update checklist completion
+      const { error } = await supabase
+        .from('qa_checklist_completions')
+        .upsert({
+          qa_alert_id: alertId,
+          checklist_item_id: itemId,
+          completed_by: completedBy,
+          completed_at: new Date().toISOString(),
+          notes: notes || null
+        });
+
+      if (error) {
+        console.error('Complete checklist item error:', error);
+        return { success: false, error: 'Failed to complete checklist item' };
+      }
+
+      // Check if all required items are completed
+      const { data: alert } = await supabase
+        .from('qa_alerts')
+        .select('checklist')
+        .eq('id', alertId)
+        .single();
+
+      if (alert?.checklist) {
+        const { data: completions } = await supabase
+          .from('qa_checklist_completions')
+          .select('checklist_item_id')
+          .eq('qa_alert_id', alertId);
+
+        const completedItemIds = new Set(completions?.map(c => c.checklist_item_id) || []);
+        const requiredItems = alert.checklist.filter((item: QAChecklistItem) => item.required);
+        const allRequiredCompleted = requiredItems.every((item: QAChecklistItem) => 
+          completedItemIds.has(item.id)
+        );
+
+        // Auto-update alert status if all required items are completed
+        if (allRequiredCompleted) {
+          await this.updateQAAlertStatus(alertId, 'completed', completedBy);
+        }
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Complete checklist item error:', error);
+      return { success: false, error: 'Failed to complete checklist item' };
+    }
+  }
+
+  /**
    * AUTO-TRIGGER: Generate QA alerts when tasks change status or reach milestones
    */
-  public autoTriggerQAChecks(
+  async autoTriggerQAChecks(
     task: Task,
     previousStatus?: Task['status'],
     projectId: string = ''
-  ): QAAlert[] {
+  ): Promise<QAAlert[]> {
     const alerts: QAAlert[] = [];
     const now = new Date();
 
@@ -221,7 +393,11 @@ class QAService {
           updated_at: now
         };
 
-        alerts.push(alert);
+        // Save to database
+        const result = await this.createQAAlert(alert);
+        if (result.success && result.alert) {
+          alerts.push(result.alert);
+        }
       }
     }
 
@@ -229,104 +405,114 @@ class QAService {
   }
 
   /**
-   * SCHEDULED: Generate QA alerts for upcoming tasks (existing functionality enhanced)
+   * SCHEDULED: Generate QA alerts for upcoming tasks and save to database
    */
-  public generateQAAlerts(
+  async generateAndSaveQAAlerts(
     tasks: Task[],
-    existingAlerts: QAAlert[] = [],
     projectId: string = ''
-  ): QAAlert[] {
-    const newAlerts: QAAlert[] = [];
-    const today = new Date();
-
-    for (const task of tasks) {
-      // Skip completed tasks
-      if (task.status === 'completed') {
-        continue;
+  ): Promise<{ success: boolean; alerts?: QAAlert[]; error?: string }> {
+    try {
+      // Get existing alerts to avoid duplicates
+      const existingResult = await this.getProjectQAAlerts(projectId);
+      if (!existingResult.success) {
+        return { success: false, error: existingResult.error };
       }
 
-      // Check each QA rule
-      for (const rule of this.qaTriggerRules) {
-        if (rule.taskCategories.includes(task.category)) {
-          const daysUntilTask = differenceInDays(task.start_date, today);
-          
-          // Check if we should trigger this alert
-          if (daysUntilTask <= rule.triggerDays && daysUntilTask >= 0) {
-            // Check if alert already exists
-            const existingAlert = existingAlerts.find(
-              alert => alert.task_id === task.id && alert.type === rule.alertType
-            );
+      const existingAlerts = existingResult.alerts || [];
+      const newAlerts: QAAlert[] = [];
+      const today = new Date();
 
-            if (!existingAlert) {
-              const alertId = `qa_${task.id}_${rule.alertType}_${Date.now()}`;
-              
-              const checklist: QAChecklistItem[] = rule.checklist?.map((item, index) => ({
-                id: `${alertId}_item_${index}`,
-                text: item.text,
-                required: item.required,
-                completed: false
-              })) || [];
+      for (const task of tasks) {
+        // Skip completed tasks
+        if (task.status === 'completed') {
+          continue;
+        }
 
-              const alert: QAAlert = {
-                id: alertId,
-                project_id: projectId,
-                task_id: task.id,
-                type: rule.alertType,
-                status: 'pending',
-                title: rule.title,
-                description: rule.description,
-                due_date: addDays(task.start_date, -1), // Due 1 day before task starts
-                assigned_to: task.assigned_to,
-                checklist,
-                priority: rule.priority,
-                created_at: today,
-                updated_at: today
-              };
+        // Check each QA rule
+        for (const rule of this.qaTriggerRules) {
+          if (rule.taskCategories.includes(task.category)) {
+            const daysUntilTask = differenceInDays(task.start_date, today);
+            
+            // Check if we should trigger this alert
+            if (daysUntilTask <= rule.triggerDays && daysUntilTask >= 0) {
+              // Check if alert already exists
+              const existingAlert = existingAlerts.find(
+                alert => alert.task_id === task.id && alert.type === rule.alertType
+              );
 
-              newAlerts.push(alert);
+              if (!existingAlert) {
+                const alertId = `qa_${task.id}_${rule.alertType}_${Date.now()}`;
+                
+                const checklist: QAChecklistItem[] = rule.checklist?.map((item, index) => ({
+                  id: `${alertId}_item_${index}`,
+                  text: item.text,
+                  required: item.required,
+                  completed: false
+                })) || [];
+
+                const alert: QAAlert = {
+                  id: alertId,
+                  project_id: projectId,
+                  task_id: task.id,
+                  type: rule.alertType,
+                  status: 'pending',
+                  title: rule.title,
+                  description: rule.description,
+                  due_date: addDays(task.start_date, -1), // Due 1 day before task starts
+                  assigned_to: task.assigned_to,
+                  checklist,
+                  priority: rule.priority,
+                  created_at: today,
+                  updated_at: today
+                };
+
+                // Save to database
+                const result = await this.createQAAlert(alert);
+                if (result.success && result.alert) {
+                  newAlerts.push(result.alert);
+                }
+              }
             }
           }
         }
       }
-    }
 
-    return newAlerts;
+      return { success: true, alerts: newAlerts };
+    } catch (error) {
+      console.error('Generate QA alerts error:', error);
+      return { success: false, error: 'Failed to generate QA alerts' };
+    }
   }
 
   /**
-   * Complete a QA alert checklist item
+   * Delete a QA alert
    */
-  public completeChecklistItem(
-    alertId: string,
-    itemId: string,
-    completedBy: string,
-    notes?: string
-  ): Partial<QAAlert> {
-    return {
-      checklist: [], // This would be updated with the specific item marked complete
-      updated_at: new Date()
-    };
+  async deleteQAAlert(alertId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase
+        .from('qa_alerts')
+        .delete()
+        .eq('id', alertId);
+
+      if (error) {
+        console.error('Delete QA alert error:', error);
+        return { success: false, error: 'Failed to delete QA alert' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Delete QA alert error:', error);
+      return { success: false, error: 'Failed to delete QA alert' };
+    }
   }
 
-  /**
-   * Update QA alert status
-   */
-  public updateAlertStatus(
-    alertId: string,
-    status: QAAlert['status'],
-    completedBy?: string
-  ): Partial<QAAlert> {
-    const updates: Partial<QAAlert> = {
-      status,
-      updated_at: new Date()
-    };
-
-    if (status === 'completed' && completedBy) {
-      updates.completed_by = completedBy;
-      updates.completed_at = new Date();
-    }
-
-    return updates;
+  // Legacy methods for backward compatibility (now use database)
+  public generateQAAlerts(projectId: string): Promise<QAAlert[]> {
+    // This method is kept for backward compatibility
+    // but now redirects to the database-backed version
+    return this.getProjectQAAlerts(projectId).then(result => 
+      result.success ? result.alerts || [] : []
+    );
   }
 
   /**
@@ -398,7 +584,6 @@ class QAService {
   }
 }
 
-// Export singleton instance
 const qaService = new QAService();
 export default qaService;
 export type { QAAlert, QAChecklistItem }; 

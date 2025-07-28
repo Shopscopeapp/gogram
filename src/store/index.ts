@@ -20,6 +20,7 @@ import type {
   DashboardStats,
   QAAlert
 } from '../types';
+import emailService from '../services/emailService';
 
 interface AppState {
   // User Management
@@ -137,6 +138,10 @@ interface AppActions {
   // Utility Actions
   generatePublicShareLink: (projectId: string) => string;
   exportDelayRegister: (format: 'pdf' | 'excel') => void;
+
+  // Email Actions
+  sendDeliveryConfirmation: (deliveryId: string, newDate: Date) => Promise<void>;
+  testEmailConfiguration: (testEmail: string) => Promise<void>;
 }
 
 type AppStore = AppState & AppActions;
@@ -325,90 +330,143 @@ export const useAppStore = create<AppStore>()(
 
       // Note: Async supplier and delivery actions are defined later in the file
 
-      // QA Actions
-      generateQAAlerts: () => {
-        const { tasks, qaAlerts, users } = get();
-        
-        // Generate new QA alerts
-        const newAlerts = qaService.generateQAAlerts(tasks, qaAlerts);
-        
-        if (newAlerts.length > 0) {
-          set((state) => ({
-            qaAlerts: [...state.qaAlerts, ...newAlerts]
-          }));
+      // QA Alert Management with Database Persistence
+      qaAlerts: [] as QAAlert[],
 
-          // Create notifications for assigned users
-          const qaNotifications = qaService.generateQANotifications(newAlerts, users);
-          
-          // Add notifications to the system
-          qaNotifications.forEach(notification => {
-            get().addNotification(notification);
-          });
+      // Initialize QA alerts from database
+      initializeQAAlerts: async () => {
+        const { currentProject } = get();
+        if (!currentProject) return;
 
-          if (qaNotifications.length > 0) {
-            toast(`🔍 ${newAlerts.length} new QA alert${newAlerts.length > 1 ? 's' : ''} generated`, {
-              duration: 5000,
-              style: {
-                background: '#3b82f6',
-                color: '#fff',
-              },
-            });
+        try {
+          const result = await qaService.getProjectQAAlerts(currentProject.id);
+          if (result.success) {
+            set({ qaAlerts: result.alerts || [] });
+          } else {
+            console.error('Failed to load QA alerts:', result.error);
           }
+        } catch (error) {
+          console.error('Error initializing QA alerts:', error);
         }
       },
 
-      updateQAAlertStatus: (alertId, status) => {
-        const { qaAlerts, currentUser } = get();
-        const alertUpdates = qaService.updateAlertStatus(alertId, status, currentUser?.id);
-        
-        set((state) => ({
-          qaAlerts: state.qaAlerts.map(alert =>
-            alert.id === alertId ? { ...alert, ...alertUpdates } : alert
-          )
-        }));
-        
-        if (status === 'completed') {
-          toast.success('QA checklist completed successfully!');
+      // Generate new QA alerts for tasks
+      generateQAAlerts: async () => {
+        const { currentProject, tasks } = get();
+        if (!currentProject) return;
+
+        try {
+          const result = await qaService.generateAndSaveQAAlerts(tasks, currentProject.id);
+          if (result.success && result.alerts && result.alerts.length > 0) {
+            set(state => ({
+              qaAlerts: [...state.qaAlerts, ...result.alerts!]
+            }));
+            toast.success(`${result.alerts.length} new QA alert${result.alerts.length > 1 ? 's' : ''} created`);
+          }
+        } catch (error) {
+          console.error('Error generating QA alerts:', error);
+          toast.error('Failed to generate QA alerts');
         }
       },
 
-      completeQAChecklistItem: (alertId, itemId, notes) => {
-        const { qaAlerts, currentUser } = get();
-        if (!currentUser) return;
+      // Complete a QA checklist item
+      completeQAChecklistItem: async (alertId: string, itemId: string, notes?: string) => {
+        const { currentUser } = get();
+        if (!currentUser) {
+          toast.error('User not found');
+          return;
+        }
 
-        // Update the checklist item locally
-        set((state) => ({
-          qaAlerts: state.qaAlerts.map(alert => {
-            if (alert.id === alertId) {
-              const updatedChecklist = alert.checklist.map(item =>
-                item.id === itemId
-                  ? {
-                      ...item, 
-                      completed: true,
-                      completed_at: new Date(),
-                      completed_by: currentUser.id,
-                      notes
-                    }
-                  : item
-              );
+        try {
+          const result = await qaService.completeChecklistItem(alertId, itemId, currentUser.id, notes);
+          if (result.success) {
+            // Refresh QA alerts to get updated completion status
+            await get().initializeQAAlerts();
+            toast.success('Checklist item completed!');
+          } else {
+            toast.error(result.error || 'Failed to complete checklist item');
+          }
+        } catch (error) {
+          console.error('Error completing checklist item:', error);
+          toast.error('Failed to complete checklist item');
+        }
+      },
 
-              // Check if all required items are completed
-              const allRequiredCompleted = updatedChecklist
-                .filter(item => item.required)
-                .every(item => item.completed);
+      // Update QA alert status
+      updateQAAlertStatus: async (alertId: string, status: QAAlert['status']) => {
+        const { currentUser } = get();
+        if (!currentUser) {
+          toast.error('User not found');
+          return;
+        }
 
-              return {
-                ...alert,
-                checklist: updatedChecklist,
-                status: allRequiredCompleted ? 'completed' as const : alert.status,
-                updated_at: new Date()
-              };
+        try {
+          const result = await qaService.updateQAAlertStatus(alertId, status, currentUser.id);
+          if (result.success) {
+            // Update local state
+            set(state => ({
+              qaAlerts: state.qaAlerts.map(alert =>
+                alert.id === alertId
+                  ? { ...alert, status, updated_at: new Date() }
+                  : alert
+              )
+            }));
+            
+            const statusText = status === 'completed' ? 'completed' : 
+                             status === 'in_progress' ? 'marked in progress' : 'updated';
+            toast.success(`QA alert ${statusText}!`);
+          } else {
+            toast.error(result.error || 'Failed to update QA alert status');
+          }
+        } catch (error) {
+          console.error('Error updating QA alert status:', error);
+          toast.error('Failed to update QA alert status');
+        }
+      },
+
+      // Delete a QA alert
+      deleteQAAlert: async (alertId: string) => {
+        try {
+          const result = await qaService.deleteQAAlert(alertId);
+          if (result.success) {
+            set(state => ({
+              qaAlerts: state.qaAlerts.filter(alert => alert.id !== alertId)
+            }));
+            toast.success('QA alert deleted!');
+          } else {
+            toast.error(result.error || 'Failed to delete QA alert');
+          }
+        } catch (error) {
+          console.error('Error deleting QA alert:', error);
+          toast.error('Failed to delete QA alert');
+        }
+      },
+
+      // Auto-trigger QA checks when tasks are updated
+      autoTriggerQAChecks: async (task: Task, previousStatus?: Task['status']) => {
+        const { currentProject } = get();
+        if (!currentProject) return;
+
+        try {
+          const newAlerts = await qaService.autoTriggerQAChecks(task, previousStatus, currentProject.id);
+          if (newAlerts.length > 0) {
+            set(state => ({
+              qaAlerts: [...state.qaAlerts, ...newAlerts]
+            }));
+            
+            // Show notification for critical alerts
+            const criticalAlerts = newAlerts.filter(alert => alert.priority === 'critical');
+            if (criticalAlerts.length > 0) {
+              toast.error(`🔍 CRITICAL QA Alert: ${criticalAlerts[0].title}`, {
+                duration: 8000
+              });
+            } else {
+              toast.success(`🔍 New QA alert created: ${newAlerts[0].title}`);
             }
-            return alert;
-          })
-        }));
-        
-        toast.success('Checklist item completed');
+          }
+        } catch (error) {
+          console.error('Error auto-triggering QA checks:', error);
+        }
       },
 
       // Notification Actions
@@ -648,7 +706,8 @@ export const useAppStore = create<AppStore>()(
       },
 
       // Real task management methods
-      addTask: async (task) => {
+      // Enhanced addTask with QA integration
+      addTask: async (taskData: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => {
         const { currentUser, currentProject } = get();
         if (!currentUser || !currentProject) {
           toast.error('User or project not found');
@@ -657,86 +716,41 @@ export const useAppStore = create<AppStore>()(
 
         try {
           const result = await taskService.createTask({
-            project_id: currentProject.id,
-            title: task.title,
-            description: task.description,
-            category: task.category,
-            location: task.location,
-            status: task.status,
-            priority: task.priority,
-            assigned_to: task.assigned_to,
-            start_date: task.start_date,
-            end_date: task.end_date,
-            planned_duration: task.planned_duration,
-            color: task.color,
-            dependencies: task.dependencies,
-            notes: task.notes,
-            primary_supplier_id: task.primary_supplier_id,
-            material_delivery_date: task.material_delivery_date,
-            procurement_notes: task.procurement_notes,
+            ...taskData,
+            project_id: currentProject.id
           }, currentUser.id);
 
           if (result.success && result.task) {
-            // Add to local state
             set(state => ({
               tasks: [...state.tasks, result.task!]
             }));
 
-            // Auto-create delivery if materials required
-            if (task.primary_supplier_id) {
-              const { suppliers, deliveries } = get();
-              const supplier = suppliers.find(s => s.id === task.primary_supplier_id);
-              
-              const plannedDate = task.material_delivery_date || addDays(task.start_date, -2);
-              
-              const newDelivery = {
-                id: Date.now().toString(),
-                task_id: result.task.id,
-                supplier_id: task.primary_supplier_id,
-                planned_date: plannedDate,
-                confirmation_status: 'pending' as const,
-                notes: task.procurement_notes,
-                created_at: new Date(),
-                updated_at: new Date(),
-              };
+            // Auto-trigger QA checks for new task
+            await get().autoTriggerQAChecks(result.task);
 
-              set(state => ({
-                deliveries: [...state.deliveries, newDelivery]
-              }));
-
-              toast.success(`Task created and delivery scheduled for ${format(plannedDate, 'MMM dd, yyyy')}`);
-              if (supplier) {
-                toast.success(`Supplier ${supplier.name} linked to task`);
+            // Send email notification if task is assigned to someone
+            if (result.task.assigned_to && result.task.assigned_to !== currentUser.id) {
+              const assignee = get().users.find(u => u.id === result.task!.assigned_to);
+              if (assignee) {
+                emailService.sendTaskAssignment(
+                  result.task,
+                  assignee,
+                  currentProject,
+                  currentUser
+                ).then(emailResult => {
+                  if (emailResult.success) {
+                    toast.success(`Task assigned and notification sent to ${assignee.full_name}`);
+                  } else {
+                    console.error('Failed to send task assignment email:', emailResult.error);
+                    toast.success('Task assigned (email notification failed)');
+                  }
+                }).catch(error => {
+                  console.error('Email service error:', error);
+                });
               }
             } else {
-              toast.success('Task created successfully');
+              toast.success('Task added successfully!');
             }
-
-            // Check for QA requirements
-            if (qaService.requiresQA(task.category)) {
-              const requirements = qaService.getQARequirements(task.category);
-              toast(`⚠️ QA Required: ${requirements.join(', ')}`, {
-                duration: 6000,
-                style: { background: '#f59e0b', color: 'white' }
-              });
-            }
-
-            // Trigger QA checks for status changes
-            const newAlerts = await qaService.autoTriggerQAChecks(result.task, currentProject.id);
-            if (newAlerts.length > 0) {
-              set(state => ({
-                qaAlerts: [...state.qaAlerts, ...newAlerts]
-              }));
-
-              // Show toast for critical/high priority alerts
-              newAlerts.forEach(alert => {
-                if (alert.priority === 'critical' || alert.priority === 'high') {
-                  toast.error(`QA Alert: ${alert.type.replace('_', ' ').toUpperCase()}`);
-                }
-              });
-            }
-
-            get().updateDashboardStats();
           } else {
             toast.error(result.error || 'Failed to create task');
           }
@@ -746,52 +760,60 @@ export const useAppStore = create<AppStore>()(
         }
       },
 
-      updateTask: async (taskId, updates) => {
-        const { currentUser, tasks } = get();
+      // Enhanced updateTask with QA integration
+      updateTask: async (taskId: string, updates: Partial<Task>) => {
+        const { currentUser, tasks, currentProject, users } = get();
         if (!currentUser) {
           toast.error('User not found');
           return;
         }
 
-        const originalTask = tasks.find(t => t.id === taskId);
-        if (!originalTask) {
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) {
           toast.error('Task not found');
           return;
         }
+
+        const previousStatus = task.status;
 
         try {
           const result = await taskService.updateTask(taskId, updates, currentUser.id);
 
           if (result.success && result.task) {
-            // Update local state
             set(state => ({
-              tasks: state.tasks.map(task => 
-                task.id === taskId ? result.task! : task
+              tasks: state.tasks.map(t => 
+                t.id === taskId ? result.task! : t
               )
             }));
 
-            // Trigger QA checks for status or progress changes
-            if (updates.status || updates.progress_percentage !== undefined) {
-              const { currentProject, qaAlerts } = get();
-              if (currentProject) {
-                const newAlerts = await qaService.autoTriggerQAChecks(result.task, currentProject.id);
-                if (newAlerts.length > 0) {
-                  set(state => ({
-                    qaAlerts: [...state.qaAlerts, ...newAlerts]
-                  }));
-
-                  // Show toast for critical/high priority alerts
-                  newAlerts.forEach(alert => {
-                    if (alert.priority === 'critical' || alert.priority === 'high') {
-                      toast.error(`QA Alert: ${alert.type.replace('_', ' ').toUpperCase()}`);
-                    }
-                  });
-                }
-              }
+            // Auto-trigger QA checks if status changed
+            if (updates.status && updates.status !== previousStatus) {
+              await get().autoTriggerQAChecks(result.task, previousStatus);
             }
 
-            get().updateDashboardStats();
-            toast.success('Task updated successfully');
+            // Send email notification if assignee changed
+            if (updates.assigned_to && updates.assigned_to !== task.assigned_to && updates.assigned_to !== currentUser.id) {
+              const newAssignee = users.find(u => u.id === updates.assigned_to);
+              if (newAssignee && currentProject) {
+                emailService.sendTaskAssignment(
+                  result.task,
+                  newAssignee,
+                  currentProject,
+                  currentUser
+                ).then(emailResult => {
+                  if (emailResult.success) {
+                    toast.success(`Task updated and notification sent to ${newAssignee.full_name}`);
+                  } else {
+                    console.error('Failed to send task assignment email:', emailResult.error);
+                    toast.success('Task updated (email notification failed)');
+                  }
+                }).catch(error => {
+                  console.error('Email service error:', error);
+                });
+              }
+            } else {
+              toast.success('Task updated successfully!');
+            }
           } else {
             toast.error(result.error || 'Failed to update task');
           }
@@ -1035,6 +1057,64 @@ export const useAppStore = create<AppStore>()(
         } catch (error) {
           console.error('Error updating delivery:', error);
           toast.error('Failed to update delivery');
+        }
+      },
+
+      // Add method to send delivery confirmation emails
+      sendDeliveryConfirmation: async (deliveryId: string, newDate: Date) => {
+        const { currentUser, currentProject, deliveries, tasks, suppliers } = get();
+        if (!currentUser || !currentProject) {
+          toast.error('User or project not found');
+          return;
+        }
+
+        const delivery = deliveries.find(d => d.id === deliveryId);
+        if (!delivery) {
+          toast.error('Delivery not found');
+          return;
+        }
+
+        const task = tasks.find(t => t.id === delivery.task_id);
+        const supplier = suppliers.find(s => s.id === delivery.supplier_id);
+
+        if (!task || !supplier) {
+          toast.error('Associated task or supplier not found');
+          return;
+        }
+
+        try {
+          const result = await emailService.sendDeliveryConfirmation(
+            delivery,
+            { ...supplier, email: supplier.email || `${supplier.contact_person}@${supplier.company}.com` } as any,
+            task,
+            currentProject,
+            currentUser,
+            newDate
+          );
+
+          if (result.success) {
+            toast.success(`Delivery confirmation sent to ${supplier.company}`);
+          } else {
+            toast.error(result.error || 'Failed to send delivery confirmation');
+          }
+        } catch (error) {
+          console.error('Error sending delivery confirmation:', error);
+          toast.error('Failed to send delivery confirmation');
+        }
+      },
+
+      // Test email configuration
+      testEmailConfiguration: async (testEmail: string) => {
+        try {
+          const result = await emailService.testEmailConfiguration(testEmail);
+          if (result.success) {
+            toast.success('Test email sent successfully! Check your inbox.');
+          } else {
+            toast.error(result.error || 'Failed to send test email');
+          }
+        } catch (error) {
+          console.error('Error testing email configuration:', error);
+          toast.error('Failed to test email configuration');
         }
       },
     }),
