@@ -106,7 +106,7 @@ class TaskService {
         notes: task.notes,
         attachments: task.attachments || [],
         primary_supplier_id: task.primary_supplier_id,
-        requires_materials: task.requires_materials,
+
         material_delivery_date: task.material_delivery_date ? new Date(task.material_delivery_date) : undefined,
         procurement_notes: task.procurement_notes,
         created_by: task.created_by,
@@ -165,7 +165,6 @@ class TaskService {
         notes: task.notes,
         attachments: task.attachments || [],
         primary_supplier_id: task.primary_supplier_id,
-        requires_materials: task.requires_materials,
         material_delivery_date: task.material_delivery_date ? new Date(task.material_delivery_date) : undefined,
         procurement_notes: task.procurement_notes,
         created_by: task.created_by,
@@ -208,7 +207,6 @@ class TaskService {
       if (updates.color !== undefined) updateData.color = updates.color;
       if (updates.notes !== undefined) updateData.notes = updates.notes;
       if (updates.primary_supplier_id !== undefined) updateData.primary_supplier_id = updates.primary_supplier_id;
-      if (updates.requires_materials !== undefined) updateData.requires_materials = updates.requires_materials;
       if (updates.material_delivery_date !== undefined) updateData.material_delivery_date = updates.material_delivery_date?.toISOString();
       if (updates.procurement_notes !== undefined) updateData.procurement_notes = updates.procurement_notes;
 
@@ -302,7 +300,6 @@ class TaskService {
         notes: task.notes,
         attachments: task.attachments || [],
         primary_supplier_id: task.primary_supplier_id,
-        requires_materials: task.requires_materials,
         material_delivery_date: task.material_delivery_date ? new Date(task.material_delivery_date) : undefined,
         procurement_notes: task.procurement_notes,
         created_by: task.created_by,

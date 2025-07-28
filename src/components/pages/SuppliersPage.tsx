@@ -421,7 +421,23 @@ export default function SuppliersPage() {
 
       {/* Suppliers Grid */}
       <div className="grid lg:grid-cols-2 gap-6">
-        {suppliers.map((supplier) => {
+        {suppliers.length === 0 ? (
+          <div className="col-span-2 p-12 text-center">
+            <Truck className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <div>
+              <p className="text-gray-500 mb-2">No suppliers have been added yet.</p>
+              <p className="text-sm text-gray-400">Add your first supplier to start managing deliveries!</p>
+            </div>
+            <button 
+              onClick={() => setShowAddModal(true)}
+              className="mt-4 btn btn-primary btn-md"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add First Supplier
+            </button>
+          </div>
+        ) : (
+          suppliers.map((supplier) => {
           const supplierDeliveries = deliveries.filter(d => d.supplier_id === supplier.id);
           
           return (
@@ -509,7 +525,8 @@ export default function SuppliersPage() {
               </div>
             </motion.div>
           );
-        })}
+        })
+        )}
       </div>
 
       {/* Delivery Summary */}

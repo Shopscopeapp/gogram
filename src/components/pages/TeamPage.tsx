@@ -453,7 +453,14 @@ export default function TeamPage() {
         {filteredMembers.length === 0 && (
           <div className="p-8 text-center">
             <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500">No team members found matching your search criteria.</p>
+            {users.length === 0 ? (
+              <div>
+                <p className="text-gray-500 mb-2">No team members have been added yet.</p>
+                <p className="text-sm text-gray-400">Add your first team member to get started!</p>
+              </div>
+            ) : (
+              <p className="text-gray-500">No team members found matching your search criteria.</p>
+            )}
           </div>
         )}
       </div>

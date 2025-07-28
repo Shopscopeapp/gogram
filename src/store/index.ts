@@ -588,9 +588,9 @@ export const useAppStore = create<AppStore>()(
         import('../utils/mockData').then((mockData) => {
           console.log('Mock data imported:', mockData);
           
-          const { mockProject, mockTasks, mockDeliveries, mockSuppliers, mockTaskChangeProposals } = mockData;
+          const { mockProject, mockTasks, mockDeliveries, mockSuppliers, mockTaskChangeProposals, mockUsers } = mockData;
           
-          if (!mockProject || !mockTasks || !mockDeliveries || !mockSuppliers) {
+          if (!mockProject || !mockTasks || !mockDeliveries || !mockSuppliers || !mockUsers) {
             console.error('Missing required mock data exports');
             return;
           }
@@ -603,6 +603,7 @@ export const useAppStore = create<AppStore>()(
             tasks: mockTasks,
             deliveries: mockDeliveries, 
             suppliers: mockSuppliers,
+            users: mockUsers,
             taskChangeProposals: mockTaskChangeProposals || [],
             qaAlerts: [], // Start with empty QA alerts, they'll be generated
           });
@@ -671,7 +672,6 @@ export const useAppStore = create<AppStore>()(
             dependencies: task.dependencies,
             notes: task.notes,
             primary_supplier_id: task.primary_supplier_id,
-            requires_materials: task.requires_materials,
             material_delivery_date: task.material_delivery_date,
             procurement_notes: task.procurement_notes,
           }, currentUser.id);
@@ -683,7 +683,7 @@ export const useAppStore = create<AppStore>()(
             }));
 
             // Auto-create delivery if materials required
-            if (task.requires_materials && task.primary_supplier_id) {
+            if (task.primary_supplier_id) {
               const { suppliers, deliveries } = get();
               const supplier = suppliers.find(s => s.id === task.primary_supplier_id);
               

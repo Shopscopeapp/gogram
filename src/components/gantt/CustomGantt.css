@@ -1,0 +1,202 @@
+/* Custom Gantt Chart Styles - Construction Project Management */
+
+.custom-gantt-container {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  min-height: 600px; /* Ensure minimum height for construction projects */
+}
+
+.gantt-timeline-header {
+  background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
+  border-bottom: 2px solid #e2e8f0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 8px 0; /* More padding for construction visibility */
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.gantt-timeline-month {
+  background: #f8fafc;
+  border-right: 1px solid #cbd5e1;
+  font-weight: 600;
+  color: #475569;
+  padding: 12px 6px; /* Increased padding */
+  font-size: 14px; /* Slightly larger for construction readability */
+}
+
+.gantt-timeline-day {
+  border-right: 1px solid #f1f5f9;
+  transition: background-color 0.15s ease;
+  padding: 8px 3px; /* More padding */
+  font-size: 12px;
+  min-height: 60px; /* Ensure adequate height */
+}
+
+.gantt-timeline-day:hover {
+  background-color: #f8fafc;
+}
+
+.gantt-timeline-day.today {
+  background-color: #dbeafe;
+  border-right: 1px solid #93c5fd;
+  font-weight: 600;
+}
+
+.gantt-timeline-day.weekend {
+  background-color: #f9fafb;
+  color: #9ca3af;
+}
+
+.gantt-task-row {
+  border-bottom: 1px solid #f1f5f9;
+  transition: all 0.15s ease;
+  min-height: 80px; /* Much taller rows for construction */
+  display: flex;
+  align-items: stretch;
+}
+
+.gantt-task-row:hover {
+  background-color: #f8fafc;
+  box-shadow: inset 3px 0 0 #3b82f6;
+}
+
+.gantt-task-row.selected {
+  background-color: #eff6ff;
+  box-shadow: inset 3px 0 0 #2563eb;
+}
+
+.gantt-task-row.critical {
+  border-left: 4px solid #dc2626;
+  background-color: #fef2f2;
+}
+
+.gantt-task-name {
+  border-right: 2px solid #e5e7eb;
+  background: white;
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  font-size: 14px;
+  position: sticky;
+  left: 0;
+  z-index: 50;
+}
+
+.gantt-task-bar {
+  position: relative;
+  border-radius: 8px; /* More rounded for modern construction look */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); /* Enhanced shadow */
+  transition: all 0.2s ease;
+  cursor: move;
+  overflow: hidden;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px; /* Larger minimum height */
+}
+
+.gantt-task-bar:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 30;
+}
+
+.gantt-task-bar.critical {
+  border: 2px solid #dc2626;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+.gantt-task-bar.critical:hover {
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.4);
+}
+
+.gantt-task-label {
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  font-weight: 500;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.gantt-task-progress {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 6px 0 0 6px;
+  transition: width 0.3s ease;
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  backdrop-filter: blur(2px);
+}
+
+.gantt-dependency-line {
+  position: absolute;
+  stroke: #6b7280;
+  stroke-width: 2;
+  fill: none;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.gantt-dependency-arrow {
+  fill: #6b7280;
+}
+
+.gantt-milestone {
+  transform: rotate(45deg);
+  border-radius: 0;
+  width: 24px !important;
+  height: 24px !important;
+  background: linear-gradient(135deg, #7c3aed, #5b21b6);
+}
+
+/* Construction-specific styles */
+.gantt-critical-path {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  border: 2px solid #991b1b;
+  animation: criticalPulse 2s ease-in-out infinite;
+}
+
+@keyframes criticalPulse {
+  0%, 100% { 
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3); 
+  }
+  50% { 
+    box-shadow: 0 4px 16px rgba(220, 38, 38, 0.5); 
+  }
+}
+
+.gantt-resource-indicator {
+  position: absolute;
+  top: -8px;
+  right: 4px;
+  background: #374151;
+  color: white;
+  border-radius: 10px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.gantt-float-indicator {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  background: #f59e0b;
+  color: white;
+  border-radius: 8px;
+  padding: 1px 4px;
+  font-size: 9px;
+  font-weight: 600;
+} 

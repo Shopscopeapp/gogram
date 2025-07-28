@@ -341,6 +341,15 @@ function AppContent() {
         {/* Public routes - always accessible */}
         <Route path="/confirm-delivery/:deliveryId" element={<SupplierConfirmationPage />} />
         <Route path="/public/project/:shareToken" element={<PublicProjectPage />} />
+        
+        {/* Demo route - always accessible */}
+        <Route path="/demo" element={
+          <LoginScreen 
+            onLogin={handleDemoLogin} 
+            onBack={() => navigate('/')}
+            isDemo={true}
+          />
+        } />
 
         {/* Auth route - accessible from any state but with guards */}
         <Route path="/auth" element={
@@ -372,15 +381,6 @@ function AppContent() {
         {appState === 'unauthenticated' && (
           <>
             <Route path="/" element={<LandingPage onGetStarted={handleGetStarted} onStartDemo={handleStartDemo} onCreateAccount={handleCreateAccount} />} />
-            
-            {/* Demo login screen */}
-            <Route path="/demo" element={
-              <LoginScreen 
-                onLogin={handleDemoLogin} 
-                onBack={() => navigate('/')}
-                isDemo={true}
-              />
-            } />
             
             <Route path="*" element={<Navigate to="/" replace />} />
           </>

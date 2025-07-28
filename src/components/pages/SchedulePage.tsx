@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Clock, Users, Plus, Filter, Settings, X, Zap, BarChart3 } from 'lucide-react';
+import { Calendar, Clock, Users, Plus, Filter, Settings, X, BarChart3 } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { format, addDays, parseISO } from 'date-fns';
+import { safeDateFormat } from '../../utils/dateHelpers';
 import GanttChart from '../gantt/GanttChart';
-import SVARGanttChart from '../gantt/SVARGanttChart';
+import CustomGanttChart from '../gantt/CustomGanttChart';
 import type { Task } from '../../types';
 import toast from 'react-hot-toast';
 
@@ -336,7 +337,7 @@ function AddTaskModal({ isOpen, onClose, onAddTask }: AddTaskModalProps) {
 export default function SchedulePage() {
   const { tasks, currentProject, currentUser, addTask, updateTask, moveTask } = useAppStore();
   const [view, setView] = useState<'gantt' | 'list'>('gantt');
-  const [ganttType, setGanttType] = useState<'svar' | 'custom'>('svar'); // Default to SVAR
+
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
 
   if (!currentProject) {
@@ -402,36 +403,7 @@ export default function SchedulePage() {
             </button>
           </div>
 
-          {/* Gantt Type Toggle - only show when gantt view is active */}
-          {view === 'gantt' && (
-            <div className="flex items-center space-x-2 border-l pl-3">
-              <span className="text-sm text-gray-600">Gantt Engine:</span>
-              <button
-                onClick={() => setGanttType('svar')}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors flex items-center space-x-1 ${
-                  ganttType === 'svar'
-                    ? 'bg-green-100 text-green-800 border border-green-300'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-                title="Professional SVAR Gantt - High performance, modern features"
-              >
-                <Zap className="w-3 h-3" />
-                <span>SVAR Pro</span>
-              </button>
-              <button
-                onClick={() => setGanttType('custom')}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors flex items-center space-x-1 ${
-                  ganttType === 'custom'
-                    ? 'bg-blue-100 text-blue-800 border border-blue-300'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-                title="Custom built Gantt - Basic functionality"
-              >
-                <BarChart3 className="w-3 h-3" />
-                <span>Custom</span>
-              </button>
-            </div>
-          )}
+
 
           <div className="flex items-center space-x-2">
             <button className="btn btn-secondary btn-md">
@@ -454,97 +426,42 @@ export default function SchedulePage() {
       {/* Schedule Content */}
       {view === 'gantt' ? (
         <div>
-          {/* Gantt Chart Engine Selection */}
-          {ganttType === 'svar' ? (
-            <div>
-              {/* Professional SVAR Gantt Chart */}
-              <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-3">
-                <div className="flex items-center space-x-2">
-                  <Zap className="w-4 h-4 text-green-600" />
-                  <span className="text-sm font-medium text-green-800">
-                    SVAR Professional Gantt - High Performance Engine
-                  </span>
-                  <span className="text-xs bg-green-200 text-green-800 px-2 py-1 rounded">
-                    FREE • Open Source
-                  </span>
-                </div>
-              </div>
-              
-              <SVARGanttChart
-                tasks={tasks}
-                onTaskUpdate={(taskId, updates) => updateTask(taskId, updates)}
-                onTaskAdd={(taskData) => {
-                  const newTask = {
-                    ...taskData,
-                    id: Date.now().toString(),
-                    project_id: currentProject?.id || '',
-                    created_at: new Date(),
-                    updated_at: new Date(),
-                  } as Task;
-                  addTask(newTask);
-                }}
-                height="600px"
-              />
-              
-              {/* SVAR Tips for Construction Workers */}
-              <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
-                <h3 className="font-medium text-green-900 mb-2">⚡ SVAR Professional Features</h3>
-                <div className="grid md:grid-cols-2 gap-4 text-sm text-green-800">
-                  <div>
-                    <strong>High Performance:</strong> Handles 10,000+ tasks smoothly with optimized rendering.
-                  </div>
-                  <div>
-                    <strong>Professional UI:</strong> Modern construction-focused interface with status icons.
-                  </div>
-                  <div>
-                    <strong>Smart Dependencies:</strong> Auto-scheduling with intelligent dependency management.
-                  </div>
-                  <div>
-                    <strong>Touch Friendly:</strong> Perfect for tablets and mobile devices on construction sites.
-                  </div>
-                  <div>
-                    <strong>Working Hours:</strong> Configured for construction hours (8 AM - 5 PM, Mon-Fri).
-                  </div>
-                  <div>
-                    <strong>Rich Tooltips:</strong> Detailed task information including materials and suppliers.
-                  </div>
-                </div>
+          {/* Custom Professional Gantt Chart */}
+          <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="flex items-center space-x-2">
+              <BarChart3 className="w-4 h-4 text-blue-600" />
+              <span className="text-sm font-medium text-blue-800">
+                🏗️ Professional Construction Gantt Chart - Enhanced for Project Management
+              </span>
+              <span className="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded">
+                Custom Built
+              </span>
+            </div>
+          </div>
+          
+          <CustomGanttChart
+            tasks={tasks}
+            onTaskUpdate={(taskId, updates) => updateTask(taskId, updates)}
+            onTaskClick={(task) => {
+              // Handle task click - could open edit modal
+              console.log('Task clicked:', task);
+            }}
+            readOnly={!canEditSchedule}
+            showDependencies={true}
+          />
+          
+          {/* Professional Features Info */}
+          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h3 className="font-medium text-blue-900 mb-2">🏗️ Professional Construction Gantt Chart - Enhanced for Project Management</h3>
+            <div className="grid md:grid-cols-2 gap-4 text-sm text-blue-800">
+              <div className="text-sm text-blue-800 space-y-1">
+                <p><strong>Construction Features:</strong> Critical path highlighting, resource tracking, progress monitoring, task dependencies</p>
+                <p><strong>Task Management:</strong> Drag & drop scheduling, inline editing, milestone tracking, float time calculation</p>
+                <p><strong>Visual Indicators:</strong> Color-coded priorities, completion progress, resource assignments, dependency lines</p>
+                <p><strong>Project Control:</strong> Enhanced spacing for construction visibility, critical path analysis, resource optimization</p>
               </div>
             </div>
-          ) : (
-            <div>
-              {/* Custom Gantt Chart */}
-              <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div className="flex items-center space-x-2">
-                  <BarChart3 className="w-4 h-4 text-blue-600" />
-                  <span className="text-sm font-medium text-blue-800">
-                    Custom Built Gantt - Basic Functionality
-                  </span>
-                </div>
-              </div>
-              
-              <GanttChart />
-              
-              {/* Custom Gantt Tips for Construction Workers */}
-              <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="font-medium text-blue-900 mb-2">🏗️ Basic Schedule Management</h3>
-                <div className="grid md:grid-cols-2 gap-4 text-sm text-blue-800">
-                  <div>
-                    <strong>Drag & Drop:</strong> Click and drag any task bar to reschedule it. Dependent tasks will automatically move.
-                  </div>
-                  <div>
-                    <strong>Dependencies:</strong> Tasks with chain icons depend on other tasks completing first.
-                  </div>
-                  <div>
-                    <strong>Colors:</strong> Green = completed, Blue = in progress, Red = delayed, Gray = pending.
-                  </div>
-                  <div>
-                    <strong>Zoom:</strong> Use +/- buttons to zoom in/out for better visibility of your timeline.
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          </div>
         </div>
       ) : (
         /* List View */
@@ -570,7 +487,7 @@ export default function SchedulePage() {
                       <div>
                         <h3 className="font-medium text-gray-900">{task.title}</h3>
                         <p className="text-sm text-gray-500">
-                          {format(task.start_date, 'MMM dd')} - {format(task.end_date, 'MMM dd')} • {task.category}
+                          {safeDateFormat(task.start_date, 'MMM dd')} - {safeDateFormat(task.end_date, 'MMM dd')} • {task.category}
                         </p>
                         {task.description && (
                           <p className="text-sm text-gray-600 mt-1">{task.description}</p>
@@ -652,7 +569,7 @@ export default function SchedulePage() {
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Project Duration</span>
               <span className="font-medium">
-                {format(currentProject.start_date, 'MMM dd, yyyy')} - {format(currentProject.end_date, 'MMM dd, yyyy')}
+                {safeDateFormat(currentProject.start_date, 'MMM dd, yyyy')} - {safeDateFormat(currentProject.end_date, 'MMM dd, yyyy')}
               </span>
             </div>
             <div className="flex justify-between text-sm">
@@ -670,8 +587,8 @@ export default function SchedulePage() {
               />
             </div>
             <div className="flex justify-between text-xs text-gray-500">
-              <span>Started {format(currentProject.start_date, 'MMM dd')}</span>
-              <span>Due {format(currentProject.end_date, 'MMM dd')}</span>
+              <span>Started {safeDateFormat(currentProject.start_date, 'MMM dd')}</span>
+              <span>Due {safeDateFormat(currentProject.end_date, 'MMM dd')}</span>
             </div>
           </div>
         </div>
