@@ -31,7 +31,7 @@ const navigationItems: NavItem[] = [
     id: 'dashboard',
     label: 'Dashboard',
     icon: LayoutDashboard,
-    path: '/dashboard',
+    path: '/',
     roles: ['project_manager', 'project_coordinator', 'subcontractor', 'supplier', 'viewer']
   },
   {

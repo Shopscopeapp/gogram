@@ -276,11 +276,14 @@ export default function ProjectDashboard({ currentUser, onProjectSelect, onLogou
     setProjects(prev => [newProject, ...prev]);
   };
 
-  const filteredProjects = projects.filter(project =>
-    project.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    project.client?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    project.location?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredProjects = projects.filter(project => {
+    const query = searchQuery.toLowerCase();
+    return (
+      (project.name && project.name.toLowerCase().includes(query)) ||
+      (project.client && project.client.toLowerCase().includes(query)) ||
+      (project.location && project.location.toLowerCase().includes(query))
+    );
+  });
 
   const handleLogout = async () => {
     try {
@@ -384,7 +387,7 @@ export default function ProjectDashboard({ currentUser, onProjectSelect, onLogou
                 <div className="p-6">
                   <div className="flex items-start justify-between mb-4">
                     <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
-                      {project.title}
+                      {project.name}
                     </h3>
                     <div className="flex-shrink-0">
                       <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">

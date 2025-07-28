@@ -57,148 +57,24 @@ interface Folder {
 }
 
 export default function DocumentsPage() {
-  const { currentUser, isProjectManager } = useAppStore();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
+  const { currentProject } = useAppStore();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [showUploadModal, setShowUploadModal] = useState(false);
 
-  // Mock data - in real app, this would come from the store/database
-  const [folders] = useState<Folder[]>([
-    {
-      id: '1',
-      name: 'Project Drawings',
-      createdBy: 'Mike Thompson',
-      createdAt: new Date('2024-01-15'),
-      documentCount: 12,
-      color: 'blue'
-    },
-    {
-      id: '2',
-      name: 'Contracts & Legal',
-      createdBy: 'Sarah Wilson',
-      createdAt: new Date('2024-01-20'),
-      documentCount: 8,
-      color: 'green'
-    },
-    {
-      id: '3',
-      name: 'Quality Reports',
-      createdBy: 'Lisa Chen',
-      createdAt: new Date('2024-02-01'),
-      documentCount: 15,
-      color: 'purple'
-    },
-    {
-      id: '4',
-      name: 'Site Photos',
-      createdBy: 'Jake Rodriguez',
-      createdAt: new Date('2024-02-10'),
-      documentCount: 45,
-      color: 'orange'
-    }
-  ]);
-
-  const [documents] = useState<Document[]>([
-    {
-      id: '1',
-      name: 'Architectural Plans - Level 1.pdf',
-      type: 'pdf',
-      size: 2400000,
-      category: 'drawings',
-      uploadedBy: 'Mike Thompson',
-      uploadedAt: new Date('2024-01-15'),
-      lastModified: new Date('2024-01-20'),
-      tags: ['architectural', 'level-1', 'foundation'],
-      isStarred: true,
-      isShared: true,
-      permissions: {
-        canView: ['all'],
-        canEdit: ['project_manager', 'project_coordinator'],
-        canDelete: ['project_manager']
-      }
-    },
-    {
-      id: '2',
-      name: 'Construction Contract.docx',
-      type: 'docx',
-      size: 850000,
-      category: 'contracts',
-      uploadedBy: 'Sarah Wilson',
-      uploadedAt: new Date('2024-01-18'),
-      lastModified: new Date('2024-01-25'),
-      tags: ['contract', 'legal', 'main-contractor'],
-      isStarred: false,
-      isShared: false,
-      permissions: {
-        canView: ['project_manager', 'project_coordinator'],
-        canEdit: ['project_manager'],
-        canDelete: ['project_manager']
-      }
-    },
-    {
-      id: '3',
-      name: 'Weekly Progress Report - Week 3.pdf',
-      type: 'pdf',
-      size: 1200000,
-      category: 'reports',
-      uploadedBy: 'Lisa Chen',
-      uploadedAt: new Date('2024-02-01'),
-      lastModified: new Date('2024-02-01'),
-      tags: ['progress', 'weekly', 'week-3'],
-      isStarred: false,
-      isShared: true,
-      permissions: {
-        canView: ['all'],
-        canEdit: ['project_manager', 'project_coordinator'],
-        canDelete: ['project_manager']
-      }
-    },
-    {
-      id: '4',
-      name: 'Foundation Pour - Site Photo.jpg',
-      type: 'jpg',
-      size: 3200000,
-      category: 'photos',
-      uploadedBy: 'Jake Rodriguez',
-      uploadedAt: new Date('2024-02-05'),
-      lastModified: new Date('2024-02-05'),
-      tags: ['foundation', 'concrete', 'site-photo'],
-      isStarred: true,
-      isShared: true,
-      permissions: {
-        canView: ['all'],
-        canEdit: ['project_manager', 'project_coordinator', 'subcontractor'],
-        canDelete: ['project_manager', 'subcontractor']
-      }
-    },
-    {
-      id: '5',
-      name: 'Material Safety Certificate.pdf',
-      type: 'pdf',
-      size: 650000,
-      category: 'certificates',
-      uploadedBy: 'Lisa Chen',
-      uploadedAt: new Date('2024-02-10'),
-      lastModified: new Date('2024-02-10'),
-      tags: ['safety', 'certificate', 'materials'],
-      isStarred: false,
-      isShared: false,
-      permissions: {
-        canView: ['project_manager', 'project_coordinator', 'supplier'],
-        canEdit: ['project_manager'],
-        canDelete: ['project_manager']
-      }
-    }
-  ]);
+  // TODO: Replace with actual document service/API calls
+  // For now using empty arrays - in production this would connect to:
+  // - File storage service (AWS S3, Azure Blob, etc.)
+  // - Database for document metadata
+  // - Permission management system
+  const [folders] = useState<Folder[]>([]);
+  const [documents] = useState<Document[]>([]);
 
   const filteredDocuments = documents.filter(doc => {
     const matchesSearch = doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          doc.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
-    
     const matchesCategory = categoryFilter === 'all' || doc.category === categoryFilter;
-    
     return matchesSearch && matchesCategory;
   });
 
@@ -249,10 +125,19 @@ export default function DocumentsPage() {
     }
   };
 
-  const handleUpload = () => {
-    // Mock file upload
-    toast.success('File upload functionality would be implemented here with real file handling');
-    setShowUploadModal(false);
+  const handleUpload = (files: FileList) => {
+    // TODO: Implement actual file upload
+    // This would typically:
+    // 1. Upload files to cloud storage
+    // 2. Create document metadata in database
+    // 3. Set proper permissions based on user role
+    // 4. Generate thumbnails for images/PDFs
+    // 5. Update document list
+    
+    Array.from(files).forEach(file => {
+      console.log('Would upload file:', file.name);
+      toast.success(`File upload functionality not yet implemented`);
+    });
   };
 
   const handleDownload = (doc: Document) => {
@@ -270,7 +155,7 @@ export default function DocumentsPage() {
     }
   };
 
-  if (!currentUser) {
+  if (!currentProject) {
     return <div>Loading...</div>;
   }
 
@@ -404,12 +289,12 @@ export default function DocumentsPage() {
       <div className="card p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Folders</h3>
-          {isProjectManager && (
+          {/* {isProjectManager && (
             <button className="btn btn-outline btn-sm flex items-center space-x-2">
               <FolderPlus className="w-4 h-4" />
               <span>New Folder</span>
             </button>
-          )}
+          )} */}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -490,14 +375,14 @@ export default function DocumentsPage() {
                         <Share2 className="w-4 h-4" />
                       </button>
                     </div>
-                    {isProjectManager && (
+                    {/* {isProjectManager && (
                       <button
                         onClick={() => handleDelete(doc.id)}
                         className="p-1 text-gray-400 hover:text-red-600"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
-                    )}
+                    )} */}
                   </div>
                 </motion.div>
               ))}
@@ -565,14 +450,14 @@ export default function DocumentsPage() {
                         >
                           <Share2 className="w-4 h-4" />
                         </button>
-                        {isProjectManager && (
+                        {/* {isProjectManager && (
                           <button
                             onClick={() => handleDelete(doc.id)}
                             className="text-red-600 hover:text-red-900"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
-                        )}
+                        )} */}
                       </div>
                     </td>
                   </motion.tr>
@@ -585,7 +470,14 @@ export default function DocumentsPage() {
         {filteredDocuments.length === 0 && (
           <div className="p-8 text-center">
             <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500">No documents found matching your search criteria.</p>
+            {documents.length === 0 ? (
+              <div>
+                <p className="text-gray-500 mb-2">No documents have been uploaded yet.</p>
+                <p className="text-sm text-gray-400">Upload your first document to get started!</p>
+              </div>
+            ) : (
+              <p className="text-gray-500">No documents found matching your search criteria.</p>
+            )}
           </div>
         )}
       </div>
@@ -624,7 +516,7 @@ export default function DocumentsPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={handleUpload}
+                  onClick={() => setShowUploadModal(false)}
                   className="btn btn-primary"
                 >
                   Upload

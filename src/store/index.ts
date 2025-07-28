@@ -297,30 +297,13 @@ export const useAppStore = create<AppStore>()(
         return taskDelays.filter(delay => delay.task_id === taskId);
       },
 
-      // Supplier Actions
-      addSupplier: (supplier) => set((state) => ({ 
-        suppliers: [...state.suppliers, supplier] 
-      })),
-      
-      updateSupplier: (id, updates) => set((state) => ({
-        suppliers: state.suppliers.map(supplier => 
-          supplier.id === id ? { ...supplier, ...updates } : supplier
-        )
-      })),
-      
+      // Sync methods for local state updates (still needed for some UI interactions)
       removeSupplier: (id) => set((state) => ({
         suppliers: state.suppliers.filter(supplier => supplier.id !== id)
       })),
 
-      // Delivery Actions
       addDelivery: (delivery) => set((state) => ({ 
         deliveries: [...state.deliveries, delivery] 
-      })),
-      
-      updateDelivery: (id, updates) => set((state) => ({
-        deliveries: state.deliveries.map(delivery => 
-          delivery.id === id ? { ...delivery, ...updates } : delivery
-        )
       })),
       
       confirmDelivery: (id, confirmed, newDate) => {
@@ -329,7 +312,7 @@ export const useAppStore = create<AppStore>()(
             delivery.id === id 
               ? { 
                   ...delivery, 
-                  confirmationStatus: confirmed ? 'confirmed' : 'rejected',
+                  confirmation_status: confirmed ? 'confirmed' : 'rejected' as any,
                   planned_date: newDate || delivery.planned_date 
                 }
               : delivery
@@ -339,6 +322,8 @@ export const useAppStore = create<AppStore>()(
         const statusText = confirmed ? 'confirmed' : 'rejected';
         toast.success(`Delivery ${statusText} successfully!`);
       },
+
+      // Note: Async supplier and delivery actions are defined later in the file
 
       // QA Actions
       generateQAAlerts: () => {

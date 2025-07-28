@@ -17,9 +17,27 @@ import {
   Globe
 } from 'lucide-react';
 import { useAppStore } from '../../store';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import publicSharingService, { type PublicShareSettings } from '../../services/publicSharingService';
 import toast from 'react-hot-toast';
+
+// Safe date formatting helper
+const safeDateFormat = (date: any, formatStr: string): string => {
+  if (!date) return 'N/A';
+  try {
+    if (date instanceof Date) {
+      return isNaN(date.getTime()) ? 'Invalid date' : format(date, formatStr);
+    }
+    if (typeof date === 'string') {
+      const parsed = parseISO(date);
+      return isNaN(parsed.getTime()) ? 'Invalid date' : format(parsed, formatStr);
+    }
+    return 'Invalid date';
+  } catch (error) {
+    console.warn('Date formatting error:', error, 'Date:', date);
+    return 'Invalid date';
+  }
+};
 
 interface ShareLinkCardProps {
   shareLink: PublicShareSettings;
@@ -71,13 +89,11 @@ function ShareLinkCard({ shareLink, onToggleStatus, onUpdateSettings, onDelete }
             <div>
               <h3 className="font-medium text-gray-900">Public Project Link</h3>
               <p className="text-sm text-gray-600 mt-1">
-                Created {format(shareLink.createdAt, 'MMM dd, yyyy')}
+                Created {safeDateFormat(shareLink.createdAt, 'MMM dd, yyyy')}
               </p>
-              {shareLink.expiresAt && (
-                <p className="text-sm text-warning-600 mt-1">
-                  Expires {format(shareLink.expiresAt, 'MMM dd, yyyy')}
-                </p>
-              )}
+              <p className="text-xs text-gray-500">
+                Expires {safeDateFormat(shareLink.expiresAt, 'MMM dd, yyyy')}
+              </p>
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -375,11 +391,11 @@ export default function SharePage() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Start Date:</span>
-                  <span>{format(currentProject.start_date, 'MMM dd, yyyy')}</span>
+                  <span>{safeDateFormat(currentProject.start_date, 'MMM dd, yyyy')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">End Date:</span>
-                  <span>{format(currentProject.end_date, 'MMM dd, yyyy')}</span>
+                  <span>{safeDateFormat(currentProject.end_date, 'MMM dd, yyyy')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Status:</span>

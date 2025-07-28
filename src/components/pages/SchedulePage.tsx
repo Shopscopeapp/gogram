@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Clock, Users, Plus, Filter, Settings, X, Zap, BarChart3 } from 'lucide-react';
 import { useAppStore } from '../../store';
-import { format, addDays } from 'date-fns';
+import { format, addDays, parseISO } from 'date-fns';
 import GanttChart from '../gantt/GanttChart';
 import SVARGanttChart from '../gantt/SVARGanttChart';
 import type { Task } from '../../types';

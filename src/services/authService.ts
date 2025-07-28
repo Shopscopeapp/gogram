@@ -191,22 +191,38 @@ class AuthService {
   }
 
   /**
-   * Get current user session
+   * Get current user session with timeout and better error handling
    */
   async getCurrentUser(): Promise<User | null> {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      // Add timeout with retry capability
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Session check timeout')), 3000); // Reduced to 3s for faster response
+      });
+
+      const sessionPromise = supabase.auth.getSession();
+      
+      const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
       
       if (!session?.user) {
+        console.log('No active session found');
         return null;
       }
 
-      // Fetch user profile from our users table
-      const { data: profile, error } = await supabase
+      console.log('Active session found for:', session.user.email);
+
+      // Fetch user profile with shorter timeout
+      const profileTimeout = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 2000); // Reduced to 2s
+      });
+
+      const profilePromise = supabase
         .from('users')
         .select('*')
         .eq('auth_user_id', session.user.id)
         .single();
+
+      const { data: profile, error } = await Promise.race([profilePromise, profileTimeout]);
 
       if (error) {
         console.error('Profile fetch error:', error);
@@ -236,6 +252,8 @@ class AuthService {
             return null;
           }
 
+          console.log('Profile created successfully');
+
           return {
             id: session.user.id,
             email: createdProfile.email,
@@ -253,6 +271,8 @@ class AuthService {
         return null;
       }
 
+      console.log('Profile loaded successfully for:', profile.email);
+
       return {
         id: session.user.id, // Use auth user ID for consistency  
         email: profile.email,
@@ -266,6 +286,10 @@ class AuthService {
         updated_at: new Date(profile.updated_at),
       };
     } catch (error) {
+      if (error instanceof Error && error.message.includes('timeout')) {
+        console.error('Session check timeout - this usually indicates network issues');
+        return null;
+      }
       console.error('Get current user error:', error);
       return null;
     }

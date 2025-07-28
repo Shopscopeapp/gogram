@@ -32,28 +32,44 @@ export interface ProjectInvitation {
   invited_by_user?: User;
 }
 
+interface ProjectListResponse {
+  success: boolean;
+  projects?: Project[];
+  error?: string;
+}
+
 class ProjectService {
   /**
    * Create a new construction project
    */
   async createProject(projectData: CreateProjectData, userId: string): Promise<{ success: boolean; project?: Project; error?: string }> {
     try {
-      // Create the project
+      // First, get the correct user ID from public.users table
+      const { data: user, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('auth_user_id', userId)
+        .single();
+
+      if (userError || !user) {
+        console.error('User lookup error:', userError);
+        return { success: false, error: 'User not found' };
+      }
+
+      // Create the project using the public.users.id
       const { data: project, error: projectError } = await supabase
         .from('projects')
         .insert({
-          title: projectData.title,
+          name: projectData.title, // Map title to name in database
           description: projectData.description,
           client: projectData.client,
           location: projectData.location,
           start_date: projectData.start_date.toISOString(),
           end_date: projectData.end_date.toISOString(),
           budget: projectData.budget,
-          created_by: userId,
+          project_manager_id: user.id, // Use the public.users.id instead of auth user ID
+          status: 'planning',
           progress_percentage: 0,
-          is_public: false,
-          public_share_token: null,
-          public_settings: null,
         })
         .select()
         .single();
@@ -63,25 +79,24 @@ class ProjectService {
         return { success: false, error: 'Failed to create project' };
       }
 
-      // Add the creator as project owner
-      const { error: memberError } = await supabase
+      // Now manually add the creator as a project member
+      const { data: memberData, error: memberError } = await supabase
         .from('project_members')
         .insert({
           project_id: project.id,
-          user_id: userId,
-          role: 'owner',
-        });
+          user_id: user.id,
+          role: 'project_manager',
+        })
+        .select();
 
       if (memberError) {
         console.error('Project member creation error:', memberError);
-        // Clean up the project if member creation fails
-        await supabase.from('projects').delete().eq('id', project.id);
-        return { success: false, error: 'Failed to set project ownership' };
+        // Don't fail the whole operation, just log it
       }
 
       const formattedProject: Project = {
         id: project.id,
-        title: project.title,
+        name: project.name, // Use name field from database
         description: project.description,
         client: project.client,
         location: project.location,
@@ -89,10 +104,8 @@ class ProjectService {
         end_date: new Date(project.end_date),
         budget: project.budget,
         progress_percentage: project.progress_percentage,
-        is_public: project.is_public,
-        public_share_token: project.public_share_token,
-        public_settings: project.public_settings,
-        created_by: project.created_by,
+        status: project.status,
+        project_manager_id: project.project_manager_id,
         created_at: new Date(project.created_at),
         updated_at: new Date(project.updated_at),
       };
@@ -107,16 +120,27 @@ class ProjectService {
   /**
    * Get all projects for a user
    */
-  async getUserProjects(userId: string): Promise<{ success: boolean; projects?: Project[]; error?: string }> {
+  async getUserProjects(userId: string): Promise<ProjectListResponse> {
     try {
+      // First, get the correct user ID from public.users table
+      const { data: user, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('auth_user_id', userId)
+        .single();
+
+      if (userError || !user) {
+        console.error('User lookup error:', userError);
+        return { success: false, error: 'User not found' };
+      }
+
       const { data: projectMembers, error } = await supabase
         .from('project_members')
         .select(`
           role,
-          joined_at,
           projects (
             id,
-            title,
+            name,
             description,
             client,
             location,
@@ -124,15 +148,13 @@ class ProjectService {
             end_date,
             budget,
             progress_percentage,
-            is_public,
-            public_share_token,
-            public_settings,
-            created_by,
+            status,
+            project_manager_id,
             created_at,
             updated_at
           )
         `)
-        .eq('user_id', userId);
+        .eq('user_id', user.id); // Use the public.users.id
 
       if (error) {
         console.error('Get user projects error:', error);
@@ -141,23 +163,24 @@ class ProjectService {
 
       const projects: Project[] = projectMembers
         .filter(member => member.projects)
-        .map(member => ({
-          id: member.projects.id,
-          title: member.projects.title,
-          description: member.projects.description,
-          client: member.projects.client,
-          location: member.projects.location,
-          start_date: new Date(member.projects.start_date),
-          end_date: new Date(member.projects.end_date),
-          budget: member.projects.budget,
-          progress_percentage: member.projects.progress_percentage,
-          is_public: member.projects.is_public,
-          public_share_token: member.projects.public_share_token,
-          public_settings: member.projects.public_settings,
-          created_by: member.projects.created_by,
-          created_at: new Date(member.projects.created_at),
-          updated_at: new Date(member.projects.updated_at),
-        }));
+        .map(member => {
+          const project = member.projects as any; // Type assertion for debugging
+          return {
+            id: project.id,
+            name: project.name, // Use name instead of title
+            description: project.description,
+            client: project.client,
+            location: project.location,
+            start_date: new Date(project.start_date),
+            end_date: new Date(project.end_date),
+            budget: project.budget,
+            progress_percentage: project.progress_percentage,
+            status: project.status,
+            project_manager_id: project.project_manager_id,
+            created_at: new Date(project.created_at),
+            updated_at: new Date(project.updated_at),
+          };
+        });
 
       return { success: true, projects };
     } catch (error) {

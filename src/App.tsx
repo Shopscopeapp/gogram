@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAppStore } from './store';
 import { authService } from './services/authService';
@@ -29,7 +30,18 @@ import PublicProjectPage from './components/pages/PublicProjectPage';
 import LandingPage from './components/landing/LandingPage';
 
 type AuthMode = 'login' | 'signup' | 'forgot-password';
-type AppState = 'loading' | 'landing' | 'demo-selection' | 'demo-active' | 'unauthenticated' | 'project-selection' | 'authenticated';
+
+// Simplified app states - only 3 states instead of 7
+type AppState = 
+  | 'initializing'    // App is starting up and checking auth
+  | 'unauthenticated' // User needs to login/signup or use demo
+  | 'authenticated';  // User is logged in and using the app
+
+interface AppData {
+  user: User | null;
+  project: Project | null;
+  isDemoMode: boolean;
+}
 
 function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -45,134 +57,200 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-function App() {
-  const [appState, setAppState] = useState<AppState>('loading');
+function LoadingScreen({ message = "Loading Gogram..." }: { message?: string }) {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-white flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-16 h-16 bg-primary-600 rounded-xl flex items-center justify-center mx-auto mb-4 animate-pulse">
+          <div className="w-8 h-8 bg-white rounded" />
+        </div>
+        <p className="text-gray-600">{message}</p>
+      </div>
+    </div>
+  );
+}
+
+function AppContent() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [appState, setAppState] = useState<AppState>('initializing');
   const [authMode, setAuthMode] = useState<AuthMode>('login');
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [appData, setAppData] = useState<AppData>({
+    user: null,
+    project: null,
+    isDemoMode: false
+  });
+  const [authError, setAuthError] = useState<string | null>(null);
   
   const { 
     initializeUserSession,
     initializeProjectData,
-    initializeDemoData,
     subscribeToRealTimeUpdates,
-    unsubscribeFromRealTimeUpdates
+    unsubscribeFromRealTimeUpdates,
+    setCurrentUser
   } = useAppStore();
 
+  // Initialize app on mount
   useEffect(() => {
-    initializeAuth();
+    initializeApp();
   }, []);
 
+  // Handle auth state changes for real users only
   useEffect(() => {
-    // Set up auth state listener only for real auth mode
-    if (!isDemoMode) {
-      const subscription = authService.onAuthStateChange((user) => {
+    if (appData.isDemoMode) return;
+    
+    let mounted = true;
+    let authTimeout: NodeJS.Timeout;
+    
+    const { data: { subscription } } = authService.onAuthStateChange(async (user) => {
+      if (!mounted) return;
+      
+      // Clear any pending auth updates
+      if (authTimeout) clearTimeout(authTimeout);
+      
+      // Debounce auth state changes to prevent flipping
+      authTimeout = setTimeout(async () => {
         if (user) {
-          setCurrentUser(user);
-          setAppState('project-selection');
+          console.log('Auth state changed: user logged in', user.email);
+          setAppData(prev => ({ ...prev, user }));
+          
+          // If we don't have a project selected, stay authenticated but show project selection
+          if (!appData.project) {
+            setAppState('authenticated');
+          } else {
+            // If we have both user and project, initialize data
+            await initializeWithProject(user, appData.project);
+          }
         } else {
-          setCurrentUser(null);
-          setSelectedProject(null);
-          setAppState('unauthenticated');
-          unsubscribeFromRealTimeUpdates();
+          console.log('Auth state changed: user logged out');
+          handleSignOut();
         }
-      });
+      }, 100); // 100ms debounce
+    });
 
-      return () => {
-        subscription?.data?.subscription?.unsubscribe();
-      };
-    }
-  }, [isDemoMode, unsubscribeFromRealTimeUpdates]);
+    return () => {
+      mounted = false;
+      if (authTimeout) clearTimeout(authTimeout);
+      subscription.unsubscribe();
+    };
+  }, [appData.isDemoMode, appData.project]);
 
-  useEffect(() => {
-    // Initialize project data when user and project are selected
-    if (currentUser && selectedProject && !isDemoMode) {
-      initializeUserSession();
-      initializeProjectData(selectedProject.id);
-      subscribeToRealTimeUpdates(selectedProject.id);
-      setAppState('authenticated');
-    }
-  }, [currentUser, selectedProject, isDemoMode, initializeUserSession, initializeProjectData, subscribeToRealTimeUpdates]);
-
-  const initializeAuth = async () => {
+  const initializeApp = async () => {
     try {
+      console.log('Initializing app...');
+      setAuthError(null);
+      
+      // Check for existing session
       const user = await authService.getCurrentUser();
+      
       if (user) {
-        setCurrentUser(user);
-        setAppState('project-selection');
+        console.log('Found existing session for:', user.email);
+        setAppData(prev => ({ ...prev, user }));
+        setAppState('authenticated');
       } else {
-        setAppState('landing');
+        console.log('No existing session found');
+        setAppState('unauthenticated');
       }
     } catch (error) {
-      console.error('Auth initialization error:', error);
-      setAppState('landing');
+      console.error('App initialization error:', error);
+      setAuthError('Failed to initialize app. Please refresh the page.');
+      setAppState('unauthenticated');
     }
+  };
+
+  const initializeWithProject = async (user: User, project: Project) => {
+    try {
+      console.log('Initializing with project:', project.name);
+      
+      // Set in store
+      setCurrentUser(user);
+      
+      // Initialize project data
+      await initializeUserSession();
+      await initializeProjectData(project.id);
+      
+      // Subscribe to real-time updates
+      subscribeToRealTimeUpdates(project.id);
+      
+      console.log('Project initialization complete');
+    } catch (error) {
+      console.error('Project initialization error:', error);
+      setAuthError('Failed to load project data. Please try again.');
+    }
+  };
+
+  const handleSignOut = () => {
+    console.log('Signing out...');
+    
+    // Clean up
+    unsubscribeFromRealTimeUpdates();
+    setCurrentUser(null);
+    
+    // Reset state
+    setAppData({
+      user: null,
+      project: null,
+      isDemoMode: false
+    });
+    setAuthError(null);
+    setAppState('unauthenticated');
   };
 
   const handleAuthSuccess = () => {
-    // After successful auth, go directly to project selection
-    // No need to wait for email verification if disabled
-    console.log('Authentication successful, redirecting to project selection');
+    console.log('Authentication successful');
+    setAuthError(null);
+    // Don't change state here - let the auth state change listener handle it
   };
 
-  const handleProjectSelect = (project: Project) => {
-    setSelectedProject(project);
-  };
+  const handleProjectSelect = async (project: Project) => {
+    console.log('Project selected:', project.name);
+    
+    if (!appData.user) {
+      setAuthError('No user found. Please sign in again.');
+      return;
+    }
 
-  const handleLogout = () => {
-    setCurrentUser(null);
-    setSelectedProject(null);
-    setIsDemoMode(false);
-    setAppState('landing');
+    setAppData(prev => ({ ...prev, project }));
+    
+    // Initialize data for this project
+    await initializeWithProject(appData.user, project);
   };
 
   const handleBackToProjects = () => {
-    if (isDemoMode) {
-      setAppState('landing');
-      setIsDemoMode(false);
+    if (appData.isDemoMode) {
+      handleExitDemo();
     } else {
-      setSelectedProject(null);
-      setAppState('project-selection');
+      // Just clear the project, keep user
+      setAppData(prev => ({ ...prev, project: null }));
       unsubscribeFromRealTimeUpdates();
     }
   };
 
-  const handleGetStarted = () => {
-    setAppState('demo-selection');
-  };
-
   const handleStartDemo = () => {
-    setIsDemoMode(true);
-    setAppState('demo-selection');
-  };
-
-  const handleCreateAccount = () => {
-    setAuthMode('signup');
-    setAppState('unauthenticated');
-    // Force navigation to auth route
-    window.location.href = '/auth';
+    console.log('Starting demo mode');
+    navigate('/demo');
   };
 
   const handleDemoLogin = async (demoUser: User) => {
-    console.log('Demo login initiated for user:', demoUser);
-    
-    // Set demo user and state immediately - no authentication needed
-    setCurrentUser(demoUser);
-    setIsDemoMode(true);
-    setAppState('demo-active');
-    
     try {
-      // Load demo data using dynamic imports (browser-compatible)
+      console.log('Demo login initiated for user:', demoUser.email);
+      
+      // Set demo state
+      setAppData({
+        user: demoUser,
+        project: null, // Will be set when demo data loads
+        isDemoMode: true
+      });
+      
+      // Load demo data
       const mockData = await import('./utils/mockData');
       const { mockProject, mockTasks, mockDeliveries, mockSuppliers, mockTaskChangeProposals } = mockData;
       
-      console.log('Mock data loaded:', { mockProject: !!mockProject, mockTasks: !!mockTasks });
+      // Set demo project
+      setAppData(prev => ({ ...prev, project: mockProject }));
       
-      // Set all demo data immediately using proper Zustand setState
-      const store = useAppStore.getState();
-      store.setCurrentUser(demoUser);
-      
+      // Set in store
+      setCurrentUser(demoUser);
       useAppStore.setState({
         currentProject: mockProject,
         tasks: mockTasks,
@@ -182,13 +260,11 @@ function App() {
         qaAlerts: [],
       });
       
-      console.log('Demo data set in store');
-      
-      // Generate QA alerts using dynamic import
+      // Generate QA alerts
       setTimeout(async () => {
         try {
           const qaModule = await import('./services/qaService');
-          const qaAlerts = qaModule.default.generateQAAlerts(mockProject.id);
+          const qaAlerts = qaModule.default.generateQAAlerts(mockTasks);
           useAppStore.setState({ qaAlerts });
           console.log('QA alerts generated:', qaAlerts.length);
         } catch (error) {
@@ -196,172 +272,90 @@ function App() {
         }
       }, 100);
       
-      console.log('Demo mode activated with mock data');
+      setAppState('authenticated');
+      console.log('Demo mode activated');
+      
     } catch (error) {
       console.error('Failed to load demo data:', error);
-      // Fallback to ensure user doesn't get stuck
-      useAppStore.setState({
-        currentProject: null,
-        tasks: [],
-        deliveries: [], 
-        suppliers: [],
-        taskChangeProposals: [],
-        qaAlerts: [],
-      });
+      setAuthError('Failed to load demo. Please try again.');
     }
   };
 
-  const handleForgotPassword = () => {
-    // TODO: Implement forgot password flow
-    console.log('Forgot password clicked');
+  const handleExitDemo = () => {
+    console.log('Exiting demo mode');
+    handleSignOut();
   };
 
-  // Loading state
-  if (appState === 'loading') {
+  const handleGetStarted = () => {
+    // Don't navigate to auth if already authenticated
+    if (appState !== 'unauthenticated') {
+      console.log('Already authenticated, ignoring handleGetStarted');
+      return;
+    }
+    setAuthMode('signup');
+    navigate('/auth');
+  };
+
+  const handleCreateAccount = () => {
+    // Don't navigate to auth if already authenticated
+    if (appState !== 'unauthenticated') {
+      console.log('Already authenticated, ignoring handleCreateAccount');
+      return;
+    }
+    setAuthMode('signup');
+    navigate('/auth');
+  };
+
+  // Render based on app state
+  if (appState === 'initializing') {
+    return <LoadingScreen message="Initializing Gogram..." />;
+  }
+
+  // Show error if auth failed
+  if (authError && appState === 'unauthenticated') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-primary-600 rounded-xl flex items-center justify-center mx-auto mb-4 animate-pulse">
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-white flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="w-16 h-16 bg-red-600 rounded-xl flex items-center justify-center mx-auto mb-4">
             <div className="w-8 h-8 bg-white rounded" />
           </div>
-          <p className="text-gray-600">Loading Gogram...</p>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Something went wrong</h2>
+          <p className="text-gray-600 mb-4">{authError}</p>
+          <button
+            onClick={() => {
+              setAuthError(null);
+              initializeApp();
+            }}
+            className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
   }
 
-  // Landing page
-  if (appState === 'landing') {
-    return (
-      <BrowserRouter>
-        <Routes>
-          <Route path="/confirm-delivery/:deliveryId" element={<SupplierConfirmationPage />} />
-          <Route path="/public/project/:shareToken" element={<PublicProjectPage />} />
-          <Route path="*" element={<LandingPage onGetStarted={handleGetStarted} onStartDemo={handleStartDemo} onCreateAccount={handleCreateAccount} />} />
-        </Routes>
-        <Toaster position="top-right" />
-      </BrowserRouter>
-    );
-  }
+  return (
+    <>
+      <Routes>
+        {/* Public routes - always accessible */}
+        <Route path="/confirm-delivery/:deliveryId" element={<SupplierConfirmationPage />} />
+        <Route path="/public/project/:shareToken" element={<PublicProjectPage />} />
 
-  // Demo selection screen
-  if (appState === 'demo-selection') {
-    return (
-      <BrowserRouter>
-        <Routes>
-          <Route path="/confirm-delivery/:deliveryId" element={<SupplierConfirmationPage />} />
-          <Route path="/public/project/:shareToken" element={<PublicProjectPage />} />
-          <Route path="*" element={
-            <LoginScreen 
-              onLogin={handleDemoLogin} 
-              onBack={() => setAppState('landing')}
-              isDemo={true}
-            />
-          } />
-        </Routes>
-        <Toaster position="top-right" />
-      </BrowserRouter>
-    );
-  }
-
-  // Demo mode active
-  if (appState === 'demo-active' && isDemoMode && currentUser) {
-    return (
-      <BrowserRouter>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/confirm-delivery/:deliveryId" element={<SupplierConfirmationPage />} />
-          <Route path="/public/project/:shareToken" element={<PublicProjectPage />} />
-          
-          {/* Demo routes */}
-          <Route path="/" element={
-            <AuthenticatedLayout>
-              <Dashboard />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/schedule" element={
-            <AuthenticatedLayout>
-              <SchedulePage />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/tasks" element={
-            <AuthenticatedLayout>
-              <TasksPage />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/approvals" element={
-            <AuthenticatedLayout>
-              <ApprovalsPage />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/suppliers" element={
-            <AuthenticatedLayout>
-              <SuppliersPage />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/reports" element={
-            <AuthenticatedLayout>
-              <ReportsPage />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/share" element={
-            <AuthenticatedLayout>
-              <SharePage />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/qa" element={
-            <AuthenticatedLayout>
-              <QAPage />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/team" element={
-            <AuthenticatedLayout>
-              <TeamPage />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/documents" element={
-            <AuthenticatedLayout>
-              <DocumentsPage />
-            </AuthenticatedLayout>
-          } />
-        </Routes>
-        
-        {/* Demo mode indicator */}
-        <div className="fixed top-4 left-4 z-50 flex items-center space-x-2">
-          <div className="bg-orange-500 text-white px-3 py-1 rounded-full text-xs font-medium">
-            DEMO MODE
-          </div>
-          <button
-            onClick={handleBackToProjects}
-            className="bg-white shadow-lg rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 border"
-          >
-            ← Exit Demo
-          </button>
-        </div>
-        
-        <Toaster position="top-right" />
-      </BrowserRouter>
-    );
-  }
-
-  // Authentication flow
-  if (appState === 'unauthenticated') {
-    return (
-      <BrowserRouter>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/" element={<LandingPage onGetStarted={handleGetStarted} onStartDemo={handleStartDemo} onCreateAccount={handleCreateAccount} />} />
-          <Route path="/confirm-delivery/:deliveryId" element={<SupplierConfirmationPage />} />
-          <Route path="/public/project/:shareToken" element={<PublicProjectPage />} />
-          
-          {/* Auth routes */}
-          <Route path="/auth" element={
+        {/* Auth route - accessible from any state but with guards */}
+        <Route path="/auth" element={
+          appState === 'authenticated' ? (
+            (() => {
+              console.log('Redirecting from /auth - user already authenticated');
+              return <Navigate to="/" replace />;
+            })()
+          ) : (
             <>
               {authMode === 'login' && (
                 <LoginForm
                   onSuccess={handleAuthSuccess}
                   onSwitchToSignup={() => setAuthMode('signup')}
-                  onForgotPassword={handleForgotPassword}
+                  onForgotPassword={() => setAuthMode('forgot-password')}
                 />
               )}
               {authMode === 'signup' && (
@@ -371,111 +365,126 @@ function App() {
                 />
               )}
             </>
-          } />
-          
-          {/* Redirect all other routes to auth */}
-          <Route path="*" element={<Navigate to="/auth" replace />} />
-        </Routes>
-        <Toaster position="top-right" />
-      </BrowserRouter>
-    );
-  }
+          )
+        } />
 
-  // Project selection
-  if (appState === 'project-selection' && currentUser) {
-    return (
-      <BrowserRouter>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/confirm-delivery/:deliveryId" element={<SupplierConfirmationPage />} />
-          <Route path="/public/project/:shareToken" element={<PublicProjectPage />} />
-          
-          {/* Project dashboard */}
-          <Route path="*" element={
-            <ProjectDashboard
-              currentUser={currentUser}
-              onProjectSelect={handleProjectSelect}
-              onLogout={handleLogout}
-            />
-          } />
-        </Routes>
-        <Toaster position="top-right" />
-      </BrowserRouter>
-    );
-  }
+        {/* Unauthenticated routes */}
+        {appState === 'unauthenticated' && (
+          <>
+            <Route path="/" element={<LandingPage onGetStarted={handleGetStarted} onStartDemo={handleStartDemo} onCreateAccount={handleCreateAccount} />} />
+            
+            {/* Demo login screen */}
+            <Route path="/demo" element={
+              <LoginScreen 
+                onLogin={handleDemoLogin} 
+                onBack={() => navigate('/')}
+                isDemo={true}
+              />
+            } />
+            
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </>
+        )}
 
-  // Authenticated app with selected project
-  if (appState === 'authenticated' && currentUser && selectedProject) {
-    return (
-      <BrowserRouter>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/confirm-delivery/:deliveryId" element={<SupplierConfirmationPage />} />
-          <Route path="/public/project/:shareToken" element={<PublicProjectPage />} />
-          
-          {/* Authenticated routes */}
-          <Route path="/" element={
-            <AuthenticatedLayout>
-              <Dashboard />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/schedule" element={
-            <AuthenticatedLayout>
-              <SchedulePage />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/tasks" element={
-            <AuthenticatedLayout>
-              <TasksPage />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/approvals" element={
-            <AuthenticatedLayout>
-              <ApprovalsPage />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/suppliers" element={
-            <AuthenticatedLayout>
-              <SuppliersPage />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/reports" element={
-            <AuthenticatedLayout>
-              <ReportsPage />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/share" element={
-            <AuthenticatedLayout>
-              <SharePage />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/qa" element={
-            <AuthenticatedLayout>
-              <QAPage />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/team" element={
-            <AuthenticatedLayout>
-              <TeamPage />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/documents" element={
-            <AuthenticatedLayout>
-              <DocumentsPage />
-            </AuthenticatedLayout>
-          } />
-          
-          {/* Project selection route */}
-          <Route path="/projects" element={
-            <ProjectDashboard
-              currentUser={currentUser}
-              onProjectSelect={handleProjectSelect}
-              onLogout={handleLogout}
-            />
-          } />
-        </Routes>
-        
-        {/* Add project switcher in header */}
+        {/* Authenticated routes */}
+        {appState === 'authenticated' && (
+          <>
+            {/* Project selection - no project selected yet */}
+            {appData.user && !appData.project && !appData.isDemoMode && (
+              <Route path="*" element={
+                <ProjectDashboard
+                  currentUser={appData.user}
+                  onProjectSelect={handleProjectSelect}
+                  onLogout={handleSignOut}
+                />
+              } />
+            )}
+
+            {/* Main app - user and project both selected */}
+            {appData.user && appData.project && (
+              <>
+                <Route path="/" element={
+                  <AuthenticatedLayout>
+                    <Dashboard />
+                  </AuthenticatedLayout>
+                } />
+                <Route path="/schedule" element={
+                  <AuthenticatedLayout>
+                    <SchedulePage />
+                  </AuthenticatedLayout>
+                } />
+                <Route path="/tasks" element={
+                  <AuthenticatedLayout>
+                    <TasksPage />
+                  </AuthenticatedLayout>
+                } />
+                <Route path="/approvals" element={
+                  <AuthenticatedLayout>
+                    <ApprovalsPage />
+                  </AuthenticatedLayout>
+                } />
+                <Route path="/suppliers" element={
+                  <AuthenticatedLayout>
+                    <SuppliersPage />
+                  </AuthenticatedLayout>
+                } />
+                <Route path="/reports" element={
+                  <AuthenticatedLayout>
+                    <ReportsPage />
+                  </AuthenticatedLayout>
+                } />
+                <Route path="/share" element={
+                  <AuthenticatedLayout>
+                    <SharePage />
+                  </AuthenticatedLayout>
+                } />
+                <Route path="/qa" element={
+                  <AuthenticatedLayout>
+                    <QAPage />
+                  </AuthenticatedLayout>
+                } />
+                <Route path="/team" element={
+                  <AuthenticatedLayout>
+                    <TeamPage />
+                  </AuthenticatedLayout>
+                } />
+                <Route path="/documents" element={
+                  <AuthenticatedLayout>
+                    <DocumentsPage />
+                  </AuthenticatedLayout>
+                } />
+                
+                {/* Back to projects route */}
+                <Route path="/projects" element={
+                  <ProjectDashboard
+                    currentUser={appData.user}
+                    onProjectSelect={handleProjectSelect}
+                    onLogout={handleSignOut}
+                  />
+                } />
+              </>
+            )}
+          </>
+        )}
+      </Routes>
+
+      {/* Demo mode indicator */}
+      {appData.isDemoMode && appState === 'authenticated' && (
+        <div className="fixed top-4 left-4 z-50 flex items-center space-x-2">
+          <div className="bg-orange-500 text-white px-3 py-1 rounded-full text-xs font-medium">
+            DEMO MODE
+          </div>
+          <button
+            onClick={handleExitDemo}
+            className="bg-white shadow-lg rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 border"
+          >
+            ← Exit Demo
+          </button>
+        </div>
+      )}
+
+      {/* Project switcher for real users */}
+      {!appData.isDemoMode && appState === 'authenticated' && appData.project && (
         <div className="fixed top-4 left-4 z-50">
           <button
             onClick={handleBackToProjects}
@@ -484,19 +493,17 @@ function App() {
             ← Back to Projects
           </button>
         </div>
-        
-        <Toaster position="top-right" />
-      </BrowserRouter>
-    );
-  }
+      )}
+    </>
+  );
+}
 
-  // Fallback
+function App() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-white flex items-center justify-center">
-      <div className="text-center">
-        <p className="text-gray-600">Something went wrong. Please refresh the page.</p>
-      </div>
-    </div>
+    <BrowserRouter>
+      <AppContent />
+      <Toaster position="top-right" />
+    </BrowserRouter>
   );
 }
 

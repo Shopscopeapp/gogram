@@ -455,17 +455,15 @@ export default function LandingPage({ onGetStarted, onStartDemo, onCreateAccount
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
                 onClick={onCreateAccount}
-                className="btn btn-white btn-lg flex items-center justify-center space-x-2 hover:bg-gray-50"
+                className="bg-primary-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-primary-700 transition-colors shadow-lg"
               >
-                <span>Get Started Free</span>
-                <ArrowRight className="w-5 h-5" />
+                Get Started Free
               </button>
-              <button 
-                onClick={onStartDemo}
-                className="btn btn-outline btn-lg border-white text-white hover:bg-white hover:text-primary-600 flex items-center justify-center space-x-2"
+              <button
+                onClick={() => window.location.href = '/demo'}
+                className="bg-white text-primary-600 px-8 py-4 rounded-xl font-semibold text-lg hover:bg-gray-50 transition-colors border-2 border-primary-600"
               >
-                <Play className="w-5 h-5" />
-                <span>Try Demo</span>
+                Try Demo First
               </button>
             </div>
             <p className="text-primary-200 mt-6">
