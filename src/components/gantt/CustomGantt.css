@@ -129,24 +129,66 @@
   border-left: 4px solid #3b82f6;
 }
 
-.gantt-task-row.dragging {
-  background: #f0f9ff;
-  border-left: 4px solid #1d4ed8;
-}
-
-/* Task Name Cell */
+/* Task Name Cell with drag handle */
 .gantt-task-name-cell {
   background: #fafafa;
   border-right: 2px solid #e2e8f0;
   padding: 12px 16px;
   display: flex;
   align-items: center;
-  cursor: pointer;
+  cursor: grab;
   transition: background-color 0.2s ease;
+  position: relative;
 }
 
 .gantt-task-name-cell:hover {
   background: #f0f9ff;
+}
+
+.gantt-task-name-cell:active {
+  cursor: grabbing;
+}
+
+/* Drag handle */
+.gantt-drag-handle {
+  font-size: 16px;
+  color: #9ca3af;
+  margin-right: 8px;
+  cursor: grab;
+  user-select: none;
+  transition: color 0.2s ease;
+}
+
+.gantt-task-name-cell:hover .gantt-drag-handle {
+  color: #6b7280;
+}
+
+.gantt-task-name-cell:active .gantt-drag-handle {
+  cursor: grabbing;
+}
+
+/* Drop indicator */
+.gantt-drop-indicator {
+  animation: dropIndicatorPulse 1s ease-in-out infinite;
+}
+
+@keyframes dropIndicatorPulse {
+  0%, 100% {
+    opacity: 0.7;
+    transform: scaleY(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleY(1.2);
+  }
+}
+
+/* Task row dragging states */
+.gantt-task-row.dragging {
+  background: #f0f9ff;
+  border-left: 4px solid #3b82f6;
+  border-radius: 4px;
+  margin: 2px 0;
 }
 
 .gantt-task-info {

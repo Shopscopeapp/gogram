@@ -446,6 +446,28 @@ export default function SchedulePage() {
               // Handle task click - could open edit modal
               console.log('Task clicked:', task);
             }}
+            onTaskReorder={(draggedTaskId, targetIndex) => {
+              // Handle task reordering
+              console.log('Reordering task:', draggedTaskId, 'to index:', targetIndex);
+              // Find the task and update its order/sequence
+              const reorderedTasks = [...tasks];
+              const draggedTaskIndex = reorderedTasks.findIndex(t => t.id === draggedTaskId);
+              
+              if (draggedTaskIndex !== -1) {
+                const [draggedTask] = reorderedTasks.splice(draggedTaskIndex, 1);
+                reorderedTasks.splice(targetIndex, 0, draggedTask);
+                
+                // Update task sequence numbers or priorities to reflect new order
+                reorderedTasks.forEach((task, index) => {
+                  updateTask(task.id, { 
+                    // Using index as a simple ordering mechanism
+                    // In a real app, you might have a sequence_number or priority field
+                    priority: index < reorderedTasks.length / 3 ? 'high' : 
+                             index < (reorderedTasks.length * 2) / 3 ? 'medium' : 'low'
+                  });
+                });
+              }
+            }}
             readOnly={!canEditSchedule}
             showDependencies={true}
           />

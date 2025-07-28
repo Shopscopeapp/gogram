@@ -10,6 +10,7 @@ interface CustomGanttChartProps {
   tasks: Task[];
   onTaskUpdate?: (taskId: string, updates: Partial<Task>) => void;
   onTaskClick?: (task: Task) => void;
+  onTaskReorder?: (draggedTaskId: string, targetIndex: number) => void;
   readOnly?: boolean;
   showDependencies?: boolean;
   timelineStart?: Date;
@@ -55,6 +56,7 @@ export default function CustomGanttChart({
   tasks,
   onTaskUpdate,
   onTaskClick,
+  onTaskReorder,
   readOnly = false,
   showDependencies = true,
   timelineStart,
@@ -65,7 +67,10 @@ export default function CustomGanttChart({
     isDragging: false,
     dragTaskId: null as string | null,
     dragStartX: 0,
-    dragStartDate: null as Date | null
+    dragStartY: 0,
+    dragStartDate: null as Date | null,
+    dragMode: 'none' as 'none' | 'horizontal' | 'vertical',
+    dropIndex: -1
   });
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -177,7 +182,10 @@ export default function CustomGanttChart({
       isDragging: true,
       dragTaskId: task.id,
       dragStartX: initialX,
-      dragStartDate: initialDate
+      dragStartY: 0,
+      dragStartDate: initialDate,
+      dragMode: 'horizontal',
+      dropIndex: -1
     });
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -185,12 +193,14 @@ export default function CustomGanttChart({
       if (!currentRect) return;
       
       const currentX = e.clientX - currentRect.left;
+      const currentY = e.clientY - currentRect.top;
       const deltaX = currentX - initialX; // Use local variable, not state
+      const deltaY = currentY - initialY; // Use local variable, not state
       
       // Visual feedback during drag
       const taskElement = document.querySelector(`[data-task-id="${task.id}"] .gantt-task-bar`) as HTMLElement;
       if (taskElement) {
-        taskElement.style.transform = `translateX(${deltaX}px)`;
+        taskElement.style.transform = `translateX(${deltaX}px) translateY(${deltaY}px)`;
         taskElement.style.opacity = '0.8';
         taskElement.style.zIndex = '100';
         taskElement.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.3)';
@@ -202,7 +212,9 @@ export default function CustomGanttChart({
       if (!currentRect) return;
       
       const currentX = e.clientX - currentRect.left;
+      const currentY = e.clientY - currentRect.top;
       const deltaX = currentX - initialX; // Use local variable, not state
+      const deltaY = currentY - initialY; // Use local variable, not state
       const daysDelta = Math.round(deltaX / GANTT_CONFIG.dayWidth);
       
       // Reset visual feedback
@@ -233,7 +245,10 @@ export default function CustomGanttChart({
         isDragging: false,
         dragTaskId: null,
         dragStartX: 0,
-        dragStartDate: null
+        dragStartY: 0,
+        dragStartDate: null,
+        dragMode: 'none',
+        dropIndex: -1
       });
       
       // Remove event listeners
@@ -242,6 +257,86 @@ export default function CustomGanttChart({
     };
 
     // Add event listeners
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  // Handle vertical drag for task reordering
+  const handleVerticalDragStart = (e: React.MouseEvent, task: GanttTask, taskIndex: number) => {
+    if (readOnly) return;
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const initialX = e.clientX - rect.left;
+    const initialY = e.clientY - rect.top;
+    
+    setDragState({
+      isDragging: true,
+      dragTaskId: task.id,
+      dragStartX: initialX,
+      dragStartY: initialY,
+      dragStartDate: null,
+      dragMode: 'vertical',
+      dropIndex: taskIndex
+    });
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const currentRect = containerRef.current?.getBoundingClientRect();
+      if (!currentRect) return;
+      
+      const currentY = e.clientY - currentRect.top;
+      const deltaY = currentY - initialY;
+      
+      // Calculate which row we're hovering over
+      const hoveredRowIndex = Math.floor(currentY / GANTT_CONFIG.rowHeight);
+      const clampedIndex = Math.max(0, Math.min(hoveredRowIndex, processedTasks.length - 1));
+      
+      setDragState(prev => ({ ...prev, dropIndex: clampedIndex }));
+      
+      // Visual feedback for the dragged task
+      const taskElement = document.querySelector(`[data-task-row="${taskIndex}"]`) as HTMLElement;
+      if (taskElement) {
+        taskElement.style.transform = `translateY(${deltaY}px)`;
+        taskElement.style.opacity = '0.7';
+        taskElement.style.zIndex = '100';
+        taskElement.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.3)';
+      }
+    };
+
+    const handleMouseUp = () => {
+      // Reset visual feedback
+      const taskElement = document.querySelector(`[data-task-row="${taskIndex}"]`) as HTMLElement;
+      if (taskElement) {
+        taskElement.style.transform = '';
+        taskElement.style.opacity = '';
+        taskElement.style.zIndex = '';
+        taskElement.style.boxShadow = '';
+      }
+      
+      // Execute reorder if position changed
+      if (dragState.dropIndex !== taskIndex && dragState.dropIndex >= 0) {
+        console.log('Reordering task:', task.id, 'from index', taskIndex, 'to', dragState.dropIndex);
+        onTaskReorder?.(task.id, dragState.dropIndex);
+      }
+      
+      // Clean up
+      setDragState({
+        isDragging: false,
+        dragTaskId: null,
+        dragStartX: 0,
+        dragStartY: 0,
+        dragStartDate: null,
+        dragMode: 'none',
+        dropIndex: -1
+      });
+      
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
   };
@@ -314,97 +409,120 @@ export default function CustomGanttChart({
     const isMilestone = task.category === 'milestone' || taskDuration <= 1;
     const isSelected = selectedTaskId === task.id;
     const isDragging = dragState.dragTaskId === task.id;
+    const isDropTarget = dragState.isDragging && dragState.dragMode === 'vertical' && dragState.dropIndex === index;
 
     return (
-      <div
-        key={task.id}
-        data-task-id={task.id}
-        className={`gantt-task-row ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''}`}
-        style={{ height: GANTT_CONFIG.rowHeight }}
-      >
-        {/* Task Name Column */}
-        <div 
-          className="gantt-task-name-cell"
-          style={{ width: GANTT_CONFIG.taskNameWidth }}
-          onClick={(e) => handleTaskClick(task, e)}
+      <React.Fragment key={task.id}>
+        {/* Drop indicator line */}
+        {isDropTarget && dragState.dragTaskId !== task.id && (
+          <div
+            className="gantt-drop-indicator"
+            style={{
+              height: '3px',
+              backgroundColor: '#3b82f6',
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: index * GANTT_CONFIG.rowHeight - 1.5,
+              zIndex: 1000,
+              borderRadius: '2px',
+              boxShadow: '0 0 8px rgba(59, 130, 246, 0.5)'
+            }}
+          />
+        )}
+        
+        <div
+          data-task-id={task.id}
+          data-task-row={index}
+          className={`gantt-task-row ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''}`}
+          style={{ height: GANTT_CONFIG.rowHeight }}
         >
-          <div className="gantt-task-info">
-            <div className="gantt-task-title">
-              {task.title}
-              {task.isCritical && <span className="critical-badge">CRITICAL</span>}
-              {isMilestone && <span className="milestone-badge">MILESTONE</span>}
-            </div>
-            <div className="gantt-task-details">
-              <span>{safeDateFormat(startDate, 'MMM dd')} - {safeDateFormat(endDate, 'MMM dd')}</span>
-              <span>({taskDuration}d)</span>
-              {(task.actualProgress || 0) > 0 && <span>{task.actualProgress || 0}%</span>}
+          {/* Task Name Column */}
+          <div 
+            className="gantt-task-name-cell"
+            style={{ width: GANTT_CONFIG.taskNameWidth }}
+            onClick={(e) => handleTaskClick(task, e)}
+            onMouseDown={(e) => !readOnly && handleVerticalDragStart(e, task, index)}
+          >
+            <div className="gantt-task-info">
+              <div className="gantt-task-title">
+                <span className="gantt-drag-handle">⋮⋮</span>
+                {task.title}
+                {task.isCritical && <span className="critical-badge">CRITICAL</span>}
+                {isMilestone && <span className="milestone-badge">MILESTONE</span>}
+              </div>
+              <div className="gantt-task-details">
+                <span>{safeDateFormat(startDate, 'MMM dd')} - {safeDateFormat(endDate, 'MMM dd')}</span>
+                <span>({taskDuration}d)</span>
+                {(task.actualProgress || 0) > 0 && <span>{task.actualProgress || 0}%</span>}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Task Timeline */}
-        <div className="gantt-task-timeline" style={{ width: totalTimelineWidth }}>
-          {isMilestone ? (
-            <div
-              className={`gantt-milestone ${task.isCritical ? 'critical' : ''}`}
-              style={{
-                position: 'absolute',
-                left: taskStartPosition,
-                top: (GANTT_CONFIG.rowHeight - 20) / 2,
-                width: 20,
-                height: 20,
-                backgroundColor: getTaskColor(),
-                transform: 'rotate(45deg)',
-                cursor: readOnly ? 'pointer' : 'move'
-              }}
-              onMouseDown={(e) => !readOnly && handleTaskDragStart(e, task)}
-              onClick={(e) => handleTaskClick(task, e)}
-              title={`Milestone: ${task.title}`}
-            />
-          ) : (
-            <div
-              className={`gantt-task-bar ${task.isCritical ? 'critical' : ''} ${isSelected ? 'selected' : ''}`}
-              style={{
-                position: 'absolute',
-                left: taskStartPosition,
-                width: taskWidth,
-                height: GANTT_CONFIG.taskBarHeight,
-                top: (GANTT_CONFIG.rowHeight - GANTT_CONFIG.taskBarHeight) / 2,
-                backgroundColor: getTaskColor(),
-                cursor: readOnly ? 'pointer' : 'move',
-                borderRadius: '4px',
-                border: isSelected ? '2px solid #1d4ed8' : task.isCritical ? '2px solid #dc2626' : '1px solid rgba(0,0,0,0.1)',
-                zIndex: isSelected ? 20 : task.isCritical ? 15 : 10,
-                userSelect: 'none'
-              }}
-              onMouseDown={(e) => !readOnly && handleTaskDragStart(e, task)}
-              onClick={(e) => handleTaskClick(task, e)}
-              title={`${task.title} (${taskDuration} days)`}
-            >
-              {/* Progress bar */}
-              {progressWidth > 0 && (
-                <div
-                  className="gantt-task-progress"
-                  style={{
-                    width: progressWidth,
-                    height: '100%',
-                    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                    borderRadius: '2px 0 0 2px'
-                  }}
-                />
-              )}
-              
-              {/* Task label */}
-              {taskWidth > 60 && (
-                <div className="gantt-task-label">
-                  <span>{task.title}</span>
-                  {(task.actualProgress || 0) > 0 && <span className="progress-text">{task.actualProgress || 0}%</span>}
-                </div>
-              )}
-            </div>
-          )}
+          {/* Task Timeline */}
+          <div className="gantt-task-timeline" style={{ width: totalTimelineWidth }}>
+            {isMilestone ? (
+              <div
+                className={`gantt-milestone ${task.isCritical ? 'critical' : ''}`}
+                style={{
+                  position: 'absolute',
+                  left: taskStartPosition,
+                  top: (GANTT_CONFIG.rowHeight - 20) / 2,
+                  width: 20,
+                  height: 20,
+                  backgroundColor: getTaskColor(),
+                  transform: 'rotate(45deg)',
+                  cursor: readOnly ? 'pointer' : 'move'
+                }}
+                onMouseDown={(e) => !readOnly && handleTaskDragStart(e, task)}
+                onClick={(e) => handleTaskClick(task, e)}
+                title={`Milestone: ${task.title}`}
+              />
+            ) : (
+              <div
+                className={`gantt-task-bar ${task.isCritical ? 'critical' : ''} ${isSelected ? 'selected' : ''}`}
+                style={{
+                  position: 'absolute',
+                  left: taskStartPosition,
+                  width: taskWidth,
+                  height: GANTT_CONFIG.taskBarHeight,
+                  top: (GANTT_CONFIG.rowHeight - GANTT_CONFIG.taskBarHeight) / 2,
+                  backgroundColor: getTaskColor(),
+                  cursor: readOnly ? 'pointer' : 'move',
+                  borderRadius: '4px',
+                  border: isSelected ? '2px solid #1d4ed8' : task.isCritical ? '2px solid #dc2626' : '1px solid rgba(0,0,0,0.1)',
+                  zIndex: isSelected ? 20 : task.isCritical ? 15 : 10,
+                  userSelect: 'none'
+                }}
+                onMouseDown={(e) => !readOnly && handleTaskDragStart(e, task)}
+                onClick={(e) => handleTaskClick(task, e)}
+                title={`${task.title} (${taskDuration} days)`}
+              >
+                {/* Progress bar */}
+                {progressWidth > 0 && (
+                  <div
+                    className="gantt-task-progress"
+                    style={{
+                      width: progressWidth,
+                      height: '100%',
+                      backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                      borderRadius: '2px 0 0 2px'
+                    }}
+                  />
+                )}
+                
+                {/* Task label */}
+                {taskWidth > 60 && (
+                  <div className="gantt-task-label">
+                    <span>{task.title}</span>
+                    {(task.actualProgress || 0) > 0 && <span className="progress-text">{task.actualProgress || 0}%</span>}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      </React.Fragment>
     );
   };
 
