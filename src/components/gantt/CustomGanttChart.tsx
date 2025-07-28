@@ -143,8 +143,17 @@ export default function CustomGanttChart({
   // Handle task click
   const handleTaskClick = (task: GanttTask, e: React.MouseEvent) => {
     e.stopPropagation();
+    e.preventDefault();
+    
+    console.log('Task clicked:', task.title, task);
     setSelectedTaskId(task.id);
-    onTaskClick?.(task);
+    
+    if (onTaskClick) {
+      console.log('Calling onTaskClick callback');
+      onTaskClick(task);
+    } else {
+      console.log('No onTaskClick callback provided');
+    }
   };
 
   // Handle horizontal drag for date changes

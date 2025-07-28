@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Clock, Users, Plus, Filter, Settings, X, BarChart3 } from 'lucide-react';
 import { useAppStore } from '../../store';
@@ -13,49 +13,67 @@ interface AddTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddTask: (taskData: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => void;
+  editingTask?: Task; // Optional task for editing mode
 }
 
-function AddTaskModal({ isOpen, onClose, onAddTask }: AddTaskModalProps) {
-  const { currentProject, currentUser, suppliers, users } = useAppStore();
+function AddTaskModal({ isOpen, onClose, onAddTask, editingTask }: AddTaskModalProps) {
+  const { currentProject, currentUser, users = [], suppliers = [] } = useAppStore();
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    category: 'General',
-    priority: 'medium' as const,
-    status: 'pending' as const,
-    start_date: format(new Date(), 'yyyy-MM-dd'),
-    planned_duration: 1,
-    color: '#3b82f6',
-    assigned_to: currentUser?.id || '',
-    dependencies: [] as string[],
-    // Supplier/Procurement fields
-    primary_supplier_id: '',
-    requires_materials: false,
-    material_delivery_date: '',
-    procurement_notes: ''
+    title: editingTask?.title || '',
+    description: editingTask?.description || '',
+    category: editingTask?.category || 'General',
+    status: editingTask?.status || 'pending',
+    priority: editingTask?.priority || 'medium',
+    assigned_to: editingTask?.assigned_to || '',
+    start_date: editingTask ? format(new Date(editingTask.start_date), 'yyyy-MM-dd') : '',
+    planned_duration: editingTask?.planned_duration || 1,
+    color: editingTask?.color || '#3b82f6',
+    dependencies: editingTask?.dependencies || [],
+    requires_materials: editingTask?.requires_materials || false,
+    primary_supplier_id: editingTask?.primary_supplier_id || '',
+    material_delivery_date: editingTask?.material_delivery_date ? format(new Date(editingTask.material_delivery_date), 'yyyy-MM-dd') : '',
+    procurement_notes: editingTask?.procurement_notes || ''
   });
 
-  React.useEffect(() => {
-    if (isOpen) {
+  // Reset form when modal opens/closes or editing task changes
+  useEffect(() => {
+    if (editingTask) {
+      setFormData({
+        title: editingTask.title,
+        description: editingTask.description,
+        category: editingTask.category,
+        status: editingTask.status,
+        priority: editingTask.priority,
+        assigned_to: editingTask.assigned_to || '',
+        start_date: format(new Date(editingTask.start_date), 'yyyy-MM-dd'),
+        planned_duration: editingTask.planned_duration,
+        color: editingTask.color || '#3b82f6',
+        dependencies: editingTask.dependencies || [],
+        requires_materials: editingTask.requires_materials || false,
+        primary_supplier_id: editingTask.primary_supplier_id || '',
+        material_delivery_date: editingTask.material_delivery_date ? format(new Date(editingTask.material_delivery_date), 'yyyy-MM-dd') : '',
+        procurement_notes: editingTask.procurement_notes || ''
+      });
+    } else {
+      // Reset to default values for adding new task
       setFormData({
         title: '',
         description: '',
         category: 'General',
-        priority: 'medium',
         status: 'pending',
-        start_date: format(new Date(), 'yyyy-MM-dd'),
+        priority: 'medium',
+        assigned_to: '',
+        start_date: '',
         planned_duration: 1,
         color: '#3b82f6',
-        assigned_to: currentUser?.id || '',
         dependencies: [],
-        // Supplier/Procurement fields
-        primary_supplier_id: '',
         requires_materials: false,
+        primary_supplier_id: '',
         material_delivery_date: '',
         procurement_notes: ''
       });
     }
-  }, [isOpen, currentUser]);
+  }, [editingTask, isOpen]);
 
   if (!isOpen) return null;
 
@@ -337,8 +355,9 @@ function AddTaskModal({ isOpen, onClose, onAddTask }: AddTaskModalProps) {
 export default function SchedulePage() {
   const { tasks, currentProject, currentUser, addTask, updateTask, moveTask } = useAppStore();
   const [view, setView] = useState<'gantt' | 'list'>('gantt');
-
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
+  const [showEditTaskModal, setShowEditTaskModal] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   if (!currentProject) {
     return <div>Loading...</div>;
@@ -368,6 +387,28 @@ export default function SchedulePage() {
     };
     
     addTask(newTask);
+  };
+
+  const handleTaskClick = (task: Task) => {
+    console.log('Task clicked for editing:', task);
+    if (canEditSchedule) {
+      setSelectedTask(task);
+      setShowEditTaskModal(true);
+    } else {
+      toast.error('You do not have permission to edit tasks');
+    }
+  };
+
+  const handleEditTask = (taskData: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => {
+    if (selectedTask) {
+      updateTask(selectedTask.id, {
+        ...taskData,
+        updated_at: new Date()
+      });
+      setShowEditTaskModal(false);
+      setSelectedTask(null);
+      toast.success('Task updated successfully!');
+    }
   };
 
   return (
@@ -442,10 +483,7 @@ export default function SchedulePage() {
           <CustomGanttChart
             tasks={tasks}
             onTaskUpdate={(taskId, updates) => updateTask(taskId, updates)}
-            onTaskClick={(task) => {
-              // Handle task click - could open edit modal
-              console.log('Task clicked:', task);
-            }}
+            onTaskClick={handleTaskClick}
             onTaskReorder={(draggedTaskId, targetIndex) => {
               // Handle task reordering
               console.log('Reordering task:', draggedTaskId, 'to index:', targetIndex);
@@ -632,7 +670,21 @@ export default function SchedulePage() {
         isOpen={showAddTaskModal}
         onClose={() => setShowAddTaskModal(false)}
         onAddTask={handleAddTask}
+        editingTask={selectedTask}
       />
+
+      {/* Edit Task Modal */}
+      {selectedTask && (
+        <AddTaskModal
+          isOpen={showEditTaskModal}
+          onClose={() => {
+            setShowEditTaskModal(false);
+            setSelectedTask(null);
+          }}
+          onAddTask={handleEditTask}
+          editingTask={selectedTask}
+        />
+      )}
     </div>
   );
 } 
