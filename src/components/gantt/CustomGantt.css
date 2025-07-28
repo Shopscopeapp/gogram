@@ -156,15 +156,20 @@
   margin-right: 8px;
   cursor: grab;
   user-select: none;
-  transition: color 0.2s ease;
+  transition: all 0.2s ease;
+  padding: 2px 4px;
+  border-radius: 4px;
 }
 
-.gantt-task-name-cell:hover .gantt-drag-handle {
+.gantt-drag-handle:hover {
   color: #6b7280;
+  background: rgba(59, 130, 246, 0.1);
+  transform: scale(1.1);
 }
 
-.gantt-task-name-cell:active .gantt-drag-handle {
+.gantt-drag-handle:active {
   cursor: grabbing;
+  background: rgba(59, 130, 246, 0.2);
 }
 
 /* Drop indicator */
@@ -248,17 +253,26 @@
 
 /* Task Bars */
 .gantt-task-bar {
-  position: absolute;
-  border-radius: 6px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  position: relative;
   transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  color: white;
-  font-weight: 500;
-  overflow: hidden;
-  cursor: move; /* Show move cursor */
-  user-select: none; /* Prevent text selection during drag */
+}
+
+.gantt-task-bar::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  background: transparent;
+  border-radius: 8px;
+  pointer-events: none;
+  transition: all 0.2s ease;
+}
+
+.gantt-task-bar:hover::before {
+  background: rgba(59, 130, 246, 0.1);
+  border: 2px solid rgba(59, 130, 246, 0.3);
 }
 
 .gantt-task-bar:hover {
@@ -314,6 +328,27 @@
 .gantt-milestone.critical {
   background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
   border: 2px solid #991b1b !important;
+}
+
+/* Dependency chain visual feedback */
+.gantt-task-bar.will-be-affected {
+  background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+  border: 2px solid #b45309 !important;
+  animation: dependencyPulse 1s ease-in-out infinite;
+}
+
+.gantt-task-row.will-be-affected {
+  background: #fef3c7;
+  border-left: 4px solid #f59e0b;
+}
+
+@keyframes dependencyPulse {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+  }
+  50% {
+    box-shadow: 0 4px 16px rgba(245, 158, 11, 0.5);
+  }
 }
 
 /* Task Labels and Progress */

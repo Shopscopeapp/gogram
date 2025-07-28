@@ -52,6 +52,192 @@ const GANTT_CONFIG = {
   }
 };
 
+// Smart dependency management utilities
+const calculateDependencyUpdates = (
+  movedTask: GanttTask, 
+  newStartDate: Date, 
+  allTasks: GanttTask[]
+): { taskId: string; updates: { start_date: Date; end_date: Date } }[] => {
+  const updates: { taskId: string; updates: { start_date: Date; end_date: Date } }[] = [];
+  const visited = new Set<string>();
+  
+  // Get all tasks that depend on the moved task (successors)
+  const getSuccessors = (taskId: string): GanttTask[] => {
+    return allTasks.filter(task => 
+      task.predecessors && task.predecessors.includes(taskId)
+    );
+  };
+  
+  // Recursively update dependent tasks
+  const updateDependentTasks = (changedTaskId: string, changedEndDate: Date) => {
+    if (visited.has(changedTaskId)) return; // Prevent infinite loops
+    visited.add(changedTaskId);
+    
+    const successors = getSuccessors(changedTaskId);
+    
+    successors.forEach(successor => {
+      const currentStartDate = new Date(successor.start_date);
+      const currentEndDate = new Date(successor.end_date);
+      const taskDuration = differenceInDays(currentEndDate, currentStartDate);
+      
+      // New start date should be at least 1 day after the predecessor ends
+      const newSuccessorStartDate = addDays(changedEndDate, 1);
+      const newSuccessorEndDate = addDays(newSuccessorStartDate, taskDuration);
+      
+      // Only update if the successor needs to be moved forward
+      if (newSuccessorStartDate > currentStartDate) {
+        updates.push({
+          taskId: successor.id,
+          updates: {
+            start_date: newSuccessorStartDate,
+            end_date: newSuccessorEndDate
+          }
+        });
+        
+        // Recursively update tasks that depend on this successor
+        updateDependentTasks(successor.id, newSuccessorEndDate);
+      }
+    });
+  };
+  
+  // Start the cascade from the moved task
+  const movedTaskDuration = differenceInDays(new Date(movedTask.end_date), new Date(movedTask.start_date));
+  const newEndDate = addDays(newStartDate, movedTaskDuration);
+  
+  updateDependentTasks(movedTask.id, newEndDate);
+  
+  return updates;
+};
+
+// Validate that a move doesn't create circular dependencies
+const validateDependencyMove = (
+  taskToMove: GanttTask,
+  newStartDate: Date,
+  allTasks: GanttTask[]
+): { isValid: boolean; reason?: string } => {
+  // Check if moving this task would create a circular dependency
+  const visited = new Set<string>();
+  
+  const hasCircularDependency = (taskId: string, targetTaskId: string): boolean => {
+    if (visited.has(taskId)) return false;
+    visited.add(taskId);
+    
+    const task = allTasks.find(t => t.id === taskId);
+    if (!task || !task.predecessors) return false;
+    
+    for (const predId of task.predecessors) {
+      if (predId === targetTaskId) return true;
+      if (hasCircularDependency(predId, targetTaskId)) return true;
+    }
+    
+    return false;
+  };
+  
+  // Check if any successor of the moved task would create a circular dependency
+  const successors = allTasks.filter(task => 
+    task.predecessors && task.predecessors.includes(taskToMove.id)
+  );
+  
+  for (const successor of successors) {
+    if (hasCircularDependency(successor.id, taskToMove.id)) {
+      return {
+        isValid: false,
+        reason: `Moving this task would create a circular dependency with ${successor.title}`
+      };
+    }
+  }
+  
+  return { isValid: true };
+};
+
+// Critical path calculation utility
+const recalculateCriticalPath = (allTasks: GanttTask[]): string[] => {
+  const criticalTasks: string[] = [];
+  
+  // Simple critical path detection - find the longest path through the project
+  const findLongestPath = (taskId: string, visited: Set<string> = new Set()): number => {
+    if (visited.has(taskId)) return 0; // Prevent infinite loops
+    visited.add(taskId);
+    
+    const task = allTasks.find(t => t.id === taskId);
+    if (!task) return 0;
+    
+    const taskDuration = differenceInDays(new Date(task.end_date), new Date(task.start_date)) + 1;
+    
+    // Get all successors (tasks that depend on this task)
+    const successors = allTasks.filter(t => 
+      t.predecessors && t.predecessors.includes(taskId)
+    );
+    
+    if (successors.length === 0) {
+      return taskDuration; // Leaf task
+    }
+    
+    // Find the longest path through successors
+    const maxSuccessorPath = Math.max(
+      ...successors.map(successor => findLongestPath(successor.id, new Set(visited)))
+    );
+    
+    return taskDuration + maxSuccessorPath;
+  };
+  
+  // Find tasks with no predecessors (start tasks)
+  const startTasks = allTasks.filter(task => 
+    !task.predecessors || task.predecessors.length === 0
+  );
+  
+  let longestPathLength = 0;
+  let criticalStartTask: string | null = null;
+  
+  // Find the start task that leads to the longest path
+  startTasks.forEach(startTask => {
+    const pathLength = findLongestPath(startTask.id);
+    if (pathLength > longestPathLength) {
+      longestPathLength = pathLength;
+      criticalStartTask = startTask.id;
+    }
+  });
+  
+  // Trace the critical path
+  if (criticalStartTask) {
+    const traceCriticalPath = (taskId: string, visited: Set<string> = new Set()): string[] => {
+      if (visited.has(taskId)) return [];
+      visited.add(taskId);
+      
+      const task = allTasks.find(t => t.id === taskId);
+      if (!task) return [];
+      
+      criticalTasks.push(taskId);
+      
+      // Find the successor with the longest path
+      const successors = allTasks.filter(t => 
+        t.predecessors && t.predecessors.includes(taskId)
+      );
+      
+      let longestSuccessor: string | null = null;
+      let maxLength = 0;
+      
+      successors.forEach(successor => {
+        const pathLength = findLongestPath(successor.id, new Set(visited));
+        if (pathLength > maxLength) {
+          maxLength = pathLength;
+          longestSuccessor = successor.id;
+        }
+      });
+      
+      if (longestSuccessor) {
+        return [taskId, ...traceCriticalPath(longestSuccessor, new Set(visited))];
+      }
+      
+      return [taskId];
+    };
+    
+    return traceCriticalPath(criticalStartTask);
+  }
+  
+  return criticalTasks;
+};
+
 export default function CustomGanttChart({
   tasks,
   onTaskUpdate,
@@ -165,16 +351,17 @@ export default function CustomGanttChart({
     onTaskClick?.(task);
   };
 
-  // Handle task drag
-  const handleTaskDragStart = (e: React.MouseEvent, task: GanttTask) => {
+  // Handle task drag (horizontal - for date changes)
+  const handleHorizontalDragStart = (e: React.MouseEvent, task: GanttTask) => {
     if (readOnly) return;
     e.preventDefault();
     e.stopPropagation();
     
+    console.log('Starting horizontal drag for task:', task.title);
+    
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    // Store initial values locally to avoid stale state issues
     const initialX = e.clientX - rect.left;
     const initialDate = new Date(task.start_date);
     
@@ -193,14 +380,12 @@ export default function CustomGanttChart({
       if (!currentRect) return;
       
       const currentX = e.clientX - currentRect.left;
-      const currentY = e.clientY - currentRect.top;
-      const deltaX = currentX - initialX; // Use local variable, not state
-      const deltaY = currentY - initialY; // Use local variable, not state
+      const deltaX = currentX - initialX;
       
       // Visual feedback during drag
       const taskElement = document.querySelector(`[data-task-id="${task.id}"] .gantt-task-bar`) as HTMLElement;
       if (taskElement) {
-        taskElement.style.transform = `translateX(${deltaX}px) translateY(${deltaY}px)`;
+        taskElement.style.transform = `translateX(${deltaX}px)`;
         taskElement.style.opacity = '0.8';
         taskElement.style.zIndex = '100';
         taskElement.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.3)';
@@ -208,13 +393,13 @@ export default function CustomGanttChart({
     };
 
     const handleMouseUp = (e: MouseEvent) => {
+      console.log('Ending horizontal drag for task:', task.title);
+      
       const currentRect = containerRef.current?.getBoundingClientRect();
       if (!currentRect) return;
       
       const currentX = e.clientX - currentRect.left;
-      const currentY = e.clientY - currentRect.top;
-      const deltaX = currentX - initialX; // Use local variable, not state
-      const deltaY = currentY - initialY; // Use local variable, not state
+      const deltaX = currentX - initialX;
       const daysDelta = Math.round(deltaX / GANTT_CONFIG.dayWidth);
       
       // Reset visual feedback
@@ -234,10 +419,37 @@ export default function CustomGanttChart({
         
         console.log('Updating task:', task.id, 'from', task.start_date, 'to', newStartDate);
         
+        // Validate the move doesn't create circular dependencies
+        const validation = validateDependencyMove(task, newStartDate, processedTasks);
+        
+        if (!validation.isValid) {
+          console.error('Invalid move:', validation.reason);
+          // TODO: Show user feedback about invalid move
+          return;
+        }
+        
+        // Calculate cascade updates for dependent tasks
+        const dependencyUpdates = calculateDependencyUpdates(task, newStartDate, processedTasks);
+        
+        console.log('Dependency cascade updates:', dependencyUpdates);
+        
+        // Apply the main task update
         onTaskUpdate?.(task.id, {
           start_date: newStartDate,
           end_date: newEndDate
         });
+        
+        // Apply cascade updates to dependent tasks
+        dependencyUpdates.forEach(update => {
+          console.log('Cascading update to task:', update.taskId, update.updates);
+          onTaskUpdate?.(update.taskId, update.updates);
+        });
+        
+        // Show user feedback about cascade updates
+        if (dependencyUpdates.length > 0) {
+          console.log(`✅ Smart Gantt: Updated ${dependencyUpdates.length} dependent tasks automatically`);
+          // TODO: Show toast notification to user
+        }
       }
       
       // Clean up
@@ -251,12 +463,10 @@ export default function CustomGanttChart({
         dropIndex: -1
       });
       
-      // Remove event listeners
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
 
-    // Add event listeners
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
   };
@@ -264,19 +474,27 @@ export default function CustomGanttChart({
   // Handle vertical drag for task reordering
   const handleVerticalDragStart = (e: React.MouseEvent, task: GanttTask, taskIndex: number) => {
     if (readOnly) return;
+    
+    // Only handle if clicking on the drag handle area
+    const target = e.target as HTMLElement;
+    if (!target.classList.contains('gantt-drag-handle') && !target.closest('.gantt-drag-handle')) {
+      return; // Let other handlers take over
+    }
+    
     e.preventDefault();
     e.stopPropagation();
+    
+    console.log('Starting vertical drag for task:', task.title, 'at index:', taskIndex);
     
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    const initialX = e.clientX - rect.left;
     const initialY = e.clientY - rect.top;
     
     setDragState({
       isDragging: true,
       dragTaskId: task.id,
-      dragStartX: initialX,
+      dragStartX: 0,
       dragStartY: initialY,
       dragStartDate: null,
       dragMode: 'vertical',
@@ -307,6 +525,8 @@ export default function CustomGanttChart({
     };
 
     const handleMouseUp = () => {
+      console.log('Ending vertical drag for task:', task.title);
+      
       // Reset visual feedback
       const taskElement = document.querySelector(`[data-task-row="${taskIndex}"]`) as HTMLElement;
       if (taskElement) {
@@ -437,16 +657,21 @@ export default function CustomGanttChart({
           className={`gantt-task-row ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''}`}
           style={{ height: GANTT_CONFIG.rowHeight }}
         >
-          {/* Task Name Column */}
+          {/* Task Name Column - for vertical dragging */}
           <div 
             className="gantt-task-name-cell"
             style={{ width: GANTT_CONFIG.taskNameWidth }}
             onClick={(e) => handleTaskClick(task, e)}
-            onMouseDown={(e) => !readOnly && handleVerticalDragStart(e, task, index)}
           >
             <div className="gantt-task-info">
               <div className="gantt-task-title">
-                <span className="gantt-drag-handle">⋮⋮</span>
+                <span 
+                  className="gantt-drag-handle"
+                  onMouseDown={(e) => handleVerticalDragStart(e, task, index)}
+                  title="Drag to reorder tasks"
+                >
+                  ⋮⋮
+                </span>
                 {task.title}
                 {task.isCritical && <span className="critical-badge">CRITICAL</span>}
                 {isMilestone && <span className="milestone-badge">MILESTONE</span>}
@@ -459,7 +684,7 @@ export default function CustomGanttChart({
             </div>
           </div>
 
-          {/* Task Timeline */}
+          {/* Task Timeline - for horizontal dragging */}
           <div className="gantt-task-timeline" style={{ width: totalTimelineWidth }}>
             {isMilestone ? (
               <div
@@ -474,9 +699,9 @@ export default function CustomGanttChart({
                   transform: 'rotate(45deg)',
                   cursor: readOnly ? 'pointer' : 'move'
                 }}
-                onMouseDown={(e) => !readOnly && handleTaskDragStart(e, task)}
+                onMouseDown={(e) => !readOnly && handleHorizontalDragStart(e, task)}
                 onClick={(e) => handleTaskClick(task, e)}
-                title={`Milestone: ${task.title}`}
+                title={`Milestone: ${task.title} - Drag to reschedule`}
               />
             ) : (
               <div
@@ -494,9 +719,9 @@ export default function CustomGanttChart({
                   zIndex: isSelected ? 20 : task.isCritical ? 15 : 10,
                   userSelect: 'none'
                 }}
-                onMouseDown={(e) => !readOnly && handleTaskDragStart(e, task)}
+                onMouseDown={(e) => !readOnly && handleHorizontalDragStart(e, task)}
                 onClick={(e) => handleTaskClick(task, e)}
-                title={`${task.title} (${taskDuration} days)`}
+                title={`${task.title} (${taskDuration} days) - Drag to reschedule`}
               >
                 {/* Progress bar */}
                 {progressWidth > 0 && (
@@ -515,7 +740,7 @@ export default function CustomGanttChart({
                 {taskWidth > 60 && (
                   <div className="gantt-task-label">
                     <span>{task.title}</span>
-                    {(task.actualProgress || 0) > 0 && <span className="progress-text">{task.actualProgress || 0}%</span>}
+                    {(task.actualProgress || 0) > 0 && <span className="progress-text">{(task.actualProgress || 0)}%</span>}
                   </div>
                 )}
               </div>
