@@ -330,9 +330,6 @@ export const useAppStore = create<AppStore>()(
 
       // Note: Async supplier and delivery actions are defined later in the file
 
-      // QA Alert Management with Database Persistence
-      qaAlerts: [] as QAAlert[],
-
       // Initialize QA alerts from database
       initializeQAAlerts: async () => {
         const { currentProject } = get();

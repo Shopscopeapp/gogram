@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, ChevronDown, User, Calendar, Clock, Settings } from 'lucide-react';
+import { ChevronRight, ChevronDown, User, Calendar, Clock, Settings, Smartphone, Monitor, List, BarChart3 } from 'lucide-react';
 import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, differenceInDays, parseISO, isValid } from 'date-fns';
 import type { Task } from '../../types';
 import { safeDateFormat } from '../../utils/dateHelpers';
@@ -37,6 +37,7 @@ const GANTT_CONFIG = {
   taskNameWidth: 320,
   dayWidth: 30,
   minChartHeight: 400,
+  mobileBreakpoint: 640,
   colors: {
     primary: '#3b82f6',
     secondary: '#10b981', 
@@ -63,6 +64,8 @@ export default function CustomGanttChart({
   timelineEnd
 }: CustomGanttChartProps) {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileView, setMobileView] = useState<'list' | 'timeline'>('list');
   const [dragState, setDragState] = useState({
     isDragging: false,
     dragTaskId: null as string | null,
@@ -74,6 +77,22 @@ export default function CustomGanttChart({
   });
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Check for mobile screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= GANTT_CONFIG.mobileBreakpoint);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Handle mobile view toggle
+  const toggleMobileView = () => {
+    setMobileView(prev => prev === 'list' ? 'timeline' : 'list');
+  };
 
   // Process tasks with construction-specific enhancements
   const processedTasks = useMemo(() => {
@@ -98,140 +117,96 @@ export default function CustomGanttChart({
       const now = new Date();
       return {
         start: startOfMonth(now),
-        end: endOfMonth(addDays(now, 30))
+        end: endOfMonth(addDays(now, 30)),
+        days: eachDayOfInterval({
+          start: startOfMonth(now),
+          end: endOfMonth(addDays(now, 30))
+        })
       };
     }
 
-    // Parse dates safely
-    const validDates = tasks.reduce<Date[]>((dates, task) => {
-      const startDate = typeof task.start_date === 'string' 
-        ? parseISO(task.start_date) 
-        : new Date(task.start_date);
-      const endDate = typeof task.end_date === 'string' 
-        ? parseISO(task.end_date) 
-        : new Date(task.end_date);
-
-      if (isValid(startDate)) dates.push(startDate);
-      if (isValid(endDate)) dates.push(endDate);
-      return dates;
-    }, []);
-
-    if (validDates.length === 0) {
-      const now = new Date();
-      return {
-        start: startOfMonth(now),
-        end: endOfMonth(addDays(now, 30))
-      };
-    }
-
-    const earliestDate = new Date(Math.min(...validDates.map(d => d.getTime())));
-    const latestDate = new Date(Math.max(...validDates.map(d => d.getTime())));
-
+    // Use provided bounds or calculate from tasks
+    const start = timelineStart || new Date(Math.min(...tasks.map(t => new Date(t.start_date).getTime())));
+    const end = timelineEnd || new Date(Math.max(...tasks.map(t => new Date(t.end_date).getTime())));
+    
+    // Extend to show full months
+    const monthStart = startOfMonth(start);
+    const monthEnd = endOfMonth(end);
+    
     return {
-      start: timelineStart || startOfMonth(earliestDate),
-      end: timelineEnd || endOfMonth(addDays(latestDate, 7))
+      start: monthStart,
+      end: monthEnd,
+      days: eachDayOfInterval({ start: monthStart, end: monthEnd })
     };
   }, [tasks, timelineStart, timelineEnd]);
 
-  // Generate timeline days
-  const timelineDays = eachDayOfInterval({
-    start: timelineBounds.start,
-    end: timelineBounds.end
-  });
-
-  const totalTimelineWidth = timelineDays.length * GANTT_CONFIG.dayWidth;
-
-  // Handle task click
-  const handleTaskClick = (task: GanttTask, e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    
-    console.log('Task clicked:', task.title, task);
-    setSelectedTaskId(task.id);
-    
-    if (onTaskClick) {
-      console.log('Calling onTaskClick callback');
-      onTaskClick(task);
-    } else {
-      console.log('No onTaskClick callback provided');
-    }
-  };
-
-  // Handle horizontal drag for date changes
-  const handleHorizontalDragStart = (e: React.MouseEvent, task: GanttTask) => {
+  // Enhanced mobile-friendly task drag handlers
+  const handleTaskDragStart = (task: GanttTask, e: React.MouseEvent | React.TouchEvent, mode: 'horizontal' | 'vertical') => {
     if (readOnly) return;
-    e.preventDefault();
-    e.stopPropagation();
-    
-    console.log('Starting horizontal drag for task:', task.title);
-    
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
 
-    const initialX = e.clientX - rect.left;
-    const initialDate = new Date(task.start_date);
-    
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+
     setDragState({
       isDragging: true,
       dragTaskId: task.id,
-      dragStartX: initialX,
-      dragStartY: 0,
-      dragStartDate: initialDate,
-      dragMode: 'horizontal',
+      dragStartX: clientX,
+      dragStartY: clientY,
+      dragStartDate: task.start_date,
+      dragMode: mode,
       dropIndex: -1
     });
 
-    const handleMouseMove = (e: MouseEvent) => {
-      const currentRect = containerRef.current?.getBoundingClientRect();
-      if (!currentRect) return;
+    if (mode === 'horizontal') {
+      handleHorizontalDragStart(task, clientX);
+    } else {
+      handleVerticalDragStart(task, clientY);
+    }
+  };
+
+  const handleHorizontalDragStart = (task: GanttTask, startX: number) => {
+    const handleMouseMove = (e: MouseEvent | TouchEvent) => {
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const deltaX = clientX - startX;
+      const daysDelta = Math.round(deltaX / GANTT_CONFIG.dayWidth);
       
-      const currentX = e.clientX - currentRect.left;
-      const deltaX = currentX - initialX;
-      
-      // Visual feedback during drag
-      const taskElement = document.querySelector(`[data-task-id="${task.id}"] .gantt-task-bar`) as HTMLElement;
-      if (taskElement) {
-        taskElement.style.transform = `translateX(${deltaX}px)`;
-        taskElement.style.opacity = '0.8';
-        taskElement.style.zIndex = '100';
-        taskElement.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.3)';
+      if (daysDelta !== 0) {
+        const newStartDate = addDays(dragState.dragStartDate!, daysDelta);
+        
+        // Visual feedback only
+        const taskElement = document.querySelector(`[data-task-id="${task.id}"]`) as HTMLElement;
+        if (taskElement) {
+          taskElement.style.transform = `translateX(${deltaX}px)`;
+          taskElement.style.opacity = '0.8';
+          taskElement.style.zIndex = '50';
+        }
       }
     };
 
-    const handleMouseUp = (e: MouseEvent) => {
-      console.log('Ending horizontal drag for task:', task.title);
-      
-      const currentRect = containerRef.current?.getBoundingClientRect();
-      if (!currentRect) return;
-      
-      const currentX = e.clientX - currentRect.left;
-      const deltaX = currentX - initialX;
+    const handleMouseUp = (e: MouseEvent | TouchEvent) => {
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const deltaX = clientX - startX;
       const daysDelta = Math.round(deltaX / GANTT_CONFIG.dayWidth);
       
       // Reset visual feedback
-      const taskElement = document.querySelector(`[data-task-id="${task.id}"] .gantt-task-bar`) as HTMLElement;
+      const taskElement = document.querySelector(`[data-task-id="${task.id}"]`) as HTMLElement;
       if (taskElement) {
         taskElement.style.transform = '';
         taskElement.style.opacity = '';
         taskElement.style.zIndex = '';
-        taskElement.style.boxShadow = '';
       }
-      
-      // Update task dates if moved significantly
-      if (Math.abs(daysDelta) >= 1) {
-        const newStartDate = addDays(initialDate, daysDelta);
-        const taskDuration = differenceInDays(new Date(task.end_date), new Date(task.start_date));
-        const newEndDate = addDays(newStartDate, taskDuration);
+
+      if (daysDelta !== 0 && onTaskUpdate) {
+        const newStartDate = addDays(dragState.dragStartDate!, daysDelta);
+        const duration = differenceInDays(task.end_date, task.start_date);
+        const newEndDate = addDays(newStartDate, duration);
         
-        console.log('Updating task:', task.id, 'from', task.start_date, 'to', newStartDate);
-        
-        onTaskUpdate?.(task.id, {
+        onTaskUpdate(task.id, {
           start_date: newStartDate,
           end_date: newEndDate
         });
       }
-      
-      // Clean up
+
       setDragState({
         isDragging: false,
         dragTaskId: null,
@@ -241,76 +216,41 @@ export default function CustomGanttChart({
         dragMode: 'none',
         dropIndex: -1
       });
-      
+
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('touchmove', handleMouseMove);
+      document.removeEventListener('touchend', handleMouseUp);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('touchmove', handleMouseMove);
+    document.addEventListener('touchend', handleMouseUp);
   };
 
-  // Handle vertical drag for task reordering
-  const handleVerticalDragStart = (e: React.MouseEvent, task: GanttTask, taskIndex: number) => {
-    if (readOnly) return;
+  const handleVerticalDragStart = (task: GanttTask, startY: number) => {
+    const taskIndex = processedTasks.findIndex(t => t.id === task.id);
     
-    // Only handle if clicking on the drag handle area
-    const target = e.target as HTMLElement;
-    if (!target.classList.contains('gantt-drag-handle') && !target.closest('.gantt-drag-handle')) {
-      return; // Let other handlers take over
-    }
-    
-    e.preventDefault();
-    e.stopPropagation();
-    
-    console.log('Starting vertical drag for task:', task.title, 'at index:', taskIndex);
-    
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    const handleMouseMove = (e: MouseEvent | TouchEvent) => {
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+      const deltaY = clientY - startY;
+      const newIndex = Math.max(0, Math.min(processedTasks.length - 1, 
+        taskIndex + Math.round(deltaY / GANTT_CONFIG.rowHeight)));
+      
+      setDragState(prev => ({ ...prev, dropIndex: newIndex }));
 
-    const initialY = e.clientY - rect.top;
-    let currentDropIndex = taskIndex;
-    
-    setDragState({
-      isDragging: true,
-      dragTaskId: task.id,
-      dragStartX: 0,
-      dragStartY: initialY,
-      dragStartDate: null,
-      dragMode: 'vertical',
-      dropIndex: taskIndex
-    });
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const currentRect = containerRef.current?.getBoundingClientRect();
-      if (!currentRect) return;
-      
-      const currentY = e.clientY - currentRect.top;
-      const deltaY = currentY - initialY;
-      
-      // Calculate which row we're hovering over
-      const hoveredRowIndex = Math.floor((currentY - 80) / GANTT_CONFIG.rowHeight); // Account for header height
-      const clampedIndex = Math.max(0, Math.min(hoveredRowIndex, processedTasks.length - 1));
-      
-      currentDropIndex = clampedIndex;
-      
-      setDragState(prev => ({ ...prev, dropIndex: clampedIndex }));
-      
-      // Visual feedback for the dragged task
+      // Visual feedback
       const taskElement = document.querySelector(`[data-task-row="${taskIndex}"]`) as HTMLElement;
       if (taskElement) {
         taskElement.style.transform = `translateY(${deltaY}px)`;
         taskElement.style.opacity = '0.7';
         taskElement.style.zIndex = '100';
-        taskElement.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.3)';
+        taskElement.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.15)';
       }
-      
-      console.log('Dragging to index:', clampedIndex, 'current Y:', currentY);
     };
 
     const handleMouseUp = () => {
-      console.log('Ending vertical drag for task:', task.title, 'from index:', taskIndex, 'to index:', currentDropIndex);
-      
       // Reset visual feedback
       const taskElement = document.querySelector(`[data-task-row="${taskIndex}"]`) as HTMLElement;
       if (taskElement) {
@@ -319,16 +259,12 @@ export default function CustomGanttChart({
         taskElement.style.zIndex = '';
         taskElement.style.boxShadow = '';
       }
-      
-      // Execute reorder if position changed significantly
-      if (Math.abs(currentDropIndex - taskIndex) >= 1 && currentDropIndex !== taskIndex) {
-        console.log('Calling onTaskReorder:', task.id, 'to index:', currentDropIndex);
-        onTaskReorder?.(task.id, currentDropIndex);
-      } else {
-        console.log('No reorder needed - same position or too small change');
+
+      // Execute reorder if position changed
+      if (dragState.dropIndex !== taskIndex && dragState.dropIndex >= 0) {
+        onTaskReorder?.(task.id, dragState.dropIndex);
       }
-      
-      // Clean up
+
       setDragState({
         isDragging: false,
         dragTaskId: null,
@@ -338,247 +274,230 @@ export default function CustomGanttChart({
         dragMode: 'none',
         dropIndex: -1
       });
-      
+
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('touchmove', handleMouseMove);
+      document.removeEventListener('touchend', handleMouseUp);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('touchmove', handleMouseMove);
+    document.addEventListener('touchend', handleMouseUp);
   };
 
-  // Render individual task row
-  const renderTaskRow = (task: GanttTask, index: number) => {
-    console.log('Rendering task:', task.title, task);
-    
-    const startDate = typeof task.start_date === 'string' ? parseISO(task.start_date) : new Date(task.start_date);
-    const endDate = typeof task.end_date === 'string' ? parseISO(task.end_date) : new Date(task.end_date);
-    
-    console.log('Task dates:', task.title, 'start:', startDate, 'end:', endDate, 'valid start:', isValid(startDate), 'valid end:', isValid(endDate));
-    
-    if (!isValid(startDate) || !isValid(endDate)) {
-      console.error('Skipping task with invalid dates:', task.title);
-      return null; // Skip invalid tasks
-    }
+  // Render timeline header for desktop/tablet
+  const renderTimelineHeader = () => {
+    if (isMobile) return null;
 
-    const taskStartPosition = differenceInDays(startDate, timelineBounds.start) * GANTT_CONFIG.dayWidth;
-    const taskDuration = differenceInDays(endDate, startDate) + 1;
-    const taskWidth = Math.max(taskDuration * GANTT_CONFIG.dayWidth, 20); // Minimum width
-
-    console.log('Task positioning:', task.title, 'position:', taskStartPosition, 'width:', taskWidth, 'duration:', taskDuration);
-
-    const getTaskColor = () => {
-      if (task.isCritical) return GANTT_CONFIG.colors.critical;
-      if (task.status === 'in_progress' && task.progress_percentage === 100) return GANTT_CONFIG.colors.completed;
-      if (endDate < new Date() && task.status !== 'in_progress') return GANTT_CONFIG.colors.overdue;
-      return GANTT_CONFIG.colors.primary;
-    };
-
-    const progressWidth = ((task.actualProgress || 0) / 100) * taskWidth;
-    const isMilestone = task.category === 'milestone' || taskDuration <= 1;
-    const isSelected = selectedTaskId === task.id;
-    const isDragging = dragState.dragTaskId === task.id;
-    const isDropTarget = dragState.isDragging && dragState.dragMode === 'vertical' && dragState.dropIndex === index;
+    const months = timelineBounds.days.reduce((acc, day) => {
+      const monthKey = format(day, 'yyyy-MM');
+      if (!acc[monthKey]) {
+        acc[monthKey] = {
+          name: format(day, 'MMM yyyy'),
+          days: []
+        };
+      }
+      acc[monthKey].days.push(day);
+      return acc;
+    }, {} as Record<string, { name: string; days: Date[] }>);
 
     return (
-      <div
-        key={task.id}
-        data-task-id={task.id}
-        data-task-row={index}
-        className={`gantt-task-row ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''}`}
-        style={{ height: GANTT_CONFIG.rowHeight }}
-      >
-        {/* Task Name Column */}
-        <div 
-          className="gantt-task-name-cell"
-          style={{ width: GANTT_CONFIG.taskNameWidth }}
-          onClick={(e) => handleTaskClick(task, e)}
-        >
-          <div className="gantt-task-info">
-            <div className="gantt-task-title">
-              <span 
-                className="gantt-drag-handle"
-                onMouseDown={(e) => handleVerticalDragStart(e, task, index)}
-                title="Drag to reorder tasks"
-              >
-                ⋮⋮
-              </span>
-              {task.title}
-              {task.isCritical && <span className="critical-badge">CRITICAL</span>}
-              {isMilestone && <span className="milestone-badge">MILESTONE</span>}
-            </div>
-            <div className="gantt-task-details">
-              <span>{safeDateFormat(startDate, 'MMM dd')} - {safeDateFormat(endDate, 'MMM dd')}</span>
-              <span>({taskDuration}d)</span>
-              {(task.actualProgress || 0) > 0 && <span>{task.actualProgress || 0}%</span>}
-            </div>
-          </div>
-        </div>
-
-        {/* Task Timeline */}
-        <div className="gantt-task-timeline" style={{ width: totalTimelineWidth }}>
-          {isMilestone ? (
+      <div className="gantt-timeline-header">
+        <div className="gantt-timeline-months">
+          {Object.entries(months).map(([key, month]) => (
             <div
-              className={`gantt-milestone ${task.isCritical ? 'critical' : ''}`}
-              style={{
-                position: 'absolute',
-                left: taskStartPosition,
-                top: (GANTT_CONFIG.rowHeight - 20) / 2,
-                width: 20,
-                height: 20,
-                backgroundColor: getTaskColor(),
-                transform: 'rotate(45deg)',
-                cursor: readOnly ? 'pointer' : 'move'
-              }}
-              onMouseDown={(e) => !readOnly && handleHorizontalDragStart(e, task)}
-              onClick={(e) => handleTaskClick(task, e)}
-              title={`Milestone: ${task.title} - Drag to reschedule`}
-            />
-          ) : (
-            <div
-              className={`gantt-task-bar ${task.isCritical ? 'critical' : ''} ${isSelected ? 'selected' : ''}`}
-              style={{
-                position: 'absolute',
-                left: taskStartPosition,
-                width: taskWidth,
-                height: GANTT_CONFIG.taskBarHeight,
-                top: (GANTT_CONFIG.rowHeight - GANTT_CONFIG.taskBarHeight) / 2,
-                backgroundColor: getTaskColor(),
-                cursor: readOnly ? 'pointer' : 'move',
-                borderRadius: '4px',
-                border: isSelected ? '2px solid #1d4ed8' : task.isCritical ? '2px solid #dc2626' : '1px solid rgba(0,0,0,0.1)',
-                zIndex: isSelected ? 20 : task.isCritical ? 15 : 10,
-                userSelect: 'none'
-              }}
-              onMouseDown={(e) => !readOnly && handleHorizontalDragStart(e, task)}
-              onClick={(e) => handleTaskClick(task, e)}
-              title={`${task.title} (${taskDuration} days) - Drag to reschedule`}
+              key={key}
+              className="gantt-timeline-month"
+              style={{ width: month.days.length * GANTT_CONFIG.dayWidth }}
             >
-              {/* Progress bar */}
-              {progressWidth > 0 && (
-                <div
-                  className="gantt-task-progress"
-                  style={{
-                    width: progressWidth,
-                    height: '100%',
-                    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                    borderRadius: '2px 0 0 2px'
-                  }}
-                />
-              )}
-              
-              {/* Task label */}
-              {taskWidth > 60 && (
-                <div className="gantt-task-label">
-                  <span>{task.title}</span>
-                  {(task.actualProgress || 0) > 0 && <span className="progress-text">{(task.actualProgress || 0)}%</span>}
-                </div>
-              )}
+              {month.name}
             </div>
-          )}
+          ))}
+        </div>
+        <div className="gantt-timeline-days">
+          {timelineBounds.days.map((day, index) => (
+            <div
+              key={index}
+              className={`gantt-timeline-day ${
+                day.getDay() === 0 || day.getDay() === 6 ? 'weekend' : ''
+              } ${
+                format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd') ? 'today' : ''
+              }`}
+              style={{ width: GANTT_CONFIG.dayWidth }}
+            >
+              <div className="day-number">{format(day, 'd')}</div>
+              <div className="day-name">{format(day, 'EEE')}</div>
+            </div>
+          ))}
         </div>
       </div>
     );
   };
 
-  if (!tasks || tasks.length === 0) {
+  // Render task row with mobile responsiveness
+  const renderTaskRow = (task: GanttTask, index: number) => {
+    const taskStart = new Date(task.start_date);
+    const taskEnd = new Date(task.end_date);
+    const startOffset = differenceInDays(taskStart, timelineBounds.start) * GANTT_CONFIG.dayWidth;
+    const taskWidth = Math.max(GANTT_CONFIG.dayWidth, differenceInDays(taskEnd, taskStart) * GANTT_CONFIG.dayWidth);
+
+    const getStatusClass = (status: string) => {
+      switch (status) {
+        case 'completed': return 'completed';
+        case 'in_progress': return 'in-progress';
+        case 'overdue': return 'overdue';
+        default: return '';
+      }
+    };
+
+    const statusClass = getStatusClass(task.status);
+    const criticalClass = task.isCritical ? 'critical' : '';
+
     return (
-      <div className="gantt-container">
-        <div className="gantt-empty-state">
-          <div className="empty-state-content">
-            <Calendar size={48} className="empty-state-icon" />
-            <h3>No Tasks Available</h3>
-            <p>Add tasks to see them in the Gantt timeline</p>
+      <div
+        key={task.id}
+        className={`gantt-task-row ${dragState.dropIndex === index ? 'drag-target' : ''}`}
+        data-task-row={index}
+        style={{ 
+          height: isMobile ? 'auto' : GANTT_CONFIG.rowHeight,
+          minHeight: isMobile ? '80px' : GANTT_CONFIG.rowHeight
+        }}
+      >
+        {/* Task Name Cell */}
+        <div
+          className="gantt-task-name-cell"
+          onClick={() => onTaskClick?.(task)}
+          style={{ 
+            width: isMobile ? '100%' : GANTT_CONFIG.taskNameWidth,
+            cursor: 'pointer'
+          }}
+        >
+          <div
+            className="gantt-drag-handle"
+            onMouseDown={(e) => !isMobile && handleTaskDragStart(task, e, 'vertical')}
+            onTouchStart={(e) => isMobile && handleTaskDragStart(task, e, 'vertical')}
+          >
+            ⋮⋮
+          </div>
+          <div className="gantt-task-info">
+            <div className="gantt-task-name">
+              {task.title}
+              {task.isCritical && (
+                <span className="ml-2 px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">
+                  Critical
+                </span>
+              )}
+            </div>
+            <div className="gantt-task-meta">
+              <span className="flex items-center">
+                <Calendar className="w-3 h-3 mr-1" />
+                {safeDateFormat(task.start_date, 'MMM dd')} - {safeDateFormat(task.end_date, 'MMM dd')}
+              </span>
+              {task.assigned_to && (
+                <span className="flex items-center">
+                  <User className="w-3 h-3 mr-1" />
+                  {task.assigned_to}
+                </span>
+              )}
+              <span className="flex items-center">
+                <Clock className="w-3 h-3 mr-1" />
+                {task.progress_percentage || 0}%
+              </span>
+            </div>
           </div>
         </div>
+
+        {/* Task Timeline - Hidden on mobile in list mode */}
+        {(!isMobile || mobileView === 'timeline') && (
+          <div 
+            className="gantt-task-timeline"
+            style={{ height: isMobile ? '60px' : GANTT_CONFIG.rowHeight }}
+          >
+            <div
+              className={`gantt-task-bar ${statusClass} ${criticalClass} ${
+                dragState.dragTaskId === task.id ? 'dragging' : ''
+              }`}
+              data-task-id={task.id}
+              style={{
+                left: isMobile ? 0 : startOffset,
+                width: isMobile ? '100%' : taskWidth,
+                height: isMobile ? '24px' : GANTT_CONFIG.taskBarHeight,
+                position: isMobile ? 'relative' : 'absolute'
+              }}
+              onMouseDown={(e) => !isMobile && handleTaskDragStart(task, e, 'horizontal')}
+              onTouchStart={(e) => isMobile && handleTaskDragStart(task, e, 'horizontal')}
+            >
+              <div 
+                className="gantt-task-progress"
+                style={{ width: `${task.actualProgress}%` }}
+              />
+              <span className="gantt-task-label">
+                {isMobile ? task.title : (taskWidth > 100 ? task.title : '')}
+                <span className="progress-text">{task.actualProgress}%</span>
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  if (!processedTasks || processedTasks.length === 0) {
+    return (
+      <div className="gantt-empty">
+        <BarChart3 className="gantt-empty-icon" />
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">No tasks to display</h3>
+        <p className="text-gray-600">Add some tasks to see them in the Gantt chart</p>
       </div>
     );
   }
 
   return (
     <div 
-      ref={containerRef} 
-      className="gantt-container"
-      style={{ minHeight: GANTT_CONFIG.minChartHeight }}
+      ref={containerRef}
+      className={`gantt-container ${isMobile ? 'mobile' : 'desktop'}`}
     >
       {/* Header */}
       <div className="gantt-header">
-        <div 
-          className="gantt-header-task-names"
-          style={{ width: GANTT_CONFIG.taskNameWidth }}
-        >
-          <h4>Tasks & Resources</h4>
-        </div>
-        <div 
-          className="gantt-header-timeline"
-          style={{ width: totalTimelineWidth }}
-        >
-          <div className="gantt-timeline-months">
-            {timelineDays.reduce<Array<{ month: string; width: number; start: number }>>((months, day, index) => {
-              const monthKey = format(day, 'MMM yyyy');
-              const existing = months.find(m => m.month === monthKey);
-              
-              if (existing) {
-                existing.width += GANTT_CONFIG.dayWidth;
-              } else {
-                months.push({
-                  month: monthKey,
-                  width: GANTT_CONFIG.dayWidth,
-                  start: index * GANTT_CONFIG.dayWidth
-                });
-              }
-              
-              return months;
-            }, []).map((month, index) => (
-              <div
-                key={index}
-                className="gantt-month-header"
-                style={{
-                  left: month.start,
-                  width: month.width
-                }}
+        <div className="gantt-task-names-header">
+          <span>Tasks ({processedTasks.length})</span>
+          {isMobile && (
+            <div className="gantt-mobile-controls">
+              <button
+                className={`gantt-mobile-toggle ${mobileView === 'list' ? 'active' : ''}`}
+                onClick={() => setMobileView('list')}
               >
-                {month.month}
-              </div>
-            ))}
-          </div>
-          <div className="gantt-timeline-days">
-            {timelineDays.map((day, index) => {
-              const isWeekend = day.getDay() === 0 || day.getDay() === 6;
-              const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
-              
-              return (
-                <div
-                  key={index}
-                  className={`gantt-day-header ${isWeekend ? 'weekend' : ''} ${isToday ? 'today' : ''}`}
-                  style={{
-                    left: index * GANTT_CONFIG.dayWidth,
-                    width: GANTT_CONFIG.dayWidth
-                  }}
-                >
-                  <div className="day-number">{format(day, 'd')}</div>
-                  <div className="day-name">{format(day, 'EEE')}</div>
-                </div>
-              );
-            })}
-          </div>
+                <List className="w-3 h-3 mr-1" />
+                List
+              </button>
+              <button
+                className={`gantt-mobile-toggle ${mobileView === 'timeline' ? 'active' : ''}`}
+                onClick={() => setMobileView('timeline')}
+              >
+                <BarChart3 className="w-3 h-3 mr-1" />
+                Timeline
+              </button>
+            </div>
+          )}
         </div>
+        {renderTimelineHeader()}
       </div>
 
-      {/* Main Content */}
-      <div className="gantt-content">
-        {/* Today Line */}
-        {(() => {
+      {/* Content */}
+      <div className={`gantt-content ${isMobile && mobileView === 'timeline' ? 'timeline-mode' : ''}`}>
+        {/* Today Line - Desktop only */}
+        {!isMobile && (() => {
           const today = new Date();
           const todayPosition = differenceInDays(today, timelineBounds.start) * GANTT_CONFIG.dayWidth;
-          
-          // Only show today line if today is within the timeline bounds
+
           if (today >= timelineBounds.start && today <= timelineBounds.end) {
             return (
-              <div 
+              <div
                 className="gantt-today-line"
                 style={{
-                  left: 320 + todayPosition, // 320px for task name column
+                  left: GANTT_CONFIG.taskNameWidth + todayPosition,
                   zIndex: 30
                 }}
               />
@@ -586,9 +505,30 @@ export default function CustomGanttChart({
           }
           return null;
         })()}
-        
+
+        {/* Task Rows */}
         {processedTasks.map((task, index) => renderTaskRow(task, index))}
       </div>
+
+      {/* Mobile View Toggle Button */}
+      {isMobile && (
+        <button
+          className="gantt-mobile-view-toggle"
+          onClick={toggleMobileView}
+        >
+          {mobileView === 'list' ? (
+            <>
+              <BarChart3 className="w-4 h-4 mr-2" />
+              Show Timeline
+            </>
+          ) : (
+            <>
+              <List className="w-4 h-4 mr-2" />
+              Show List
+            </>
+          )}
+        </button>
+      )}
     </div>
   );
 } 
