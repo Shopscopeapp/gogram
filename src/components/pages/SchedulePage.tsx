@@ -16,49 +16,9 @@ import {
 import { useAppStore } from '../../store';
 import { format } from 'date-fns';
 import CustomGanttChart from '../gantt/CustomGanttChart';
+import AddTaskModal from '../modals/AddTaskModal';
 import type { Task } from '../../types';
 import toast from 'react-hot-toast';
-
-// Simple inline AddTaskModal component for now
-interface AddTaskModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onAddTask: (taskData: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => void;
-  initialData?: Task;
-  isEditMode?: boolean;
-}
-
-function AddTaskModal({ isOpen, onClose, onAddTask, initialData, isEditMode = false }: AddTaskModalProps) {
-  if (!isOpen) return null;
-  
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md">
-        <h2 className="text-lg font-semibold mb-4">
-          {isEditMode ? 'Edit Task' : 'Add Task'}
-        </h2>
-        <p className="text-gray-600 mb-4">
-          Task modal functionality will be implemented with proper form handling.
-        </p>
-        <div className="flex justify-end space-x-3">
-          <button onClick={onClose} className="btn btn-outline">
-            Cancel
-          </button>
-          <button 
-            onClick={() => {
-              // Placeholder implementation 
-              onClose();
-              toast.success(isEditMode ? 'Task updated!' : 'Task added!');
-            }}
-            className="btn btn-primary"
-          >
-            {isEditMode ? 'Update' : 'Add'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function SchedulePage() {
   const { tasks, currentProject, currentUser, addTask, updateTask, moveTask } = useAppStore();
