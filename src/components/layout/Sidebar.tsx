@@ -6,7 +6,6 @@ import {
   Calendar,
   Users,
   Truck,
-  FileText,
   BarChart3,
   Settings,
   ChevronLeft,
@@ -89,13 +88,6 @@ const navigationItems: NavItem[] = [
     icon: Share2,
     path: '/share',
     roles: ['project_manager']
-  },
-  {
-    id: 'documents',
-    label: 'Documents',
-    icon: FileText,
-    path: '/documents',
-    roles: ['project_manager', 'project_coordinator', 'subcontractor', 'viewer']
   }
 ];
 

@@ -144,16 +144,6 @@ export default function SchedulePage() {
                 <Calendar className="w-4 h-4 mr-1" />
                 {format(new Date(task.start_date), 'MMM dd')}
               </span>
-              {task.assigned_to && (
-                <span className="flex items-center">
-                  <div className="w-4 h-4 rounded-full bg-blue-500 mr-1 flex items-center justify-center">
-                    <span className="text-xs text-white font-medium">
-                      {task.assigned_to?.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                  {task.assigned_to}
-                </span>
-              )}
             </div>
             <div className="flex items-center">
               {(task.progress_percentage || 0) > 0 && (
@@ -232,7 +222,7 @@ export default function SchedulePage() {
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {task.assigned_to || 'Unassigned'}
+                  {/* User assignment removed */}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   <div>
@@ -457,16 +447,59 @@ export default function SchedulePage() {
       {/* Main Content */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         {view === 'gantt' ? (
-          <div className="h-[600px] md:h-[700px]">
-            <CustomGanttChart
-              tasks={filteredTasks}
-              onTaskUpdate={(taskId, updates) => updateTask(taskId, updates)}
-              onTaskClick={handleTaskClick}
-              onTaskReorder={handleTaskReorder}
-              readOnly={false}
-              showDependencies={true}
-            />
-          </div>
+          <>
+            <div className="h-[600px] md:h-[700px]">
+              <CustomGanttChart
+                tasks={filteredTasks}
+                onTaskUpdate={(taskId, updates) => updateTask(taskId, updates)}
+                onTaskClick={handleTaskClick}
+                onTaskReorder={handleTaskReorder}
+                onAddTask={() => setShowAddTaskModal(true)}
+                readOnly={false}
+                showDependencies={true}
+              />
+            </div>
+            
+            {/* Gantt Chart Legend */}
+            <div className="bg-gray-50 border-t border-gray-200 p-4">
+              <div className="flex flex-wrap items-center gap-6 text-sm">
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 bg-blue-600 rounded"></div>
+                  <span className="text-gray-700">Normal Task</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 bg-green-600 rounded"></div>
+                  <span className="text-gray-700">Completed</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 bg-yellow-500 rounded"></div>
+                  <span className="text-gray-700">In Progress</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 bg-red-500 rounded"></div>
+                  <span className="text-gray-700">Overdue</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 bg-red-600 rounded animate-pulse"></div>
+                  <span className="text-gray-700">Critical</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 bg-orange-500 rounded"></div>
+                  <span className="text-gray-700">Milestone</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                  <span className="text-gray-700">Today</span>
+                </div>
+              </div>
+              
+              <div className="mt-3 pt-3 border-t border-gray-200">
+                <p className="text-xs text-gray-500">
+                  <strong>Tip:</strong> Drag tasks to reschedule, click to edit, or use the floating + button to add new tasks.
+                </p>
+              </div>
+            </div>
+          </>
         ) : (
           <div className="p-4 md:p-6">
             {isMobile ? renderMobileListView() : renderDesktopListView()}

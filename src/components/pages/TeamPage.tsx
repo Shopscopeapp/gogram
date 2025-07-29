@@ -164,7 +164,7 @@ function AddUserModal({ isOpen, onClose, onAddUser }: AddUserModalProps) {
 }
 
 export default function TeamPage() {
-  const { users, addUser, updateUser, removeUser } = useAppStore();
+  const { users, addUser, updateUser, removeUser, isProjectManager, currentUser } = useAppStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -200,6 +200,11 @@ export default function TeamPage() {
   };
 
   const handleRemoveMember = (memberId: string) => {
+    if (memberId === currentUser?.id) {
+      toast.error('You cannot remove yourself from the team');
+      return;
+    }
+    
     if (window.confirm('Are you sure you want to remove this team member?')) {
       removeUser(memberId);
       toast.success('Team member removed successfully');
@@ -241,17 +246,15 @@ export default function TeamPage() {
           <p className="text-gray-600 mt-1">Manage team members, roles, and permissions</p>
         </div>
 
-        {/* Assuming currentUser and isProjectManager are available from useAppStore */}
-        {/* This part of the code was not provided in the original file, so it's commented out */}
-        {/* {currentUser && isProjectManager && ( */}
-        {/*   <button */}
-        {/*     onClick={() => setShowAddModal(true)} */}
-        {/*     className="btn btn-primary flex items-center space-x-2" */}
-        {/*   > */}
-        {/*     <UserPlus className="w-4 h-4" /> */}
-        {/*     <span>Add Member</span> */}
-        {/*   </button> */}
-        {/* )} */}
+        {isProjectManager() && (
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="btn btn-primary flex items-center space-x-2"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Add Member</span>
+          </button>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -344,6 +347,16 @@ export default function TeamPage() {
               <option value="supplier">Supplier</option>
               <option value="viewer">Viewer</option>
             </select>
+            
+            {isProjectManager() && (
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="btn btn-outline btn-sm flex items-center space-x-1"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Add Member</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -363,11 +376,9 @@ export default function TeamPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activity</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stats</th>
-                {/* Assuming isProjectManager is available from useAppStore */}
-                {/* This part of the code was not provided in the original file, so it's commented out */}
-                {/* {isProjectManager && ( */}
-                {/*   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th> */}
-                {/* )} */}
+                {isProjectManager() && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                )}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -424,28 +435,28 @@ export default function TeamPage() {
                     </div>
                   </td>
 
-                  {/* Assuming isProjectManager is available from useAppStore */}
-                  {/* This part of the code was not provided in the original file, so it's commented out */}
-                  {/* {isProjectManager && ( */}
+                  {isProjectManager() && (
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
                         <button
                           onClick={() => setSelectedMember(member)}
                           className="text-blue-600 hover:text-blue-900"
+                          title="Edit member"
                         >
                           <Edit3 className="w-4 h-4" />
                         </button>
-                        {member.id !== 'currentUser?.id' && ( // Assuming currentUser?.id is available
+                        {member.id !== currentUser?.id && (
                           <button
                             onClick={() => handleRemoveMember(member.id)}
                             className="text-red-600 hover:text-red-900"
+                            title="Remove member"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         )}
                       </div>
                     </td>
-                  {/* )} */}
+                  )}
                 </motion.tr>
               ))}
             </tbody>
@@ -459,6 +470,15 @@ export default function TeamPage() {
               <div>
                 <p className="text-gray-500 mb-2">No team members have been added yet.</p>
                 <p className="text-sm text-gray-400">Add your first team member to get started!</p>
+                {isProjectManager() && (
+                  <button
+                    onClick={() => setShowAddModal(true)}
+                    className="btn btn-primary mt-4"
+                  >
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Add First Team Member
+                  </button>
+                )}
               </div>
             ) : (
               <p className="text-gray-500">No team members found matching your search criteria.</p>

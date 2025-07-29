@@ -39,6 +39,8 @@ export interface Task {
   requires_materials?: boolean;
   material_delivery_date?: Date;
   procurement_notes?: string;
+  // ITP fields
+  itp_requirements?: string[]; // Array of ITP template IDs
   created_by?: string;
   created_at: Date;
   updated_at: Date;
@@ -224,4 +226,129 @@ export interface GanttTask extends Task {
   y: number;
   width: number;
   height: number;
+}
+
+// ITP (Inspection and Test Plan) Types
+export interface ITPTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  category: string;
+  type: 'structural' | 'electrical' | 'plumbing' | 'hvac' | 'fire_safety' | 'accessibility' | 'environmental' | 'general';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  requirements: ITPRequirement[];
+  is_active: boolean;
+  created_by?: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface ITPRequirement {
+  id: string;
+  text: string;
+  required: boolean;
+  category: 'safety' | 'quality' | 'compliance' | 'documentation' | 'testing' | 'inspection';
+  order: number;
+  notes?: string;
+}
+
+export interface ITPInstance {
+  id: string;
+  template_id: string;
+  task_id: string;
+  project_id: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'overdue';
+  assigned_to?: string;
+  due_date?: Date;
+  completed_by?: string;
+  completed_at?: Date;
+  requirements: ITPRequirementInstance[];
+  notes?: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface ITPRequirementInstance {
+  id: string;
+  requirement_id: string;
+  text: string;
+  required: boolean;
+  category: 'safety' | 'quality' | 'compliance' | 'documentation' | 'testing' | 'inspection';
+  order: number;
+  completed: boolean;
+  completed_by?: string;
+  completed_at?: Date;
+  notes?: string;
+  evidence?: string; // URL to uploaded evidence
+}
+
+// Safety Types
+export interface SafetyReport {
+  id: string;
+  project_id: string;
+  report_type: 'monthly' | 'quarterly' | 'annual' | 'incident' | 'custom';
+  title: string;
+  summary: string;
+  details: any; // JSON object with report details
+  status: 'draft' | 'completed' | 'archived';
+  created_by?: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface SafetyTraining {
+  id: string;
+  project_id: string;
+  title: string;
+  description?: string;
+  training_type: 'safety_orientation' | 'equipment_operation' | 'hazard_awareness' | 'emergency_procedures' | 'compliance_training' | 'custom';
+  training_date: Date;
+  duration_hours: number;
+  instructor?: string;
+  location?: string;
+  attendees: string[]; // Array of user IDs
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  completion_rate?: number; // Percentage of attendees who completed
+  notes?: string;
+  created_by?: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface SafetyInspection {
+  id: string;
+  project_id: string;
+  inspection_type: 'routine' | 'scheduled' | 'incident_followup' | 'compliance' | 'custom';
+  title: string;
+  description?: string;
+  inspection_date: Date;
+  inspector_id?: string;
+  location?: string;
+  status: 'scheduled' | 'in_progress' | 'passed' | 'failed';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  findings: string[];
+  corrective_actions?: string[];
+  next_inspection_date?: Date;
+  notes?: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface SafetyCompliance {
+  id: string;
+  project_id: string;
+  compliance_type: 'regulatory' | 'company_policy' | 'industry_standard' | 'contractual' | 'custom';
+  title: string;
+  description?: string;
+  regulation_code?: string;
+  check_date: Date;
+  checked_by?: string;
+  compliant: boolean;
+  requirements: string[];
+  findings?: string[];
+  corrective_actions?: string[];
+  next_review_date?: Date;
+  notes?: string;
+  created_at: Date;
+  updated_at: Date;
 } 

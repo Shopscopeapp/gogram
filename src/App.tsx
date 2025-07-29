@@ -24,10 +24,10 @@ import ReportsPage from './components/pages/ReportsPage';
 import SharePage from './components/pages/SharePage';
 import QAPage from './components/pages/QAPage';
 import TeamPage from './components/pages/TeamPage';
-import DocumentsPage from './components/pages/DocumentsPage';
 import SupplierConfirmationPage from './components/pages/SupplierConfirmationPage';
 import PublicProjectPage from './components/pages/PublicProjectPage';
 import LandingPage from './components/landing/LandingPage';
+import AccountSettingsPage from './components/pages/AccountSettingsPage';
 
 type AuthMode = 'login' | 'signup' | 'forgot-password';
 
@@ -448,9 +448,10 @@ function AppContent() {
                     <TeamPage />
                   </AuthenticatedLayout>
                 } />
-                <Route path="/documents" element={
+
+                <Route path="/account" element={
                   <AuthenticatedLayout>
-                    <DocumentsPage />
+                    <AccountSettingsPage />
                   </AuthenticatedLayout>
                 } />
                 

@@ -86,6 +86,14 @@ function ReportCard({ report, onGenerate, userRole }: ReportCardProps) {
             <div>
               <h3 className="font-medium text-gray-900 mb-1">{report.name}</h3>
               <p className="text-sm text-gray-600">{report.description}</p>
+              {report.id === 'progress_report' && (
+                <div className="mt-1">
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    <Clock className="w-3 h-3 mr-1" />
+                    Coming Soon
+                  </span>
+                </div>
+              )}
             </div>
           </div>
           <button
@@ -164,44 +172,52 @@ function ReportCard({ report, onGenerate, userRole }: ReportCardProps) {
             Available formats: {report.formats.join(', ').toUpperCase()}
           </div>
           <div className="flex items-center space-x-2">
-            {report.formats.includes('pdf') && (
-              <button
-                onClick={() => handleGenerate('pdf')}
-                disabled={generating === 'pdf'}
-                className="btn btn-primary btn-sm flex items-center space-x-1"
-              >
-                {generating === 'pdf' ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Generating...</span>
-                  </>
-                ) : (
-                  <>
-                    <FileText className="w-4 h-4" />
-                    <span>PDF</span>
-                  </>
+            {report.id === 'progress_report' ? (
+              <div className="text-xs text-gray-400 italic">
+                Feature coming soon
+              </div>
+            ) : (
+              <>
+                {report.formats.includes('pdf') && (
+                  <button
+                    onClick={() => handleGenerate('pdf')}
+                    disabled={generating === 'pdf'}
+                    className="btn btn-primary btn-sm flex items-center space-x-1"
+                  >
+                    {generating === 'pdf' ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Generating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="w-4 h-4" />
+                        <span>PDF</span>
+                      </>
+                    )}
+                  </button>
                 )}
-              </button>
-            )}
-            
-            {report.formats.includes('excel') && (
-              <button
-                onClick={() => handleGenerate('excel')}
-                disabled={generating === 'excel'}
-                className="btn btn-secondary btn-sm flex items-center space-x-1"
-              >
-                {generating === 'excel' ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-gray-600 border-t-transparent rounded-full animate-spin" />
-                    <span>Generating...</span>
-                  </>
-                ) : (
-                  <>
-                    <BarChart3 className="w-4 h-4" />
-                    <span>Excel</span>
-                  </>
+                
+                {report.formats.includes('excel') && (
+                  <button
+                    onClick={() => handleGenerate('excel')}
+                    disabled={generating === 'excel'}
+                    className="btn btn-secondary btn-sm flex items-center space-x-1"
+                  >
+                    {generating === 'excel' ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-gray-600 border-t-transparent rounded-full animate-spin" />
+                        <span>Generating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <BarChart3 className="w-4 h-4" />
+                        <span>Excel</span>
+                      </>
+                    )}
+                  </button>
                 )}
-              </button>
+              </>
             )}
           </div>
         </div>
@@ -246,13 +262,13 @@ export default function ReportsPage() {
       // Generate report data based on type
       switch (reportId) {
         case 'delay_register':
-          data = reportingService.generateDelayRegister(tasks, taskDelays, options);
+          data = reportingService.generateDelayRegister(tasks, taskDelays);
           reportName = 'Delay Register';
           break;
         
         case 'progress_report':
-          data = reportingService.generateProgressReport(currentProject, tasks, options);
-          reportName = 'Progress Report';
+          toast.error('Progress Report feature is coming soon!');
+          return;
           break;
         
         case 'change_history':
@@ -387,6 +403,80 @@ export default function ReportsPage() {
                   userRole={currentUser.role}
                 />
               ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Coming Soon: Progress Reports */}
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">📊 Progress Reports</h2>
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
+            <div className="flex items-start space-x-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-blue-600" />
+                </div>
+              </div>
+              <div className="flex-1">
+                <h3 className="font-medium text-blue-900 mb-2">Progress Report Integration</h3>
+                <p className="text-blue-700 mb-3">
+                  Advanced progress tracking with automated reporting, visual dashboards, and customizable templates. 
+                  Generate comprehensive progress reports with real-time data and trend analysis.
+                </p>
+                <div className="flex items-center space-x-4 text-sm text-blue-600">
+                  <span className="flex items-center">
+                    <Clock className="w-4 h-4 mr-1" />
+                    Coming Soon
+                  </span>
+                  <span className="flex items-center">
+                    <BarChart3 className="w-4 h-4 mr-1" />
+                    Automated Dashboards
+                  </span>
+                  <span className="flex items-center">
+                    <Download className="w-4 h-4 mr-1" />
+                    PDF/Excel Export
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Coming Soon: Financial Integration */}
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">💰 Financial Software Integration</h2>
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-6">
+            <div className="flex items-start space-x-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                  <FileText className="w-6 h-6 text-green-600" />
+                </div>
+              </div>
+              <div className="flex-1">
+                <h3 className="font-medium text-green-900 mb-2">Financial Software Integration</h3>
+                <p className="text-green-700 mb-3">
+                  Seamless integration with popular construction financial software including Procore, Sage 300, 
+                  QuickBooks Construction, and more. Sync budgets, invoices, and financial data automatically.
+                </p>
+                <div className="flex items-center space-x-4 text-sm text-green-600">
+                  <span className="flex items-center">
+                    <Clock className="w-4 h-4 mr-1" />
+                    Coming Soon
+                  </span>
+                  <span className="flex items-center">
+                    <Settings className="w-4 h-4 mr-1" />
+                    API Integration
+                  </span>
+                  <span className="flex items-center">
+                    <Eye className="w-4 h-4 mr-1" />
+                    Real-time Sync
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

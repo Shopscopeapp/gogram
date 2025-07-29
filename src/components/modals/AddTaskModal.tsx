@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, X, Calendar, Clock, Palette, Package, Truck } from 'lucide-react';
+import { Plus, X, Calendar, Clock, Palette, Package, Truck, FileText, Edit3 } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { useAppStore } from '../../store';
-import { Task } from '../../types';
+import { Task, ITPTemplate } from '../../types';
 import toast from 'react-hot-toast';
+import { itpService } from '../../services/itpService';
 
 interface AddTaskModalProps {
   isOpen: boolean;
@@ -29,89 +30,24 @@ export default function AddTaskModal({
     priority: initialData?.priority || 'medium' as const,
     status: initialData?.status || 'pending' as const,
     start_date: initialData?.start_date ? format(new Date(initialData.start_date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-    planned_duration: initialData?.planned_duration || 1,
+    end_date: initialData?.end_date ? format(new Date(initialData.end_date), 'yyyy-MM-dd') : format(addDays(new Date(), 1), 'yyyy-MM-dd'),
     color: initialData?.color || '#3b82f6',
     dependencies: initialData?.dependencies || [] as string[],
     // Supplier/Procurement fields
     primary_supplier_id: initialData?.primary_supplier_id || '',
     requires_materials: initialData?.requires_materials || false,
     material_delivery_date: initialData?.material_delivery_date ? format(new Date(initialData.material_delivery_date), 'yyyy-MM-dd') : '',
-    procurement_notes: initialData?.procurement_notes || ''
+    procurement_notes: initialData?.procurement_notes || '',
+    // ITP fields
+    itp_requirements: initialData?.itp_requirements || [] as string[]
   });
 
-  React.useEffect(() => {
-    if (isOpen && !isEditMode) {
-      setFormData({
-        title: '',
-        description: '',
-        category: 'General',
-        priority: 'medium',
-        status: 'pending',
-        start_date: format(new Date(), 'yyyy-MM-dd'),
-        planned_duration: 1,
-        color: '#3b82f6',
-        dependencies: [],
-        // Supplier/Procurement fields
-        primary_supplier_id: '',
-        requires_materials: false,
-        material_delivery_date: '',
-        procurement_notes: ''
-      });
-    } else if (isOpen && isEditMode && initialData) {
-      setFormData({
-        title: initialData.title || '',
-        description: initialData.description || '',
-        category: initialData.category || 'General',
-        priority: initialData.priority || 'medium',
-        status: initialData.status || 'pending', 
-        start_date: initialData.start_date ? format(new Date(initialData.start_date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-        planned_duration: initialData.planned_duration || 1,
-        color: initialData.color || '#3b82f6',
-        dependencies: initialData.dependencies || [],
-        // Supplier/Procurement fields
-        primary_supplier_id: initialData.primary_supplier_id || '',
-        requires_materials: initialData.requires_materials || false,
-        material_delivery_date: initialData.material_delivery_date ? format(new Date(initialData.material_delivery_date), 'yyyy-MM-dd') : '',
-        procurement_notes: initialData.procurement_notes || ''
-      });
-    }
-  }, [isOpen, isEditMode, initialData, currentUser]);
-
-  if (!isOpen) return null;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const startDate = new Date(formData.start_date);
-    const endDate = addDays(startDate, formData.planned_duration - 1);
-    
-    const taskData: Omit<Task, 'id' | 'created_at' | 'updated_at'> = {
-      project_id: currentProject?.id || '',
-      title: formData.title,
-      description: formData.description,
-      category: formData.category,
-      location: '',
-      status: formData.status,
-      priority: formData.priority,
-      start_date: startDate,
-      end_date: endDate,
-      planned_duration: formData.planned_duration,
-      progress_percentage: initialData?.progress_percentage || 0,
-      color: formData.color,
-      dependencies: formData.dependencies,
-      // Supplier/Procurement fields
-      primary_supplier_id: formData.primary_supplier_id || undefined,
-      requires_materials: formData.requires_materials,
-      material_delivery_date: formData.material_delivery_date ? new Date(formData.material_delivery_date) : undefined,
-      procurement_notes: formData.procurement_notes || undefined
-    };
-
-    onAddTask(taskData);
-    onClose();
-    toast.success(isEditMode ? 'Task updated successfully!' : 'Task added successfully!');
-  };
-
-  const categoryOptions = [
+  // State for category management and ITP templates
+  const [showCategoryInput, setShowCategoryInput] = useState(false);
+  const [newCategory, setNewCategory] = useState('');
+  const [itpTemplates, setItpTemplates] = useState<ITPTemplate[]>([]);
+  const [loadingItpTemplates, setLoadingItpTemplates] = useState(false);
+  const [categoryOptions, setCategoryOptions] = useState([
     'General',
     'Site Work', 
     'Foundation',
@@ -128,7 +64,164 @@ export default function AddTaskModal({
     'Flooring',
     'Paint',
     'Landscaping'
-  ];
+  ]);
+
+      React.useEffect(() => {
+      if (isOpen && !isEditMode) {
+        setFormData({
+          title: '',
+          description: '',
+          category: 'General',
+          priority: 'medium',
+          status: 'pending',
+          start_date: format(new Date(), 'yyyy-MM-dd'),
+          end_date: format(addDays(new Date(), 1), 'yyyy-MM-dd'),
+          color: '#3b82f6',
+          dependencies: [],
+          // Supplier/Procurement fields
+          primary_supplier_id: '',
+          requires_materials: false,
+          material_delivery_date: '',
+          procurement_notes: '',
+          // ITP fields
+          itp_requirements: []
+        });
+      } else if (isOpen && isEditMode && initialData) {
+        setFormData({
+          title: initialData.title || '',
+          description: initialData.description || '',
+          category: initialData.category || 'General',
+          priority: initialData.priority || 'medium',
+          status: initialData.status || 'pending', 
+          start_date: initialData.start_date ? format(new Date(initialData.start_date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+          end_date: initialData.end_date ? format(new Date(initialData.end_date), 'yyyy-MM-dd') : format(addDays(new Date(), 1), 'yyyy-MM-dd'),
+          color: initialData.color || '#3b82f6',
+          dependencies: initialData.dependencies || [],
+          // Supplier/Procurement fields
+          primary_supplier_id: initialData.primary_supplier_id || '',
+          requires_materials: initialData.requires_materials || false,
+          material_delivery_date: initialData.material_delivery_date ? format(new Date(initialData.material_delivery_date), 'yyyy-MM-dd') : '',
+          procurement_notes: initialData.procurement_notes || '',
+          // ITP fields
+          itp_requirements: initialData.itp_requirements || []
+        });
+      }
+    }, [isOpen, isEditMode, initialData, currentUser]);
+
+    const loadItpTemplates = async () => {
+      setLoadingItpTemplates(true);
+      try {
+        const result = await itpService.getITPTemplates();
+        if (result.success && result.templates) {
+          setItpTemplates(result.templates);
+        } else {
+          console.error('Failed to load ITP templates:', result.error);
+        }
+      } catch (error) {
+        console.error('Error loading ITP templates:', error);
+      } finally {
+        setLoadingItpTemplates(false);
+      }
+    };
+
+    // Load ITP templates when modal opens
+    useEffect(() => {
+      if (isOpen) {
+        loadItpTemplates();
+      }
+    }, [isOpen]);
+
+        const handleAddCategory = () => {
+      if (newCategory.trim()) {
+        const trimmedCategory = newCategory.trim();
+        if (!categoryOptions.includes(trimmedCategory)) {
+          setCategoryOptions([...categoryOptions, trimmedCategory]);
+        }
+        setFormData({ ...formData, category: trimmedCategory });
+        setNewCategory('');
+        setShowCategoryInput(false);
+        toast.success('Category added successfully!');
+      }
+    };
+
+    // Calculate duration in days
+    const calculateDuration = () => {
+      const startDate = new Date(formData.start_date);
+      const endDate = new Date(formData.end_date);
+      const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      return diffDays;
+    };
+
+    // Early return must come after all hooks
+    if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const startDate = new Date(formData.start_date);
+    const endDate = new Date(formData.end_date);
+    const plannedDuration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    
+    const taskData: Omit<Task, 'id' | 'created_at' | 'updated_at'> = {
+      project_id: currentProject?.id || '',
+      title: formData.title,
+      description: formData.description,
+      category: formData.category,
+      location: '',
+      status: formData.status,
+      priority: formData.priority,
+      start_date: startDate,
+      end_date: endDate,
+      planned_duration: plannedDuration,
+      progress_percentage: initialData?.progress_percentage || 0,
+      color: formData.color,
+      dependencies: formData.dependencies,
+      // Supplier/Procurement fields
+      primary_supplier_id: formData.primary_supplier_id || undefined,
+      requires_materials: formData.requires_materials,
+      material_delivery_date: formData.material_delivery_date ? new Date(formData.material_delivery_date) : undefined,
+      procurement_notes: formData.procurement_notes || undefined,
+      // ITP fields
+      itp_requirements: formData.itp_requirements
+    };
+
+    try {
+      // Add the task first
+      onAddTask(taskData);
+      
+      // If this is a new task and has ITP requirements, create ITP instances
+      if (!isEditMode && formData.itp_requirements.length > 0 && currentProject?.id) {
+        // We need to wait for the task to be created to get its ID
+        // For now, we'll create a placeholder and update it later
+        // This is a simplified approach - in a real app, you might want to handle this differently
+        
+        const itpPromises = formData.itp_requirements.map(async (templateId) => {
+          try {
+            await itpService.createITPInstance({
+              template_id: templateId,
+              task_id: '', // This will be updated after task creation
+              project_id: currentProject.id,
+              due_date: endDate
+            });
+          } catch (error) {
+            console.error('Error creating ITP instance:', error);
+          }
+        });
+        
+        // Don't wait for ITP creation to complete - let it happen in background
+        Promise.all(itpPromises).catch(error => {
+          console.error('Error creating ITP instances:', error);
+        });
+      }
+      
+      onClose();
+      toast.success(isEditMode ? 'Task updated successfully!' : 'Task added successfully!');
+    } catch (error) {
+      console.error('Error creating task:', error);
+      toast.error('Failed to create task. Please try again.');
+    }
+  };
 
   const colorOptions = [
     { name: 'Blue', value: '#3b82f6' },
@@ -212,15 +305,54 @@ export default function AddTaskModal({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                >
-                  {categoryOptions.map((category) => (
-                    <option key={category} value={category}>{category}</option>
-                  ))}
-                </select>
+                <div className="flex space-x-2">
+                  <select
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  >
+                    {categoryOptions.map((category) => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setShowCategoryInput(!showCategoryInput)}
+                    className="px-3 py-2 text-primary-600 border border-primary-300 rounded-md hover:bg-primary-50 transition-colors"
+                    title="Add new category"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </button>
+                </div>
+                {showCategoryInput && (
+                  <div className="mt-2 flex space-x-2">
+                    <input
+                      type="text"
+                      placeholder="Enter new category..."
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleAddCategory()}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddCategory}
+                      className="px-3 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+                    >
+                      Add
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCategoryInput(false);
+                        setNewCategory('');
+                      }}
+                      className="px-3 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -258,14 +390,20 @@ export default function AddTaskModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Duration (days)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
                 <input
-                  type="number"
-                  min="1"
+                  type="date"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  value={formData.planned_duration}
-                  onChange={(e) => setFormData({ ...formData, planned_duration: parseInt(e.target.value) || 1 })}
+                  value={formData.end_date}
+                  onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
                 />
+              </div>
+            </div>
+            
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">Duration:</span>
+                <span className="text-sm text-gray-600">{calculateDuration()} days</span>
               </div>
             </div>
           </div>
@@ -358,6 +496,77 @@ export default function AddTaskModal({
                 </div>
               </div>
             )}
+          </div>
+
+          {/* ITP Requirements */}
+          <div className="space-y-4">
+            <h3 className="font-medium text-gray-900 flex items-center">
+              <FileText className="w-4 h-4 mr-2 text-purple-500" />
+              ITP Requirements
+            </h3>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">ITP Templates</label>
+              <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                {loadingItpTemplates ? (
+                  <div className="text-sm text-gray-500 text-center py-4">
+                    Loading ITP templates...
+                  </div>
+                ) : itpTemplates.length === 0 ? (
+                  <div className="text-sm text-gray-500 text-center py-4">
+                    No ITP templates available. Create templates in the QA page first.
+                  </div>
+                ) : (
+                  <>
+                    <div className="text-sm text-gray-500 mb-2">
+                      Select ITP templates that apply to this task:
+                    </div>
+                    {itpTemplates.map((template) => (
+                      <div key={template.id} className="flex items-start space-x-2">
+                        <input
+                          type="checkbox"
+                          id={`itp_${template.id}`}
+                          checked={formData.itp_requirements.includes(template.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFormData({
+                                ...formData,
+                                itp_requirements: [...formData.itp_requirements, template.id]
+                              });
+                            } else {
+                              setFormData({
+                                ...formData,
+                                itp_requirements: formData.itp_requirements.filter(id => id !== template.id)
+                              });
+                            }
+                          }}
+                          className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 mt-0.5"
+                        />
+                        <div className="flex-1">
+                          <label htmlFor={`itp_${template.id}`} className="text-sm font-medium text-gray-700 cursor-pointer">
+                            {template.name}
+                          </label>
+                          {template.description && (
+                            <p className="text-xs text-gray-500 mt-1">{template.description}</p>
+                          )}
+                          <div className="flex items-center space-x-2 mt-1">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                              {template.type}
+                            </span>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                              {template.priority}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                ITP instances will be created automatically when the task is created.
+              </p>
+            </div>
           </div>
 
           {/* Actions */}

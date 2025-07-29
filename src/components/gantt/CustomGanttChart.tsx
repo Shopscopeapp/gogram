@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, ChevronDown, User, Calendar, Clock, Settings, Smartphone, Monitor, List, BarChart3 } from 'lucide-react';
+import { ChevronRight, ChevronDown, Calendar, Clock, Settings, Smartphone, Monitor, List, BarChart3, Plus } from 'lucide-react';
 import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, differenceInDays, parseISO, isValid } from 'date-fns';
 import type { Task } from '../../types';
 import { safeDateFormat } from '../../utils/dateHelpers';
@@ -15,6 +15,7 @@ interface CustomGanttChartProps {
   showDependencies?: boolean;
   timelineStart?: Date;
   timelineEnd?: Date;
+  onAddTask?: () => void;
 }
 
 interface GanttTask extends Task {
@@ -61,7 +62,8 @@ export default function CustomGanttChart({
   readOnly = false,
   showDependencies = true,
   timelineStart,
-  timelineEnd
+  timelineEnd,
+  onAddTask
 }: CustomGanttChartProps) {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -103,7 +105,7 @@ export default function CustomGanttChart({
       hasChildren: false,
       isExpanded: true,
       isCritical: task.priority === 'critical' || task.title?.toLowerCase().includes('critical'),
-      resourceNames: task.assigned_to ? [task.assigned_to] : [],
+      resourceNames: [],
       actualProgress: task.progress_percentage || 0,
       predecessors: task.dependencies || [],
       successors: [],
@@ -287,10 +289,8 @@ export default function CustomGanttChart({
     document.addEventListener('touchend', handleMouseUp);
   };
 
-  // Render timeline header for desktop/tablet
+  // Render timeline header for all devices
   const renderTimelineHeader = () => {
-    if (isMobile) return null;
-
     const months = timelineBounds.days.reduce((acc, day) => {
       const monthKey = format(day, 'yyyy-MM');
       if (!acc[monthKey]) {
@@ -335,6 +335,8 @@ export default function CustomGanttChart({
       </div>
     );
   };
+
+
 
   // Render task row with mobile responsiveness
   const renderTaskRow = (task: GanttTask, index: number) => {
@@ -395,12 +397,6 @@ export default function CustomGanttChart({
                 <Calendar className="w-3 h-3 mr-1" />
                 {safeDateFormat(task.start_date, 'MMM dd')} - {safeDateFormat(task.end_date, 'MMM dd')}
               </span>
-              {task.assigned_to && (
-                <span className="flex items-center">
-                  <User className="w-3 h-3 mr-1" />
-                  {task.assigned_to}
-                </span>
-              )}
               <span className="flex items-center">
                 <Clock className="w-3 h-3 mr-1" />
                 {task.progress_percentage || 0}%
@@ -508,6 +504,17 @@ export default function CustomGanttChart({
 
         {/* Task Rows */}
         {processedTasks.map((task, index) => renderTaskRow(task, index))}
+      </div>
+
+      {/* Floating Add Task Button */}
+      <div className="gantt-floating-add-button">
+        <button
+          onClick={() => onAddTask?.()}
+          className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-3 shadow-lg transition-all duration-200 hover:scale-105 flex items-center justify-center"
+          title="Add New Task"
+        >
+          <Plus className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Mobile View Toggle Button */}
