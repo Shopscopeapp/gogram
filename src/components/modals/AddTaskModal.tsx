@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, X, User, Calendar, Clock, Palette, Package, Truck } from 'lucide-react';
+import { Plus, X, Calendar, Clock, Palette, Package, Truck } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { useAppStore } from '../../store';
 import { Task } from '../../types';
@@ -31,7 +31,6 @@ export default function AddTaskModal({
     start_date: initialData?.start_date ? format(new Date(initialData.start_date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
     planned_duration: initialData?.planned_duration || 1,
     color: initialData?.color || '#3b82f6',
-    assigned_to: initialData?.assigned_to || currentUser?.id || '',
     dependencies: initialData?.dependencies || [] as string[],
     // Supplier/Procurement fields
     primary_supplier_id: initialData?.primary_supplier_id || '',
@@ -51,7 +50,6 @@ export default function AddTaskModal({
         start_date: format(new Date(), 'yyyy-MM-dd'),
         planned_duration: 1,
         color: '#3b82f6',
-        assigned_to: currentUser?.id || '',
         dependencies: [],
         // Supplier/Procurement fields
         primary_supplier_id: '',
@@ -69,7 +67,6 @@ export default function AddTaskModal({
         start_date: initialData.start_date ? format(new Date(initialData.start_date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
         planned_duration: initialData.planned_duration || 1,
         color: initialData.color || '#3b82f6',
-        assigned_to: initialData.assigned_to || currentUser?.id || '',
         dependencies: initialData.dependencies || [],
         // Supplier/Procurement fields
         primary_supplier_id: initialData.primary_supplier_id || '',
@@ -96,7 +93,6 @@ export default function AddTaskModal({
       location: '',
       status: formData.status,
       priority: formData.priority,
-      assigned_to: formData.assigned_to,
       start_date: startDate,
       end_date: endDate,
       planned_duration: formData.planned_duration,
@@ -107,8 +103,7 @@ export default function AddTaskModal({
       primary_supplier_id: formData.primary_supplier_id || undefined,
       requires_materials: formData.requires_materials,
       material_delivery_date: formData.material_delivery_date ? new Date(formData.material_delivery_date) : undefined,
-      procurement_notes: formData.procurement_notes || undefined,
-      created_by: currentUser?.id || ''
+      procurement_notes: formData.procurement_notes || undefined
     };
 
     onAddTask(taskData);
@@ -272,30 +267,6 @@ export default function AddTaskModal({
                   onChange={(e) => setFormData({ ...formData, planned_duration: parseInt(e.target.value) || 1 })}
                 />
               </div>
-            </div>
-          </div>
-
-          {/* Assignment */}
-          <div className="space-y-4">
-            <h3 className="font-medium text-gray-900 flex items-center">
-              <User className="w-4 h-4 mr-2 text-purple-500" />
-              Assignment
-            </h3>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Assigned To</label>
-              <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                value={formData.assigned_to}
-                onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
-              >
-                <option value="">Select team member...</option>
-                {users.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.full_name} ({user.role.replace('_', ' ')})
-                  </option>
-                ))}
-              </select>
             </div>
           </div>
 
