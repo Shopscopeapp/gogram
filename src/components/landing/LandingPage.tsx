@@ -189,48 +189,28 @@ export default function LandingPage({ onGetStarted, onStartDemo, onCreateAccount
               transition={{ duration: 0.8 }}
             >
               <h1 className="text-4xl md:text-6xl font-bold leading-tight mb-6">
-                Construction Project Management
-                <span className="text-primary-200 block">Made Simple</span>
+                Construction Project Management Software
+                <span className="text-primary-200 block">That Actually Works</span>
               </h1>
               <p className="text-xl text-primary-100 mb-8 leading-relaxed">
-                Built specifically for construction professionals. Manage schedules, coordinate with suppliers, 
-                track quality assurance, and keep stakeholders informed with one powerful platform.
+                The #1 construction project management platform for builders, contractors, and project managers. 
+                Smart scheduling, automated procurement, quality assurance, and professional reporting - all in one powerful tool.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col sm:flex-row gap-6">
                 <button
                   onClick={onCreateAccount}
-                  className="btn btn-white btn-lg flex items-center justify-center space-x-2 hover:bg-gray-50"
+                  className="bg-white text-primary-600 px-8 py-4 rounded-xl font-semibold text-lg hover:bg-gray-50 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center space-x-3 border-2 border-white"
                 >
-                  <span>Get Started Free</span>
-                  <ArrowRight className="w-5 h-5" />
+                  <span className="text-lg font-semibold">Start Free Trial - No Credit Card</span>
+                  <ArrowRight className="w-6 h-6" />
                 </button>
                 <button 
                   onClick={onStartDemo}
-                  className="btn btn-outline btn-lg border-white text-white hover:bg-white hover:text-primary-600 flex items-center justify-center space-x-2"
+                  className="bg-transparent text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-white hover:text-primary-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center space-x-3 border-2 border-white"
                 >
-                  <Play className="w-5 h-5" />
-                  <span>Try Demo First</span>
+                  <Play className="w-6 h-6" />
+                  <span className="text-lg font-semibold">Try Demo</span>
                 </button>
-              </div>
-              
-              {/* Demo vs Real Account Benefits */}
-              <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                <div className="bg-white bg-opacity-10 rounded-lg p-4">
-                  <h4 className="font-semibold text-white mb-2">🚀 Get Started</h4>
-                  <ul className="text-primary-100 space-y-1">
-                    <li>• Create your free account</li>
-                    <li>• Manage real construction projects</li>
-                    <li>• Invite your team members</li>
-                  </ul>
-                </div>
-                <div className="bg-white bg-opacity-10 rounded-lg p-4">
-                  <h4 className="font-semibold text-white mb-2">🎮 Try Demo</h4>
-                  <ul className="text-primary-100 space-y-1">
-                    <li>• Explore features instantly</li>
-                    <li>• No signup required</li>
-                    <li>• Pre-loaded construction project</li>
-                  </ul>
-                </div>
               </div>
               <div className="mt-8 pt-8 border-t border-primary-500">
                 <div className="flex items-center space-x-6 text-primary-200">
@@ -306,11 +286,11 @@ export default function LandingPage({ onGetStarted, onStartDemo, onCreateAccount
             className="text-center mb-16"
           >
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Everything Construction Teams Need
+              Construction Project Management Software Features
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Designed by construction professionals, for construction professionals. 
-              Every feature is built with real construction workflows in mind.
+              Comprehensive construction project management tools designed by builders, for builders. 
+              From smart scheduling to quality assurance - everything you need to deliver projects on time and budget.
             </p>
           </motion.div>
 
@@ -474,52 +454,83 @@ export default function LandingPage({ onGetStarted, onStartDemo, onCreateAccount
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-gray-300 py-12">
+      <footer className="bg-gray-900 text-gray-300 py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div>
+          <div className="grid md:grid-cols-5 gap-8">
+            <div className="md:col-span-2">
               <div className="flex items-center space-x-3 mb-4">
                 <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
                   <HardHat className="w-5 h-5 text-white" />
                 </div>
                 <div className="text-xl font-bold text-white">Gogram</div>
               </div>
-              <p className="text-gray-400 mb-4">
-                Professional construction project management platform built for the modern construction industry.
+              <p className="text-gray-400 mb-6 leading-relaxed">
+                The leading construction project management software for builders, contractors, and project managers. 
+                Streamline scheduling, automate procurement, ensure quality compliance, and deliver projects on time.
               </p>
+              <div className="flex space-x-4 mb-6">
+                <a href="https://twitter.com/gogram" className="text-gray-400 hover:text-white transition-colors">
+                  <span className="sr-only">Twitter</span>
+                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8.29 20.251c7.547 0 11.675-6.253 11.675-11.675 0-.178 0-.355-.012-.53A8.348 8.348 0 0022 5.92a8.19 8.19 0 01-2.357.646 4.118 4.118 0 001.804-2.27 8.224 8.224 0 01-2.605.996 4.107 4.107 0 00-6.993 3.743 11.65 11.65 0 01-8.457-4.287 4.106 4.106 0 001.27 5.477A4.072 4.072 0 012.8 9.713v.052a4.105 4.105 0 003.292 4.022 4.095 4.095 0 01-1.853.07 4.108 4.108 0 003.834 2.85A8.233 8.233 0 012 18.407a11.616 11.616 0 006.29 1.84"/>
+                  </svg>
+                </a>
+                <a href="https://linkedin.com/company/gogram" className="text-gray-400 hover:text-white transition-colors">
+                  <span className="sr-only">LinkedIn</span>
+                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                  </svg>
+                </a>
+              </div>
               <div className="text-sm text-gray-400">
                 © 2024 Gogram. All rights reserved.
               </div>
             </div>
             
             <div>
-              <h3 className="font-semibold text-white mb-4">Product</h3>
+              <h3 className="font-semibold text-white mb-4">Construction Software</h3>
               <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Pricing</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Demo</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">API</a></li>
+                <li><a href="/features" className="hover:text-white transition-colors">Project Management</a></li>
+                <li><a href="/features" className="hover:text-white transition-colors">Gantt Charts</a></li>
+                <li><a href="/features" className="hover:text-white transition-colors">Procurement</a></li>
+                <li><a href="/features" className="hover:text-white transition-colors">Quality Assurance</a></li>
+                <li><a href="/pricing" className="hover:text-white transition-colors">Pricing</a></li>
               </ul>
             </div>
             
             <div>
-              <h3 className="font-semibold text-white mb-4">Solutions</h3>
+              <h3 className="font-semibold text-white mb-4">Construction Types</h3>
               <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-white transition-colors">Commercial Construction</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Residential Projects</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Infrastructure</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Renovations</a></li>
+                <li><a href="/solutions" className="hover:text-white transition-colors">Commercial Construction</a></li>
+                <li><a href="/solutions" className="hover:text-white transition-colors">Residential Projects</a></li>
+                <li><a href="/solutions" className="hover:text-white transition-colors">Infrastructure</a></li>
+                <li><a href="/solutions" className="hover:text-white transition-colors">Renovations</a></li>
+                <li><a href="/solutions" className="hover:text-white transition-colors">Industrial</a></li>
               </ul>
             </div>
             
             <div>
-              <h3 className="font-semibold text-white mb-4">Support</h3>
+              <h3 className="font-semibold text-white mb-4">Support & Resources</h3>
               <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Training</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contact Us</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Status</a></li>
+                <li><a href="/help" className="hover:text-white transition-colors">Help Center</a></li>
+                <li><a href="/training" className="hover:text-white transition-colors">Training</a></li>
+                <li><a href="/contact" className="hover:text-white transition-colors">Contact Us</a></li>
+                <li><a href="/blog" className="hover:text-white transition-colors">Construction Blog</a></li>
+                <li><a href="/status" className="hover:text-white transition-colors">System Status</a></li>
               </ul>
+            </div>
+          </div>
+          
+          <div className="border-t border-gray-800 mt-12 pt-8">
+            <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-400">
+              <div>
+                <p>Construction project management software for builders, contractors, and project managers.</p>
+              </div>
+              <div className="text-right">
+                <a href="/privacy" className="hover:text-white transition-colors mr-4">Privacy Policy</a>
+                <a href="/terms" className="hover:text-white transition-colors mr-4">Terms of Service</a>
+                <a href="/cookies" className="hover:text-white transition-colors">Cookie Policy</a>
+              </div>
             </div>
           </div>
         </div>

@@ -167,6 +167,18 @@ class QAService {
    */
   async getProjectQAAlerts(projectId: string): Promise<{ success: boolean; alerts?: QAAlert[]; error?: string }> {
     try {
+      // Validate project ID format
+      if (!projectId || projectId === '' || projectId === 'proj-1' || !projectId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        console.warn('Invalid project ID format:', projectId);
+        return { success: true, alerts: [] };
+      }
+
+      // Check if this is a demo project (using our mock UUID)
+      if (projectId === '550e8400-e29b-41d4-a716-446655440000') {
+        // Return empty array for demo projects to avoid database errors
+        return { success: true, alerts: [] };
+      }
+
       const { data: alerts, error } = await supabase
         .from('qa_alerts')
         .select('*')
@@ -356,6 +368,12 @@ class QAService {
     previousStatus?: Task['status'],
     projectId: string = ''
   ): Promise<QAAlert[]> {
+    // Validate project ID format
+    if (!projectId || projectId === '' || projectId === 'proj-1' || !projectId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      console.warn('Invalid project ID format for auto QA checks:', projectId);
+      return [];
+    }
+
     const alerts: QAAlert[] = [];
     const now = new Date();
 
@@ -412,6 +430,12 @@ class QAService {
     projectId: string = ''
   ): Promise<{ success: boolean; alerts?: QAAlert[]; error?: string }> {
     try {
+      // Validate project ID format
+      if (!projectId || projectId === '' || projectId === 'proj-1' || !projectId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        console.warn('Invalid project ID format for QA alerts:', projectId);
+        return { success: true, alerts: [] };
+      }
+
       // Get existing alerts to avoid duplicates
       const existingResult = await this.getProjectQAAlerts(projectId);
       if (!existingResult.success) {
@@ -508,6 +532,12 @@ class QAService {
 
   // Legacy methods for backward compatibility (now use database)
   public generateQAAlerts(projectId: string): Promise<QAAlert[]> {
+    // Check if this is a demo project
+    if (projectId === '550e8400-e29b-41d4-a716-446655440000') {
+      // Return empty array for demo projects to avoid database errors
+      return Promise.resolve([]);
+    }
+    
     // This method is kept for backward compatibility
     // but now redirects to the database-backed version
     return this.getProjectQAAlerts(projectId).then(result => 

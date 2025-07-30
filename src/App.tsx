@@ -162,6 +162,40 @@ function AppContent() {
     try {
       console.log('Initializing with project:', project.name);
       
+      // Clear any existing demo data first
+      useAppStore.setState({
+        currentUser: null,
+        currentProject: null,
+        projects: [],
+        tasks: [],
+        taskChangeProposals: [],
+        taskDelays: [],
+        suppliers: [],
+        deliveries: [],
+        qaAlerts: [],
+        users: [],
+        notifications: [],
+        unreadCount: 0,
+        dashboardStats: {
+          totalTasks: 0,
+          completedTasks: 0,
+          delayedTasks: 0,
+          upcomingDeadlines: 0,
+          pendingApprovals: 0,
+          activeDeliveries: 0,
+          qaAlerts: {
+            total: 0,
+            pending: 0,
+            overdue: 0,
+            completed: 0,
+          }
+        },
+        sidebarOpen: false,
+        loading: false,
+        error: null,
+        realtimeChannel: null
+      });
+      
       // Set in store
       setCurrentUser(user);
       
@@ -185,6 +219,40 @@ function AppContent() {
     // Clean up
     unsubscribeFromRealTimeUpdates();
     setCurrentUser(null);
+    
+    // Clear all data from store
+    useAppStore.setState({
+      currentUser: null,
+      currentProject: null,
+      projects: [],
+      tasks: [],
+      taskChangeProposals: [],
+      taskDelays: [],
+      suppliers: [],
+      deliveries: [],
+      qaAlerts: [],
+      users: [],
+      notifications: [],
+      unreadCount: 0,
+      dashboardStats: {
+        totalTasks: 0,
+        completedTasks: 0,
+        delayedTasks: 0,
+        upcomingDeadlines: 0,
+        pendingApprovals: 0,
+        activeDeliveries: 0,
+        qaAlerts: {
+          total: 0,
+          pending: 0,
+          overdue: 0,
+          completed: 0,
+        }
+      },
+      sidebarOpen: false,
+      loading: false,
+      error: null,
+      realtimeChannel: null
+    });
     
     // Reset state
     setAppData({
@@ -242,14 +310,82 @@ function AppContent() {
         isDemoMode: true
       });
       
-      // Load demo data
+      // Load demo data synchronously
       const mockData = await import('./utils/mockData');
       const { mockProject, mockTasks, mockDeliveries, mockSuppliers, mockTaskChangeProposals } = mockData;
+      
+      // Create hardcoded QA alerts for demo
+      const demoQAAlerts = [
+        {
+          id: 'qa_demo_1',
+          project_id: mockProject.id,
+          task_id: '3',
+          type: 'itp_required' as const,
+          status: 'pending' as const,
+          title: 'ITP Required - Concrete Pour',
+          description: 'Inspection and Test Plan must be submitted and approved before concrete pour',
+          due_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days from now
+          assigned_to: '3',
+          checklist: [
+            { id: 'item_1', text: 'ITP form completed and submitted', required: true, completed: false },
+            { id: 'item_2', text: 'Engineer approval received', required: true, completed: false },
+            { id: 'item_3', text: 'Concrete mix design approved', required: true, completed: false },
+            { id: 'item_4', text: 'Formwork inspection passed', required: true, completed: false },
+            { id: 'item_5', text: 'Reinforcement inspection passed', required: true, completed: false }
+          ],
+          priority: 'high' as const,
+          created_at: new Date(),
+          updated_at: new Date()
+        },
+        {
+          id: 'qa_demo_2',
+          project_id: mockProject.id,
+          task_id: '3',
+          type: 'pre_pour_checklist' as const,
+          status: 'overdue' as const,
+          title: 'Pre-Pour Checklist - Final Verification',
+          description: 'Critical pre-pour checklist must be completed before concrete delivery',
+          due_date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago (overdue)
+          assigned_to: '3',
+          checklist: [
+            { id: 'item_6', text: 'Weather forecast acceptable (no rain expected)', required: true, completed: false },
+            { id: 'item_7', text: 'Concrete pump/equipment on site and tested', required: true, completed: false },
+            { id: 'item_8', text: 'Site access clear for concrete trucks', required: true, completed: false },
+            { id: 'item_9', text: 'Formwork final inspection completed', required: true, completed: false },
+            { id: 'item_10', text: 'All embedments and services in place', required: true, completed: false }
+          ],
+          priority: 'critical' as const,
+          created_at: new Date(),
+          updated_at: new Date()
+        },
+        {
+          id: 'qa_demo_3',
+          project_id: mockProject.id,
+          task_id: '2',
+          type: 'engineer_inspection' as const,
+          status: 'completed' as const,
+          title: 'Foundation Quality Checkpoint',
+          description: 'Foundation work requires quality checkpoint before backfill',
+          due_date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+          assigned_to: '3',
+          checklist: [
+            { id: 'item_11', text: 'Foundation dimensions verified', required: true, completed: true },
+            { id: 'item_12', text: 'Surface finish meets specifications', required: true, completed: true },
+            { id: 'item_13', text: 'Waterproofing inspection completed', required: true, completed: true },
+            { id: 'item_14', text: 'Documentation photos taken', required: true, completed: true }
+          ],
+          priority: 'high' as const,
+          completed_by: '3',
+          completed_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+          created_at: new Date(),
+          updated_at: new Date()
+        }
+      ];
       
       // Set demo project
       setAppData(prev => ({ ...prev, project: mockProject }));
       
-      // Set in store
+      // Set everything in store synchronously
       setCurrentUser(demoUser);
       useAppStore.setState({
         currentProject: mockProject,
@@ -257,23 +393,31 @@ function AppContent() {
         deliveries: mockDeliveries, 
         suppliers: mockSuppliers,
         taskChangeProposals: mockTaskChangeProposals || [],
-        qaAlerts: [],
-      });
-      
-      // Generate QA alerts
-      setTimeout(async () => {
-        try {
-          const qaModule = await import('./services/qaService');
-          const qaAlerts = await qaModule.default.generateQAAlerts(mockProject.id);
-          useAppStore.setState({ qaAlerts });
-          console.log('QA alerts generated:', qaAlerts.length);
-        } catch (error) {
-          console.error('Failed to generate QA alerts:', error);
+        qaAlerts: demoQAAlerts, // Use hardcoded QA alerts
+        users: mockData.mockUsers || [],
+        notifications: [],
+        unreadCount: 0,
+        dashboardStats: {
+          totalTasks: mockTasks.length,
+          completedTasks: mockTasks.filter(t => t.status === 'completed').length,
+          delayedTasks: mockTasks.filter(t => t.status === 'delayed').length,
+          upcomingDeadlines: mockTasks.filter(t => t.status === 'pending').length,
+          pendingApprovals: mockTaskChangeProposals?.filter(p => p.status === 'pending').length || 0,
+          activeDeliveries: mockDeliveries.filter(d => d.confirmation_status === 'pending').length,
+          qaAlerts: {
+            total: demoQAAlerts.length,
+            pending: demoQAAlerts.filter(a => a.status === 'pending').length,
+            overdue: demoQAAlerts.filter(a => a.status === 'overdue').length,
+            completed: demoQAAlerts.filter(a => a.status === 'completed').length,
+          }
         }
-      }, 100);
+      });
       
       setAppState('authenticated');
       console.log('Demo mode activated');
+      
+      // Navigate to dashboard after demo login
+      navigate('/', { replace: true });
       
     } catch (error) {
       console.error('Failed to load demo data:', error);
@@ -283,6 +427,41 @@ function AppContent() {
 
   const handleExitDemo = () => {
     console.log('Exiting demo mode');
+    
+    // Clear all demo data from store
+    useAppStore.setState({
+      currentUser: null,
+      currentProject: null,
+      projects: [],
+      tasks: [],
+      taskChangeProposals: [],
+      taskDelays: [],
+      suppliers: [],
+      deliveries: [],
+      qaAlerts: [],
+      users: [],
+      notifications: [],
+      unreadCount: 0,
+      dashboardStats: {
+        totalTasks: 0,
+        completedTasks: 0,
+        delayedTasks: 0,
+        upcomingDeadlines: 0,
+        pendingApprovals: 0,
+        activeDeliveries: 0,
+        qaAlerts: {
+          total: 0,
+          pending: 0,
+          overdue: 0,
+          completed: 0,
+        }
+      },
+      sidebarOpen: false,
+      loading: false,
+      error: null,
+      realtimeChannel: null
+    });
+    
     handleSignOut();
   };
 
@@ -389,19 +568,8 @@ function AppContent() {
         {/* Authenticated routes */}
         {appState === 'authenticated' && (
           <>
-            {/* Project selection - no project selected yet */}
-            {appData.user && !appData.project && !appData.isDemoMode && (
-              <Route path="*" element={
-                <ProjectDashboard
-                  currentUser={appData.user}
-                  onProjectSelect={handleProjectSelect}
-                  onLogout={handleSignOut}
-                />
-              } />
-            )}
-
-            {/* Main app - user and project both selected */}
-            {appData.user && appData.project && (
+            {/* Demo mode - user and project both selected */}
+            {appData.isDemoMode && appData.user && appData.project && (
               <>
                 <Route path="/" element={
                   <AuthenticatedLayout>
@@ -448,7 +616,74 @@ function AppContent() {
                     <TeamPage />
                   </AuthenticatedLayout>
                 } />
+                <Route path="/account" element={
+                  <AuthenticatedLayout>
+                    <AccountSettingsPage />
+                  </AuthenticatedLayout>
+                } />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </>
+            )}
 
+            {/* Real user - project selection - no project selected yet */}
+            {!appData.isDemoMode && appData.user && !appData.project && (
+              <Route path="*" element={
+                <ProjectDashboard
+                  currentUser={appData.user}
+                  onProjectSelect={handleProjectSelect}
+                  onLogout={handleSignOut}
+                />
+              } />
+            )}
+
+            {/* Real user - main app - user and project both selected */}
+            {!appData.isDemoMode && appData.user && appData.project && (
+              <>
+                <Route path="/" element={
+                  <AuthenticatedLayout>
+                    <Dashboard />
+                  </AuthenticatedLayout>
+                } />
+                <Route path="/schedule" element={
+                  <AuthenticatedLayout>
+                    <SchedulePage />
+                  </AuthenticatedLayout>
+                } />
+                <Route path="/tasks" element={
+                  <AuthenticatedLayout>
+                    <TasksPage />
+                  </AuthenticatedLayout>
+                } />
+                <Route path="/approvals" element={
+                  <AuthenticatedLayout>
+                    <ApprovalsPage />
+                  </AuthenticatedLayout>
+                } />
+                <Route path="/suppliers" element={
+                  <AuthenticatedLayout>
+                    <SuppliersPage />
+                  </AuthenticatedLayout>
+                } />
+                <Route path="/reports" element={
+                  <AuthenticatedLayout>
+                    <ReportsPage />
+                  </AuthenticatedLayout>
+                } />
+                <Route path="/share" element={
+                  <AuthenticatedLayout>
+                    <SharePage />
+                  </AuthenticatedLayout>
+                } />
+                <Route path="/qa" element={
+                  <AuthenticatedLayout>
+                    <QAPage />
+                  </AuthenticatedLayout>
+                } />
+                <Route path="/team" element={
+                  <AuthenticatedLayout>
+                    <TeamPage />
+                  </AuthenticatedLayout>
+                } />
                 <Route path="/account" element={
                   <AuthenticatedLayout>
                     <AccountSettingsPage />

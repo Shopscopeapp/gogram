@@ -766,7 +766,6 @@ export default function CustomGanttChart({
 
     const getCriticalPathClass = (task: GanttTask) => {
       if (task.criticalPath) return 'border-2 border-red-600 shadow-lg';
-      if (task.totalFloat && task.totalFloat <= 2) return 'border-2 border-orange-500 shadow-md';
       return '';
     };
 
@@ -844,12 +843,7 @@ export default function CustomGanttChart({
                   Critical Path
                 </span>
               )}
-              {task.totalFloat !== undefined && task.totalFloat > 0 && (
-                <span className="flex items-center text-orange-600">
-                  <Clock className="w-3 h-3 mr-1" />
-                  Float: {task.totalFloat}d
-                </span>
-              )}
+
               {task.resource_names && task.resource_names.length > 0 && (
                 <span className="flex items-center text-blue-600">
                   <Users className="w-3 h-3 mr-1" />
@@ -1049,12 +1043,7 @@ export default function CustomGanttChart({
                 Resource Conflicts: {processedTasks.filter(t => t.resourceConflicts && t.resourceConflicts.length > 0).length}
               </span>
             </div>
-            <div className="flex items-center space-x-2">
-              <Wrench className="w-4 h-4 text-orange-600" />
-              <span className="text-gray-700">
-                Total Float: {processedTasks.reduce((sum, t) => sum + (t.totalFloat || 0), 0)} days
-              </span>
-            </div>
+
             <div className="flex items-center space-x-2">
               <DollarSign className="w-4 h-4 text-green-600" />
               <span className="text-gray-700">

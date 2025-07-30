@@ -116,7 +116,7 @@ export const mockSuppliers: Supplier[] = [
 export const mockTasks: Task[] = [
   {
     id: '1',
-    project_id: 'proj-1',
+    project_id: '550e8400-e29b-41d4-a716-446655440000',
     title: 'Site Preparation',
     description: 'Clear and prepare the construction site',
     category: 'Site Work',
@@ -140,7 +140,7 @@ export const mockTasks: Task[] = [
   },
   {
     id: '2',
-    project_id: 'proj-1',
+    project_id: '550e8400-e29b-41d4-a716-446655440000',
     title: 'Foundation Excavation',
     description: 'Excavate for building foundation',
     category: 'Foundation',
@@ -164,7 +164,7 @@ export const mockTasks: Task[] = [
   },
   {
     id: '3',
-    project_id: 'proj-1',
+    project_id: '550e8400-e29b-41d4-a716-446655440000',
     title: 'Concrete Pour - Foundation',
     description: 'Pour concrete foundation',
     category: 'Foundation',
@@ -185,7 +185,7 @@ export const mockTasks: Task[] = [
   },
   {
     id: '4',
-    project_id: 'proj-1',
+    project_id: '550e8400-e29b-41d4-a716-446655440000',
     title: 'Steel Frame Installation',
     description: 'Install steel framework',
     category: 'Structural',
@@ -206,7 +206,7 @@ export const mockTasks: Task[] = [
   },
   {
     id: '5',
-    project_id: 'proj-1',
+    project_id: '550e8400-e29b-41d4-a716-446655440000',
     title: 'Electrical Rough-in',
     description: 'Install electrical wiring and outlets',
     category: 'Electrical',
@@ -227,7 +227,7 @@ export const mockTasks: Task[] = [
   },
   {
     id: '6',
-    project_id: 'proj-1',
+    project_id: '550e8400-e29b-41d4-a716-446655440000',
     title: 'Plumbing Installation',
     description: 'Install plumbing systems',
     category: 'Plumbing',
@@ -248,7 +248,7 @@ export const mockTasks: Task[] = [
   },
   {
     id: '7',
-    project_id: 'proj-1',
+    project_id: '550e8400-e29b-41d4-a716-446655440000',
     title: 'HVAC Installation',
     description: 'Install heating and cooling systems',
     category: 'HVAC',
@@ -269,7 +269,7 @@ export const mockTasks: Task[] = [
   },
   {
     id: '8',
-    project_id: 'proj-1',
+    project_id: '550e8400-e29b-41d4-a716-446655440000',
     title: 'Drywall and Painting',
     description: 'Install drywall and paint interior',
     category: 'Interior',
@@ -293,7 +293,7 @@ export const mockTasks: Task[] = [
 export const mockDeliveries: Delivery[] = [
   {
     id: 'del-1',
-    project_id: 'proj-1',
+    project_id: '550e8400-e29b-41d4-a716-446655440000',
     task_id: '3',
     supplier_id: '1',
     item: 'Ready-Mix Concrete',
@@ -310,7 +310,7 @@ export const mockDeliveries: Delivery[] = [
   },
   {
     id: 'del-2',
-    project_id: 'proj-1',
+    project_id: '550e8400-e29b-41d4-a716-446655440000',
     task_id: '4',
     supplier_id: '2',
     item: 'Steel Beams',
@@ -325,7 +325,7 @@ export const mockDeliveries: Delivery[] = [
   },
   {
     id: 'del-3',
-    project_id: 'proj-1',
+    project_id: '550e8400-e29b-41d4-a716-446655440000',
     task_id: '5',
     supplier_id: '1',
     item: 'Rebar',
@@ -342,7 +342,7 @@ export const mockDeliveries: Delivery[] = [
   },
   {
     id: 'del-4',
-    project_id: 'proj-1',
+    project_id: '550e8400-e29b-41d4-a716-446655440000',
     task_id: '6',
     supplier_id: '3',
     item: 'Electrical Wire',
@@ -404,7 +404,7 @@ export const mockTaskChangeProposals: TaskChangeProposal[] = [
 ];
 
 export const mockProject: Project = {
-  id: 'proj-1',
+  id: '550e8400-e29b-41d4-a716-446655440000', // Valid UUID format
   name: 'Metro Office Complex',
   description: 'A modern 5-story office building in downtown Metro City',
   location: '123 Business District, Metro City',

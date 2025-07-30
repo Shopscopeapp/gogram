@@ -669,10 +669,13 @@ export const useAppStore = create<AppStore>()(
           console.log('Demo data set successfully, generating QA alerts...');
 
           // Generate QA alerts for demo
-          setTimeout(() => {
-            import('../services/qaService').then((qaModule) => {
+          setTimeout(async () => {
+            try {
+              const qaModule = await import('../services/qaService');
               console.log('QA service imported:', qaModule);
-              const qaAlerts = qaModule.default.generateQAAlerts(mockProject.id);
+              
+              // Call the async method properly
+              const qaAlerts = await qaModule.default.generateQAAlerts(mockProject.id);
               console.log('Generated QA alerts:', qaAlerts);
               set({ qaAlerts });
               
@@ -681,11 +684,11 @@ export const useAppStore = create<AppStore>()(
               get().updateDashboardStats();
               
               console.log('Demo data initialization complete!');
-            }).catch((error) => {
-              console.error('Failed to load QA service:', error);
+            } catch (error) {
+              console.error('Failed to load QA service or generate alerts:', error);
               // Continue without QA alerts
               get().updateDashboardStats();
-            });
+            }
           }, 100);
           
         }).catch((error) => {
@@ -1113,6 +1116,113 @@ export const useAppStore = create<AppStore>()(
           console.error('Error testing email configuration:', error);
           toast.error('Failed to test email configuration');
         }
+      },
+
+      // QA Actions
+      generateQAAlerts: async () => {
+        const { currentProject, tasks } = get();
+        if (!currentProject) {
+          toast.error('No project selected');
+          return;
+        }
+
+        try {
+          const result = await qaService.generateAndSaveQAAlerts(tasks, currentProject.id);
+          if (result.success && result.alerts) {
+            set({ qaAlerts: result.alerts });
+            toast.success(`Generated ${result.alerts.length} QA alerts`);
+          } else {
+            toast.error(result.error || 'Failed to generate QA alerts');
+          }
+        } catch (error) {
+          console.error('Error generating QA alerts:', error);
+          toast.error('Failed to generate QA alerts');
+        }
+      },
+
+      updateQAAlertStatus: async (alertId: string, status: QAAlert['status']) => {
+        try {
+          const result = await qaService.updateQAAlertStatus(alertId, status);
+          if (result.success) {
+            set(state => ({
+              qaAlerts: state.qaAlerts.map(alert => 
+                alert.id === alertId ? { ...alert, status } : alert
+              )
+            }));
+            toast.success('QA alert status updated');
+          } else {
+            toast.error(result.error || 'Failed to update QA alert status');
+          }
+        } catch (error) {
+          console.error('Error updating QA alert status:', error);
+          toast.error('Failed to update QA alert status');
+        }
+      },
+
+      completeQAChecklistItem: async (alertId: string, itemId: string, notes?: string) => {
+        const { currentUser } = get();
+        if (!currentUser) {
+          toast.error('User not found');
+          return;
+        }
+
+        try {
+          const result = await qaService.completeChecklistItem(alertId, itemId, currentUser.id, notes);
+          if (result.success) {
+            set(state => ({
+              qaAlerts: state.qaAlerts.map(alert => {
+                if (alert.id === alertId) {
+                  return {
+                    ...alert,
+                    checklist: alert.checklist?.map(item => 
+                      item.id === itemId 
+                        ? { ...item, completed: true, completed_at: new Date(), completed_by: currentUser.id, notes }
+                        : item
+                    )
+                  };
+                }
+                return alert;
+              })
+            }));
+            toast.success('Checklist item completed');
+          } else {
+            toast.error(result.error || 'Failed to complete checklist item');
+          }
+        } catch (error) {
+          console.error('Error completing checklist item:', error);
+          toast.error('Failed to complete checklist item');
+        }
+      },
+
+      // Missing task actions
+      removeTask: async (taskId: string) => {
+        const { currentUser } = get();
+        if (!currentUser) {
+          toast.error('User not found');
+          return;
+        }
+
+        try {
+          const result = await taskService.deleteTask(taskId, currentUser.id);
+          if (result.success) {
+            set(state => ({
+              tasks: state.tasks.filter(task => task.id !== taskId),
+              deliveries: state.deliveries.filter(delivery => delivery.task_id !== taskId),
+              qaAlerts: state.qaAlerts.filter(alert => alert.task_id !== taskId),
+            }));
+            get().updateDashboardStats();
+            toast.success('Task deleted successfully');
+          } else {
+            toast.error(result.error || 'Failed to delete task');
+          }
+        } catch (error) {
+          console.error('Error deleting task:', error);
+          toast.error('Failed to delete task');
+        }
+      },
+
+      deleteTask: async (taskId: string) => {
+        get().removeTask(taskId);
       },
     }),
     {

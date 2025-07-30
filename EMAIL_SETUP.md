@@ -1,14 +1,23 @@
 # 📧 Email Setup Guide for Gogram
 
+## 🎯 Recommended Provider: Resend
+
+For this construction project management platform, **Resend** is the recommended email provider because:
+- ✅ **Modern developer experience** with excellent TypeScript support
+- ✅ **Perfect for transactional emails** (task assignments, approvals, notifications)
+- ✅ **Great delivery rates** (99%+) for construction industry communications
+- ✅ **Affordable pricing** ($20/month for 50k emails)
+- ✅ **Already integrated** in your email service
+
 ## 🔧 Step 1: Environment Variables
 
 Create or update your `.env.local` file in the project root:
 
 ```bash
-# Email Configuration
-NEXT_PUBLIC_EMAIL_PROVIDER=simulation
+# Email Configuration (Recommended: Resend)
+NEXT_PUBLIC_EMAIL_PROVIDER=resend
 NEXT_PUBLIC_FROM_EMAIL=notifications@gogram.app
-NEXT_PUBLIC_EMAIL_API_KEY=your_email_api_key_here
+NEXT_PUBLIC_EMAIL_API_KEY=your_resend_api_key_here
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 # Supabase Configuration (if not already set)
@@ -18,7 +27,47 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 ## 🎯 Step 2: Choose Your Email Provider
 
-### Option A: Simulation Mode (Recommended for Testing)
+### Option A: Resend (Recommended)
+```bash
+NEXT_PUBLIC_EMAIL_PROVIDER=resend
+NEXT_PUBLIC_EMAIL_API_KEY=your_resend_api_key
+```
+**Setup Steps:**
+1. Sign up at [Resend](https://resend.com) (free tier available)
+2. Create API key in dashboard
+3. Verify your sender domain (gogram.app)
+4. Test with the built-in test function
+
+**Why Resend?**
+- 🚀 **Modern API** with excellent TypeScript support
+- 📊 **Built-in analytics** and webhook support
+- 💰 **Affordable pricing** ($20/month for 50k emails)
+- ✅ **99%+ delivery rates** perfect for construction communications
+- 🔧 **Easy integration** with your existing React/TypeScript stack
+
+### Option B: SendGrid (Enterprise)
+```bash
+NEXT_PUBLIC_EMAIL_PROVIDER=sendgrid
+NEXT_PUBLIC_EMAIL_API_KEY=your_sendgrid_api_key
+```
+**Best for:** Large construction companies needing enterprise-grade reliability
+- ✅ **Highest delivery rates** (99.5%+)
+- ✅ **Comprehensive analytics** and reporting
+- ❌ **More expensive** ($14.95/month for 50k emails)
+- ❌ **Complex setup** for advanced features
+
+### Option C: Mailgun (Budget)
+```bash
+NEXT_PUBLIC_EMAIL_PROVIDER=mailgun
+NEXT_PUBLIC_EMAIL_API_KEY=your_mailgun_api_key
+NEXT_PUBLIC_MAILGUN_DOMAIN=your_domain
+```
+**Best for:** Cost-conscious users with high email volume
+- ✅ **Lowest pricing** for high volume
+- ❌ **Complex setup** and outdated documentation
+- ❌ **Less intuitive** developer experience
+
+### Option D: Simulation Mode (Development)
 ```bash
 NEXT_PUBLIC_EMAIL_PROVIDER=simulation
 ```
@@ -26,33 +75,6 @@ NEXT_PUBLIC_EMAIL_PROVIDER=simulation
 - ✅ **Emails logged to browser console**
 - ✅ **Perfect for development/testing**
 - ✅ **Instant setup**
-
-### Option B: SendGrid
-```bash
-NEXT_PUBLIC_EMAIL_PROVIDER=sendgrid
-NEXT_PUBLIC_EMAIL_API_KEY=your_sendgrid_api_key
-```
-1. Sign up at [SendGrid](https://sendgrid.com)
-2. Create API key in dashboard
-3. Verify your sender domain
-
-### Option C: Resend
-```bash
-NEXT_PUBLIC_EMAIL_PROVIDER=resend
-NEXT_PUBLIC_EMAIL_API_KEY=your_resend_api_key
-```
-1. Sign up at [Resend](https://resend.com)
-2. Create API key in dashboard
-3. Verify your sender domain
-
-### Option D: Mailgun
-```bash
-NEXT_PUBLIC_EMAIL_PROVIDER=mailgun
-NEXT_PUBLIC_EMAIL_API_KEY=your_mailgun_api_key
-```
-1. Sign up at [Mailgun](https://mailgun.com)
-2. Create API key in dashboard
-3. Verify your sender domain
 
 ## 🧪 Step 3: Test Email Configuration
 
