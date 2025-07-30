@@ -264,7 +264,7 @@ function AppContent() {
       setTimeout(async () => {
         try {
           const qaModule = await import('./services/qaService');
-          const qaAlerts = qaModule.default.generateQAAlerts(mockTasks);
+          const qaAlerts = await qaModule.default.generateQAAlerts(mockProject.id);
           useAppStore.setState({ qaAlerts });
           console.log('QA alerts generated:', qaAlerts.length);
         } catch (error) {

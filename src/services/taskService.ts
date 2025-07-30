@@ -16,10 +16,31 @@ export interface CreateTaskData {
   color: string;
   dependencies: string[];
   notes?: string;
+  // Supplier/Procurement fields
   primary_supplier_id?: string;
   requires_materials?: boolean;
   material_delivery_date?: Date;
   procurement_notes?: string;
+  // ITP fields
+  itp_requirements?: string[];
+  // Construction-specific fields
+  phase?: string;
+  sub_phase?: string;
+  predecessors?: string[];
+  successors?: string[];
+  lag_days?: number;
+  lead_days?: number;
+  float_days?: number;
+  free_float_days?: number;
+  is_critical?: boolean;
+  resource_names?: string[];
+  crew_size?: number;
+  equipment_needed?: string[];
+  weather_dependent?: boolean;
+  work_hours_per_day?: number;
+  work_days_per_week?: number;
+  cost_per_day?: number;
+  total_cost?: number;
 }
 
 export interface UpdateTaskData extends Partial<CreateTaskData> {
@@ -47,16 +68,43 @@ class TaskService {
           status: taskData.status,
           priority: taskData.priority,
           assigned_to: taskData.assigned_to,
-          start_date: taskData.start_date.toISOString(),
-          end_date: taskData.end_date.toISOString(),
+          start_date: taskData.start_date instanceof Date && !isNaN(taskData.start_date.getTime()) 
+            ? taskData.start_date.toISOString() 
+            : new Date().toISOString(),
+          end_date: taskData.end_date instanceof Date && !isNaN(taskData.end_date.getTime()) 
+            ? taskData.end_date.toISOString() 
+            : new Date().toISOString(),
           planned_duration: taskData.planned_duration,
           progress_percentage: 0,
           color: taskData.color,
           notes: taskData.notes,
+          // Supplier/Procurement fields
           primary_supplier_id: taskData.primary_supplier_id,
           requires_materials: taskData.requires_materials || false,
-          material_delivery_date: taskData.material_delivery_date?.toISOString(),
+          material_delivery_date: taskData.material_delivery_date instanceof Date && !isNaN(taskData.material_delivery_date.getTime())
+            ? taskData.material_delivery_date.toISOString()
+            : null,
           procurement_notes: taskData.procurement_notes,
+          // ITP fields
+          itp_requirements: taskData.itp_requirements || [],
+          // Construction-specific fields
+          phase: taskData.phase,
+          sub_phase: taskData.sub_phase,
+          predecessors: taskData.predecessors || [],
+          successors: taskData.successors || [],
+          lag_days: taskData.lag_days || 0,
+          lead_days: taskData.lead_days || 0,
+          float_days: taskData.float_days || 0,
+          free_float_days: taskData.free_float_days || 0,
+          is_critical: taskData.is_critical || false,
+          resource_names: taskData.resource_names || [],
+          crew_size: taskData.crew_size || 1,
+          equipment_needed: taskData.equipment_needed || [],
+          weather_dependent: taskData.weather_dependent || false,
+          work_hours_per_day: taskData.work_hours_per_day || 8,
+          work_days_per_week: taskData.work_days_per_week || 5,
+          cost_per_day: taskData.cost_per_day || 0,
+          total_cost: taskData.total_cost || 0,
           created_by: userId,
         })
         .select()
@@ -197,17 +245,37 @@ class TaskService {
       if (updates.status !== undefined) updateData.status = updates.status;
       if (updates.priority !== undefined) updateData.priority = updates.priority;
       if (updates.assigned_to !== undefined) updateData.assigned_to = updates.assigned_to;
-      if (updates.start_date !== undefined) updateData.start_date = updates.start_date.toISOString();
-      if (updates.end_date !== undefined) updateData.end_date = updates.end_date.toISOString();
-      if (updates.actual_start_date !== undefined) updateData.actual_start_date = updates.actual_start_date?.toISOString();
-      if (updates.actual_end_date !== undefined) updateData.actual_end_date = updates.actual_end_date?.toISOString();
+      if (updates.start_date !== undefined) {
+        if (updates.start_date instanceof Date && !isNaN(updates.start_date.getTime())) {
+          updateData.start_date = updates.start_date.toISOString();
+        }
+      }
+      if (updates.end_date !== undefined) {
+        if (updates.end_date instanceof Date && !isNaN(updates.end_date.getTime())) {
+          updateData.end_date = updates.end_date.toISOString();
+        }
+      }
+      if (updates.actual_start_date !== undefined) {
+        if (updates.actual_start_date instanceof Date && !isNaN(updates.actual_start_date.getTime())) {
+          updateData.actual_start_date = updates.actual_start_date.toISOString();
+        }
+      }
+      if (updates.actual_end_date !== undefined) {
+        if (updates.actual_end_date instanceof Date && !isNaN(updates.actual_end_date.getTime())) {
+          updateData.actual_end_date = updates.actual_end_date.toISOString();
+        }
+      }
       if (updates.planned_duration !== undefined) updateData.planned_duration = updates.planned_duration;
       if (updates.actual_duration !== undefined) updateData.actual_duration = updates.actual_duration;
       if (updates.progress_percentage !== undefined) updateData.progress_percentage = updates.progress_percentage;
       if (updates.color !== undefined) updateData.color = updates.color;
       if (updates.notes !== undefined) updateData.notes = updates.notes;
       if (updates.primary_supplier_id !== undefined) updateData.primary_supplier_id = updates.primary_supplier_id;
-      if (updates.material_delivery_date !== undefined) updateData.material_delivery_date = updates.material_delivery_date?.toISOString();
+      if (updates.material_delivery_date !== undefined) {
+        if (updates.material_delivery_date instanceof Date && !isNaN(updates.material_delivery_date.getTime())) {
+          updateData.material_delivery_date = updates.material_delivery_date.toISOString();
+        }
+      }
       if (updates.procurement_notes !== undefined) updateData.procurement_notes = updates.procurement_notes;
 
       // Update the task

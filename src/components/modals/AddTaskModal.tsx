@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, X, Calendar, Clock, Palette, Package, Truck, FileText, Edit3 } from 'lucide-react';
+import { Plus, X, Calendar, Clock, Palette, Package, Truck, FileText, Edit3, Link } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { useAppStore } from '../../store';
 import { Task, ITPTemplate } from '../../types';
@@ -22,7 +22,7 @@ export default function AddTaskModal({
   initialData, 
   isEditMode = false 
 }: AddTaskModalProps) {
-  const { currentProject, currentUser, suppliers, users } = useAppStore();
+  const { currentProject, currentUser, suppliers, users, tasks } = useAppStore();
   const [formData, setFormData] = useState({
     title: initialData?.title || '',
     description: initialData?.description || '',
@@ -176,14 +176,14 @@ export default function AddTaskModal({
       planned_duration: plannedDuration,
       progress_percentage: initialData?.progress_percentage || 0,
       color: formData.color,
-      dependencies: formData.dependencies,
-      // Supplier/Procurement fields
-      primary_supplier_id: formData.primary_supplier_id || undefined,
-      requires_materials: formData.requires_materials,
-      material_delivery_date: formData.material_delivery_date ? new Date(formData.material_delivery_date) : undefined,
-      procurement_notes: formData.procurement_notes || undefined,
-      // ITP fields
-      itp_requirements: formData.itp_requirements
+          dependencies: formData.dependencies,
+    // Supplier/Procurement fields
+    primary_supplier_id: formData.primary_supplier_id || undefined,
+    requires_materials: formData.requires_materials,
+    material_delivery_date: formData.material_delivery_date ? new Date(formData.material_delivery_date) : undefined,
+    procurement_notes: formData.procurement_notes || undefined,
+    // ITP fields
+    itp_requirements: formData.itp_requirements
     };
 
     try {
@@ -369,6 +369,8 @@ export default function AddTaskModal({
                 </select>
               </div>
             </div>
+
+
           </div>
 
           {/* Schedule */}
@@ -433,6 +435,70 @@ export default function AddTaskModal({
                   />
                 ))}
               </div>
+            </div>
+          </div>
+
+          {/* Dependencies */}
+          <div className="space-y-4">
+            <h3 className="font-medium text-gray-900 flex items-center">
+              <Link className="w-4 h-4 mr-2 text-indigo-500" />
+              Dependencies
+            </h3>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Predecessor Tasks</label>
+              <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                {tasks.length === 0 ? (
+                  <div className="text-sm text-gray-500 text-center py-4">
+                    No tasks available. Create some tasks first to set up dependencies.
+                  </div>
+                ) : (
+                  <>
+                    <div className="text-sm text-gray-500 mb-2">
+                      Select tasks that must complete before this task starts:
+                    </div>
+                    {tasks.map((task) => (
+                      <div key={task.id} className="flex items-start space-x-2">
+                        <input
+                          type="checkbox"
+                          id={`dep_${task.id}`}
+                          checked={formData.dependencies.includes(task.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFormData({
+                                ...formData,
+                                dependencies: [...formData.dependencies, task.id]
+                              });
+                            } else {
+                              setFormData({
+                                ...formData,
+                                dependencies: formData.dependencies.filter(id => id !== task.id)
+                              });
+                            }
+                          }}
+                          className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 mt-0.5"
+                        />
+                        <div className="flex-1">
+                          <label htmlFor={`dep_${task.id}`} className="text-sm font-medium text-gray-700 cursor-pointer">
+                            {task.title}
+                          </label>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                              {task.category}
+                            </span>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                              {task.status}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                When you move this task, dependent tasks will automatically adjust their schedules.
+              </p>
             </div>
           </div>
 

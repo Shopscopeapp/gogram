@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Building2, Calendar, Users, MapPin, DollarSign, Settings, LogOut, Loader, Search } from 'lucide-react';
+import { Plus, Building2, Calendar, Users, MapPin, DollarSign, Settings, LogOut, Loader, Search, Trash2 } from 'lucide-react';
 import { projectService, type CreateProjectData } from '../../services/projectService';
 import { authService } from '../../services/authService';
 import type { Project, User } from '../../types';
@@ -250,6 +250,10 @@ export default function ProjectDashboard({ currentUser, onProjectSelect, onLogou
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     loadProjects();
@@ -292,6 +296,39 @@ export default function ProjectDashboard({ currentUser, onProjectSelect, onLogou
     } catch (error) {
       console.error('Logout error:', error);
       toast.error('Failed to logout');
+    }
+  };
+
+  const handleDeleteClick = (project: Project, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent project selection
+    setProjectToDelete(project);
+    setShowDeleteModal(true);
+    setDeleteConfirmation('');
+  };
+
+  const handleDeleteProject = async () => {
+    if (!projectToDelete || deleteConfirmation !== 'CONFIRM') {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const result = await projectService.deleteProject(projectToDelete.id, currentUser.id);
+      
+      if (result.success) {
+        toast.success('Project deleted successfully');
+        setProjects(projects.filter(p => p.id !== projectToDelete.id));
+        setShowDeleteModal(false);
+        setProjectToDelete(null);
+        setDeleteConfirmation('');
+      } else {
+        toast.error(result.error || 'Failed to delete project');
+      }
+    } catch (error) {
+      console.error('Delete project error:', error);
+      toast.error('An unexpected error occurred');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -389,9 +426,18 @@ export default function ProjectDashboard({ currentUser, onProjectSelect, onLogou
                     <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
                       {project.name}
                     </h3>
-                    <div className="flex-shrink-0">
-                      <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
-                        <Building2 className="w-6 h-6 text-primary-600" />
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={(e) => handleDeleteClick(project, e)}
+                        className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
+                        title="Delete project"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                      <div className="flex-shrink-0">
+                        <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
+                          <Building2 className="w-6 h-6 text-primary-600" />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -453,6 +499,82 @@ export default function ProjectDashboard({ currentUser, onProjectSelect, onLogou
         onClose={() => setShowCreateModal(false)}
         onSuccess={handleProjectCreated}
       />
+
+      {/* Delete Project Confirmation Modal */}
+      {showDeleteModal && projectToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl shadow-xl max-w-md w-full"
+          >
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center mr-4">
+                  <Trash2 className="w-6 h-6 text-red-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Delete Project</h2>
+                  <p className="text-sm text-gray-600">This action cannot be undone</p>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <p className="text-gray-700 mb-4">
+                  Are you sure you want to delete <strong>"{projectToDelete.name}"</strong>?
+                </p>
+                <p className="text-sm text-gray-600 mb-4">
+                  This will permanently delete the project and all associated data including tasks, team members, and project files.
+                </p>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Type <strong>CONFIRM</strong> to proceed
+                  </label>
+                  <input
+                    type="text"
+                    value={deleteConfirmation}
+                    onChange={(e) => setDeleteConfirmation(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    placeholder="Type CONFIRM"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div className="flex space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setProjectToDelete(null);
+                    setDeleteConfirmation('');
+                  }}
+                  className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteProject}
+                  disabled={deleteConfirmation !== 'CONFIRM' || isDeleting}
+                  className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader className="animate-spin w-4 h-4 mr-2" />
+                      Deleting...
+                    </>
+                  ) : (
+                    'Delete Project'
+                  )}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 } 

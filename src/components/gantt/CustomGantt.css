@@ -3,22 +3,24 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #f8fafc;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
   position: relative;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 /* Mobile-First: Base styles for mobile */
 .gantt-header {
   display: flex;
   flex-direction: column;
-  background: white;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
   border-bottom: 2px solid #e2e8f0;
   position: sticky;
   top: 0;
   z-index: 40;
+  backdrop-filter: blur(10px);
 }
 
 /* Mobile: Show timeline header but with smaller text */
@@ -66,13 +68,15 @@
   }
 
   .gantt-task-names-header {
-    padding: 12px;
-    font-weight: 600;
-    background: #f1f5f9;
-    border-bottom: 1px solid #e2e8f0;
+    padding: 16px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+    border-bottom: 1px solid #cbd5e1;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    color: #1e293b;
+    font-size: 14px;
   }
 
   .gantt-mobile-controls {
@@ -81,13 +85,21 @@
   }
 
   .gantt-mobile-toggle {
-    padding: 6px 12px;
-    background: #3b82f6;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
     color: white;
     border: none;
-    border-radius: 6px;
+    border-radius: 8px;
     font-size: 12px;
+    font-weight: 600;
     touch-action: manipulation;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+    transition: all 0.2s ease;
+  }
+
+  .gantt-mobile-toggle:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
   }
 }
 
@@ -165,6 +177,12 @@
   justify-content: center;
   align-items: center;
   min-height: 40px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  transition: background-color 0.2s ease;
+}
+
+.gantt-timeline-day:hover {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
 }
 
 /* Make dates more prominent */
@@ -185,14 +203,15 @@
 }
 
 .gantt-timeline-day.weekend {
-  background: #f8fafc;
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
   color: #94a3b8;
 }
 
 .gantt-timeline-day.today {
-  background: #dbeafe;
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
   color: #1d4ed8;
   font-weight: 600;
+  box-shadow: inset 0 0 0 2px #3b82f6;
 }
 
 /* Content Area */
@@ -203,6 +222,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0; /* Ensure proper flex behavior */
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
 }
 
 /* Ensure timeline content extends properly */
@@ -261,12 +281,15 @@
     display: flex;
     height: 60px;
     border-bottom: 1px solid #e2e8f0;
-    background: white;
-    transition: background-color 0.2s;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   }
 
   .gantt-task-row:hover {
-    background: #f8fafc;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
   }
 
   .gantt-task-name-cell {
@@ -278,6 +301,8 @@
     align-items: center;
     pointer-events: auto;
     z-index: 10;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    backdrop-filter: blur(10px);
   }
 
   .gantt-task-timeline {
@@ -306,18 +331,22 @@
   background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   color: white;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
-  transition: all 0.2s ease;
+  box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2), 0 2px 4px rgba(59, 130, 246, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   user-select: none;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
 }
 
 .gantt-task-bar:hover {
-  transform: translateY(-50%) scale(1.02);
-  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+  transform: translateY(-50%) scale(1.05);
+  box-shadow: 0 8px 16px rgba(59, 130, 246, 0.4), 0 4px 8px rgba(59, 130, 246, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
 .gantt-task-bar.dragging {
@@ -329,28 +358,38 @@
 /* Task Status Colors */
 .gantt-task-bar.completed {
   background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-  box-shadow: 0 2px 4px rgba(34, 197, 94, 0.2);
+  box-shadow: 0 4px 6px rgba(34, 197, 94, 0.3), 0 2px 4px rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.3);
 }
 
 .gantt-task-bar.in-progress {
   background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-  box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
+  box-shadow: 0 4px 6px rgba(245, 158, 11, 0.3), 0 2px 4px rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.3);
 }
 
 .gantt-task-bar.overdue {
   background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+  box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3), 0 2px 4px rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.3);
 }
 
 .gantt-task-bar.critical {
   background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);
+  box-shadow: 0 4px 6px rgba(220, 38, 38, 0.4), 0 2px 4px rgba(220, 38, 38, 0.3);
+  border-color: rgba(220, 38, 38, 0.4);
   animation: pulse-critical 2s infinite;
 }
 
 @keyframes pulse-critical {
-  0%, 100% { box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3); }
-  50% { box-shadow: 0 4px 12px rgba(220, 38, 38, 0.5); }
+  0%, 100% { 
+    box-shadow: 0 4px 6px rgba(220, 38, 38, 0.4), 0 2px 4px rgba(220, 38, 38, 0.3);
+    transform: translateY(-50%) scale(1);
+  }
+  50% { 
+    box-shadow: 0 8px 16px rgba(220, 38, 38, 0.6), 0 4px 8px rgba(220, 38, 38, 0.4);
+    transform: translateY(-50%) scale(1.02);
+  }
 }
 
 /* Progress Bar */
@@ -371,6 +410,19 @@
   color: #1e293b;
   margin-bottom: 2px;
   line-height: 1.3;
+}
+
+/* Group Header Styles */
+.gantt-task-name-cell.group-header {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-bottom: 2px solid #cbd5e1;
+  font-weight: 700;
+}
+
+.gantt-task-name-cell.group-header .gantt-task-name {
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 16px;
 }
 
 .gantt-task-meta {
@@ -733,15 +785,28 @@
 }
 
 .gantt-floating-add-button button {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
   border: none;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  box-shadow: 0 8px 16px rgba(59, 130, 246, 0.4), 0 4px 8px rgba(59, 130, 246, 0.2);
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .gantt-floating-add-button button:hover {
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 12px 24px rgba(59, 130, 246, 0.5), 0 6px 12px rgba(59, 130, 246, 0.3);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
 /* Mobile adjustments for floating button */

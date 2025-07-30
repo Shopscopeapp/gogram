@@ -19,6 +19,7 @@ import CustomGanttChart from '../gantt/CustomGanttChart';
 import AddTaskModal from '../modals/AddTaskModal';
 import type { Task } from '../../types';
 import toast from 'react-hot-toast';
+import { taskService } from '../../services/taskService';
 
 export default function SchedulePage() {
   const { tasks, currentProject, currentUser, addTask, updateTask, moveTask } = useAppStore();
@@ -42,6 +43,21 @@ export default function SchedulePage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Add sample tasks with hierarchical structure for testing
+  // useEffect(() => {
+  //   if (tasks.length === 0) {
+  //     const sampleTasks: Task[] = [
+  //       // ... sample tasks removed for now
+  //     ];
+  //     
+  //     // Add sample tasks to the store
+  //     sampleTasks.forEach(task => {
+  //       const { id, created_at, updated_at, actual_start_date, actual_end_date, actual_duration, progress_percentage, attachments, created_by, ...taskData } = task;
+  //       taskService.createTask(taskData, currentUser?.id || '');
+  //     });
+  //   }
+  // }, [tasks.length, currentProject?.id]);
+
   if (!currentProject) {
     return <div>Loading...</div>;
   }
@@ -52,16 +68,18 @@ export default function SchedulePage() {
     setShowEditTaskModal(true);
   };
 
-  // Sort tasks by updated_at (which we use for ordering) then by start date for list view
+  // Sort tasks by start date for natural timeline order, only use updated_at for manual reordering
   const sortedTasks = [...tasks].sort((a, b) => {
-    // First sort by updated_at for custom ordering (from drag and drop)
-    const aTime = new Date(a.updated_at).getTime();
-    const bTime = new Date(b.updated_at).getTime();
-    if (aTime !== bTime) {
-      return bTime - aTime; // Most recently updated first
+    // Primary sort by start date for natural timeline order
+    const aStartTime = new Date(a.start_date).getTime();
+    const bStartTime = new Date(b.start_date).getTime();
+    if (aStartTime !== bStartTime) {
+      return aStartTime - bStartTime; // Earliest start date first
     }
-    // Then by start date
-    return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
+    // Secondary sort by creation date to maintain stable order
+    const aCreatedTime = new Date(a.created_at).getTime();
+    const bCreatedTime = new Date(b.created_at).getTime();
+    return aCreatedTime - bCreatedTime;
   });
 
   // Filter tasks based on search and status

@@ -41,6 +41,24 @@ export interface Task {
   procurement_notes?: string;
   // ITP fields
   itp_requirements?: string[]; // Array of ITP template IDs
+  // Construction-specific fields
+  phase?: string; // e.g., "Foundation", "Framing", "MEP"
+  sub_phase?: string; // e.g., "Excavation", "Formwork", "Pour"
+  predecessors?: string[]; // Task IDs that must complete before this task
+  successors?: string[]; // Task IDs that depend on this task
+  lag_days?: number; // Days to wait after predecessor completes
+  lead_days?: number; // Days to start before predecessor completes
+  float_days?: number; // Total float (slack) in days
+  free_float_days?: number; // Free float in days
+  is_critical?: boolean; // Part of critical path
+  resource_names?: string[]; // Assigned resources/crews
+  crew_size?: number; // Number of workers needed
+  equipment_needed?: string[]; // Required equipment
+  weather_dependent?: boolean; // Affected by weather
+  work_hours_per_day?: number; // Default 8, can be adjusted
+  work_days_per_week?: number; // Default 5, can be adjusted
+  cost_per_day?: number; // Daily cost for this task
+  total_cost?: number; // Total cost for this task
   created_by?: string;
   created_at: Date;
   updated_at: Date;
@@ -226,6 +244,18 @@ export interface GanttTask extends Task {
   y: number;
   width: number;
   height: number;
+}
+
+export interface TaskGroup {
+  id: string;
+  name: string;
+  phase: string;
+  sub_phase?: string;
+  color: string;
+  is_expanded: boolean;
+  tasks: Task[];
+  created_at: Date;
+  updated_at: Date;
 }
 
 // ITP (Inspection and Test Plan) Types
