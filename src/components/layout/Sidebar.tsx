@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -103,7 +102,10 @@ export default function Sidebar() {
     qaAlerts
   } = useAppStore();
 
-  if (!currentUser) return null;
+  console.log('Sidebar render:', { sidebarOpen, currentUser: !!currentUser });
+
+  // Always show sidebar for debugging
+  // if (!currentUser) return null;
 
   const getNavItemCount = (item: NavItem): number | undefined => {
     if (!currentUser) return undefined;
@@ -123,7 +125,7 @@ export default function Sidebar() {
   };
 
   const filteredNavItems = navigationItems.filter(item =>
-    !item.roles || item.roles.includes(currentUser.role)
+    !item.roles || (currentUser && item.roles.includes(currentUser.role))
   );
 
   const handleNavigation = (path: string) => {
@@ -148,15 +150,8 @@ export default function Sidebar() {
         />
       )}
 
-      {/* Sidebar */}
-      <motion.aside
-        initial={false}
-        animate={{
-          x: sidebarOpen ? 0 : -280,
-          transition: { duration: 0.3 }
-        }}
-        className="fixed left-0 top-0 h-full w-72 bg-white border-r border-gray-200 z-50 lg:relative lg:translate-x-0 lg:z-auto"
-      >
+             {/* Sidebar */}
+       <aside className="fixed left-0 top-0 h-full w-72 bg-white border-r border-gray-200 z-50 lg:relative lg:translate-x-0 lg:z-auto" style={{ display: 'block', visibility: 'visible' }}>
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
@@ -177,25 +172,28 @@ export default function Sidebar() {
             </button>
           </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-2">
-            {filteredNavItems.map((item) => {
+                     {/* Navigation */}
+           <nav className="flex-1 p-4 space-y-2">
+             {!currentUser && (
+               <div className="text-center py-4 text-gray-500">
+                 <p>Loading user data...</p>
+               </div>
+             )}
+             {currentUser && filteredNavItems.map((item) => {
               const Icon = item.icon;
               const count = getNavItemCount(item);
               const active = isActive(item.path);
 
-              return (
-                <motion.button
-                  key={item.id}
-                  whileHover={{ x: 4 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => handleNavigation(item.path)}
-                  className={`w-full flex items-center justify-between p-3 rounded-xl transition-colors group ${
-                    active
-                      ? 'bg-primary-50 text-primary-900 shadow-sm'
-                      : 'hover:bg-gray-50 text-gray-700'
-                  }`}
-                >
+                             return (
+                 <button
+                   key={item.id}
+                   onClick={() => handleNavigation(item.path)}
+                   className={`w-full flex items-center justify-between p-3 rounded-xl transition-colors group ${
+                     active
+                       ? 'bg-primary-50 text-primary-900 shadow-sm'
+                       : 'hover:bg-gray-50 text-gray-700'
+                   }`}
+                 >
                   <div className="flex items-center space-x-3">
                     <div className={`p-2 rounded-lg transition-colors ${
                       active
@@ -224,10 +222,10 @@ export default function Sidebar() {
                     }`}>
                       {count > 99 ? '99+' : count}
                     </span>
-                  )}
-                </motion.button>
-              );
-            })}
+                                     )}
+                 </button>
+               );
+             })}
           </nav>
 
           {/* Project Status */}
@@ -243,32 +241,34 @@ export default function Sidebar() {
             </div>
           </div>
 
-          {/* User Role Badge */}
-          <div className="p-4 border-t border-gray-200">
-            <div className="flex items-center space-x-3">
-              {currentUser.avatar_url ? (
-                <img
-                  src={currentUser.avatar_url}
-                  alt={currentUser.full_name}
-                  className="w-10 h-10 rounded-full object-cover"
-                />
-              ) : (
-                <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center">
-                  <span className="text-white font-medium">
-                    {currentUser.full_name.charAt(0)}
-                  </span>
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900 truncate">{currentUser.full_name}</p>
-                <p className="text-sm text-primary-600 capitalize">
-                  {currentUser.role.replace('_', ' ')}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </motion.aside>
-    </>
-  );
-} 
+                     {/* User Role Badge */}
+           {currentUser && (
+             <div className="p-4 border-t border-gray-200">
+               <div className="flex items-center space-x-3">
+                 {currentUser.avatar_url ? (
+                   <img
+                     src={currentUser.avatar_url}
+                     alt={currentUser.full_name}
+                     className="w-10 h-10 rounded-full object-cover"
+                   />
+                 ) : (
+                   <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center">
+                     <span className="text-white font-medium">
+                       {currentUser.full_name.charAt(0)}
+                     </span>
+                   </div>
+                 )}
+                 <div className="flex-1 min-w-0">
+                   <p className="font-medium text-gray-900 truncate">{currentUser.full_name}</p>
+                   <p className="text-sm text-primary-600 capitalize">
+                     {currentUser.role.replace('_', ' ')}
+                   </p>
+                 </div>
+               </div>
+             </div>
+           )}
+                 </div>
+       </aside>
+     </>
+   );
+ } 

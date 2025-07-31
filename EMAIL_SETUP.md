@@ -16,7 +16,7 @@ Create or update your `.env.local` file in the project root:
 ```bash
 # Email Configuration (Recommended: Resend)
 NEXT_PUBLIC_EMAIL_PROVIDER=resend
-NEXT_PUBLIC_FROM_EMAIL=notifications@gogram.app
+NEXT_PUBLIC_FROM_EMAIL=notifications@gogram.co
 NEXT_PUBLIC_EMAIL_API_KEY=your_resend_api_key_here
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 

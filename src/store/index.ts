@@ -6,7 +6,7 @@ import procurementService from '../services/procurementService';
 import qaService from '../services/qaService';
 import taskService from '../services/taskService';
 import supplierService from '../services/supplierService';
-import { SupabaseService } from '../lib/supabase';
+import { supabase, SupabaseService } from '../lib/supabase';
 import type { 
   User, 
   Project, 
@@ -62,7 +62,8 @@ interface AppState {
 interface AppActions {
   // User Actions
   setCurrentUser: (user: User | null) => void;
-  addUser: (user: User) => void;
+  loadUsers: () => Promise<void>;
+  addUser: (user: User) => Promise<void>;
   updateUser: (id: string, updates: Partial<User>) => void;
   removeUser: (id: string) => void;
   
@@ -102,6 +103,7 @@ interface AppActions {
   generateQAAlerts: () => void;
   updateQAAlertStatus: (alertId: string, status: QAAlert['status']) => void;
   completeQAChecklistItem: (alertId: string, itemId: string, notes?: string) => void;
+  autoTriggerQAChecks: (task: Task, previousStatus?: Task['status']) => Promise<QAAlert[]>;
   
   // Notification Actions
   addNotification: (notification: Notification) => void;
@@ -177,7 +179,7 @@ export const useAppStore = create<AppStore>()(
       qaAlerts: [],
       notifications: [],
       unreadCount: 0,
-      sidebarOpen: true,
+      sidebarOpen: true, // Force sidebar to be open by default
       loading: false,
       error: null,
       realtimeChannel: null,
@@ -186,9 +188,311 @@ export const useAppStore = create<AppStore>()(
       // User Actions
       setCurrentUser: (user) => set({ currentUser: user }),
       
-      addUser: (user) => set((state) => ({ 
-        users: [...state.users, user] 
-      })),
+      loadUsers: async () => {
+        try {
+          const { currentProject } = get();
+          if (!currentProject) {
+            console.log('No current project, skipping loadUsers');
+            return;
+          }
+
+          console.log('Loading users for project:', currentProject.id);
+
+          // Load users directly from users table who are in this project
+          const { data: members, error: membersError } = await supabase
+            .from('project_members')
+            .select('user_id, role')
+            .eq('project_id', currentProject.id);
+
+          if (membersError) {
+            console.error('Error loading project members:', membersError);
+            return;
+          }
+
+          console.log('Project members found:', members);
+
+          if (!members || members.length === 0) {
+            console.log('No project members found');
+            set({ users: [] });
+            return;
+          }
+
+          // Get the user IDs
+          const userIds = members.map(m => m.user_id);
+          console.log('Loading users with IDs:', userIds);
+
+          // Load the actual user data
+          const { data: users, error: usersError } = await supabase
+            .from('users')
+            .select('*')
+            .in('id', userIds);
+
+          if (usersError) {
+            console.error('Error loading users:', usersError);
+            return;
+          }
+
+          console.log('Users loaded from database:', users);
+
+          // Map users with roles from project_members
+          const usersWithRoles = users?.map(user => {
+            const member = members.find(m => m.user_id === user.id);
+            return {
+              ...user,
+              role: member?.role || user.role
+            };
+          }) || [];
+
+          set({ users: usersWithRoles });
+          console.log('Set users in store:', usersWithRoles.length);
+        } catch (error) {
+          console.error('Error loading users:', error);
+        }
+      },
+
+      addUser: async (user) => {
+        try {
+          // Generate a proper UUID for the user
+          const generateUUID = () => {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+              const r = Math.random() * 16 | 0;
+              const v = c === 'x' ? r : (r & 0x3 | 0x8);
+              return v.toString(16);
+            });
+          };
+
+          // Create a temporary user object for local state
+          const tempUser = {
+            ...user,
+            id: generateUUID(),
+            created_at: new Date(),
+            updated_at: new Date()
+          };
+
+                    // Insert into database (RLS policies should now allow this)
+          const { currentProject: project } = get();
+          if (project) {
+            try {
+              console.log('🔥 ATTEMPTING TO ADD USER TO DATABASE:', tempUser);
+              
+              // First check if user already exists by email
+              const { data: existingUser, error: checkError } = await supabase
+                .from('users')
+                .select('*')
+                .eq('email', tempUser.email)
+                .single();
+
+              let userToUse;
+
+              if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows found
+                console.error('🔥 ERROR CHECKING FOR EXISTING USER:', checkError);
+                throw checkError;
+              }
+
+              if (existingUser) {
+                console.log('🔥 USER ALREADY EXISTS, USING EXISTING USER:', existingUser);
+                userToUse = existingUser;
+              } else {
+                console.log('🔥 USER DOES NOT EXIST, CREATING NEW USER');
+                
+                const userInsertData = {
+                  id: tempUser.id,
+                  full_name: tempUser.full_name,
+                  email: tempUser.email,
+                  role: tempUser.role,
+                  company: tempUser.company || '',
+                  phone: tempUser.phone || '',
+                  specialties: tempUser.specialties || [],
+                  avatar_url: tempUser.avatar_url || '',
+                  auth_user_id: null // External users don't have auth_user_id
+                };
+                
+                console.log('🔥 INSERTING USER DATA:', userInsertData);
+
+                // Insert into users table
+                const { data: insertedUser, error: userError } = await supabase
+                  .from('users')
+                  .insert([userInsertData])
+                  .select()
+                  .single();
+
+                if (userError) {
+                  console.error('🔥 ERROR INSERTING INTO USERS TABLE:', userError);
+                  throw userError;
+                }
+
+                console.log('🔥 SUCCESSFULLY INSERTED INTO USERS TABLE:', insertedUser);
+                userToUse = insertedUser;
+              }
+
+              // Then insert into project_members table
+              const memberInsertData = {
+                project_id: project.id,
+                user_id: userToUse.id, // Use the actual user ID (existing or new)
+                role: user.role
+              };
+              
+              console.log('🔥 INSERTING PROJECT MEMBER DATA:', memberInsertData);
+              
+              const { data: insertedMember, error: memberError } = await supabase
+                .from('project_members')
+                .insert([memberInsertData])
+                .select();
+
+              if (memberError) {
+                console.error('🔥 ERROR INSERTING INTO PROJECT_MEMBERS TABLE:', memberError);
+                throw memberError;
+              }
+
+              console.log('🔥 SUCCESSFULLY INSERTED INTO PROJECT_MEMBERS TABLE:', insertedMember);
+
+              // Update local state with the actual user data from database
+              set((state) => ({
+                users: [...state.users, userToUse as User]
+              }));
+
+              console.log('🔥 TEAM MEMBER ADDED TO DATABASE AND LOCAL STATE SUCCESSFULLY! 🎉');
+
+            } catch (error) {
+              console.error('Database insert failed:', error);
+              // Fallback to local state only
+              console.log('Falling back to local state only');
+              set((state) => ({
+                users: [...state.users, tempUser]
+              }));
+            }
+          } else {
+            console.error('No current project found');
+            // Fallback to local state only
+            set((state) => ({
+              users: [...state.users, tempUser]
+            }));
+          }
+
+          // Send role-specific welcome email to new team member
+          const { currentUser, currentProject } = get();
+          if (currentUser && currentProject) {
+            const getRoleDescription = (role: string) => {
+              switch (role) {
+                case 'project_manager':
+                  return {
+                    description: 'You have full access to manage this project, including adding team members, creating tasks, managing deliveries, and overseeing quality assurance.',
+                    permissions: [
+                      '✅ Create and assign tasks',
+                      '✅ Add/remove team members',
+                      '✅ Manage suppliers and deliveries',
+                      '✅ Review and approve changes',
+                      '✅ Access all project reports'
+                    ]
+                  };
+                case 'project_coordinator':
+                  return {
+                    description: 'You can coordinate project activities, manage tasks, and work with suppliers.',
+                    permissions: [
+                      '✅ Create and assign tasks',
+                      '✅ Manage suppliers and deliveries',
+                      '✅ Update task progress',
+                      '✅ View project reports',
+                      '❌ Cannot add/remove team members'
+                    ]
+                  };
+                case 'subcontractor':
+                  return {
+                    description: 'You can view and update tasks assigned to you, and manage your deliveries.',
+                    permissions: [
+                      '✅ View tasks assigned to you',
+                      '✅ Update your task progress',
+                      '✅ Manage your deliveries',
+                      '✅ Communicate with project team',
+                      '❌ Cannot create new tasks or manage other users'
+                    ]
+                  };
+                case 'supplier':
+                  return {
+                    description: 'You can manage deliveries, confirm orders, and track your supplies for this project.',
+                    permissions: [
+                      '✅ View delivery requests',
+                      '✅ Confirm delivery schedules',
+                      '✅ Update delivery status',
+                      '✅ Communicate with project team',
+                      '❌ Cannot access tasks or manage other users'
+                    ]
+                  };
+                case 'viewer':
+                  return {
+                    description: 'You have read-only access to view project progress and reports.',
+                    permissions: [
+                      '✅ View project dashboard',
+                      '✅ View task progress',
+                      '✅ View delivery status',
+                      '✅ View project reports',
+                      '❌ Cannot create or modify anything'
+                    ]
+                  };
+                default:
+                  return {
+                    description: 'You have been added to this construction project.',
+                    permissions: ['✅ Access project dashboard']
+                  };
+              }
+            };
+
+            const roleInfo = getRoleDescription(user.role);
+            const roleName = user.role.replace('_', ' ').toUpperCase();
+
+            emailService.sendCustomNotification(
+              user.email,
+              `🏗️ You've been added to ${currentProject.name} as ${roleName}`,
+              `Hi ${user.full_name},
+
+${currentUser.full_name} has added you to the construction project "${currentProject.name}" with the role of ${roleName}.
+
+📋 YOUR ROLE & PERMISSIONS:
+${roleInfo.description}
+
+${roleInfo.permissions.map(perm => perm).join('\n')}
+
+🚀 NEXT STEPS:
+1. Create your account: ${import.meta.env.NEXT_PUBLIC_APP_URL || 'https://gogram.co'}/invite?token=${btoa(JSON.stringify({
+  email: user.email,
+  role: user.role,
+  projectId: currentProject.id,
+  projectName: currentProject.name,
+  invitedBy: currentUser.full_name,
+  expires: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
+}))}
+2. Complete the signup process - your role and project access are already configured
+3. Save this email for reference - it contains your role permissions
+
+📧 NEED HELP?
+Reply to this email or contact the project manager directly.
+
+PROJECT DETAILS:
+• Project: ${currentProject.name}
+• Your Role: ${roleName}
+• Added by: ${currentUser.full_name}
+• Your Email: ${user.email}
+
+Welcome to the team!
+The Gogram Team`,
+              currentUser
+            ).then(emailResult => {
+              if (emailResult.success) {
+                console.log('Role-specific welcome email sent to new team member');
+              } else {
+                console.error('Failed to send welcome email:', emailResult.error);
+              }
+            }).catch(error => {
+              console.error('Welcome email error:', error);
+            });
+          }
+
+          toast.success(`${user.full_name} has been added to the team!`);
+        } catch (error) {
+          console.error('Error adding user:', error);
+          toast.error('Failed to add team member');
+        }
+      },
       
       updateUser: (id, updates) => set((state) => ({
         users: state.users.map(user => 
@@ -238,7 +542,7 @@ export const useAppStore = create<AppStore>()(
       })),
       
       approveTaskChangeProposal: (id, reviewComments) => {
-        const { taskChangeProposals, currentUser } = get();
+        const { taskChangeProposals, currentUser, tasks, users, currentProject } = get();
         const proposal = taskChangeProposals.find(p => p.id === id);
         if (!proposal || !currentUser) return;
 
@@ -257,7 +561,7 @@ export const useAppStore = create<AppStore>()(
         }));
 
         // Apply the changes to the actual task
-                if (proposal.proposed_start_date || proposal.proposed_end_date) {
+        if (proposal.proposed_start_date || proposal.proposed_end_date) {
           const task = get().tasks.find(t => t.id === proposal.task_id);
           if (task) {
             get().moveTask(
@@ -268,12 +572,45 @@ export const useAppStore = create<AppStore>()(
           }
         }
 
+        // Send approval notification to proposer
+        if (proposal.proposed_by && currentProject) {
+          const proposer = users.find(u => u.id === proposal.proposed_by);
+          const task = tasks.find(t => t.id === proposal.task_id);
+          
+          if (proposer && task) {
+            emailService.sendCustomNotification(
+              proposer.email,
+              `✅ Task Change Approved - ${task.title}`,
+              `Your proposed change for task "${task.title}" has been approved by ${currentUser.full_name}.
+
+Change Details:
+- Task: ${task.title}
+- Project: ${currentProject.name}
+- Reason: ${proposal.reason}
+- Approved by: ${currentUser.full_name}
+- Review Comments: ${reviewComments || 'No additional comments'}
+
+The changes have been applied to the task schedule.`,
+              currentUser
+            ).then(emailResult => {
+              if (emailResult.success) {
+                console.log('Approval notification sent to proposer');
+              } else {
+                console.error('Failed to send approval notification:', emailResult.error);
+              }
+            }).catch(error => {
+              console.error('Approval notification email error:', error);
+            });
+          }
+        }
+
         toast.success('Change proposal approved and applied!');
       },
       
       rejectTaskChangeProposal: (id, reviewComments) => {
-        const { currentUser } = get();
-        if (!currentUser) return;
+        const { taskChangeProposals, currentUser, tasks, users, currentProject } = get();
+        const proposal = taskChangeProposals.find(p => p.id === id);
+        if (!proposal || !currentUser) return;
 
         set((state) => ({
           taskChangeProposals: state.taskChangeProposals.map(p =>
@@ -288,6 +625,38 @@ export const useAppStore = create<AppStore>()(
               : p
           )
         }));
+
+        // Send rejection notification to proposer
+        if (proposal.proposed_by && currentProject) {
+          const proposer = users.find(u => u.id === proposal.proposed_by);
+          const task = tasks.find(t => t.id === proposal.task_id);
+          
+          if (proposer && task) {
+            emailService.sendCustomNotification(
+              proposer.email,
+              `❌ Task Change Rejected - ${task.title}`,
+              `Your proposed change for task "${task.title}" has been rejected by ${currentUser.full_name}.
+
+Change Details:
+- Task: ${task.title}
+- Project: ${currentProject.name}
+- Reason: ${proposal.reason}
+- Rejected by: ${currentUser.full_name}
+- Review Comments: ${reviewComments || 'No additional comments'}
+
+Please review the feedback and consider submitting a revised proposal if needed.`,
+              currentUser
+            ).then(emailResult => {
+              if (emailResult.success) {
+                console.log('Rejection notification sent to proposer');
+              } else {
+                console.error('Failed to send rejection notification:', emailResult.error);
+              }
+            }).catch(error => {
+              console.error('Rejection notification email error:', error);
+            });
+          }
+        }
 
         toast.error('Change proposal rejected');
       },
@@ -307,11 +676,53 @@ export const useAppStore = create<AppStore>()(
         suppliers: state.suppliers.filter(supplier => supplier.id !== id)
       })),
 
-      addDelivery: (delivery) => set((state) => ({ 
-        deliveries: [...state.deliveries, delivery] 
-      })),
+      addDelivery: (delivery) => {
+        const { currentUser, currentProject, suppliers, tasks } = get();
+        
+        set((state) => ({ 
+          deliveries: [...state.deliveries, delivery] 
+        }));
+
+        // Send delivery confirmation email to supplier
+        if (currentUser && currentProject) {
+          const supplier = suppliers.find(s => s.id === delivery.supplier_id);
+          const task = tasks.find(t => t.id === delivery.task_id);
+          
+          if (supplier && task) {
+            // Convert supplier to User format for email service
+            const supplierUser = {
+              id: supplier.id,
+              email: supplier.email,
+              full_name: supplier.name,
+              role: 'supplier',
+              company: supplier.company,
+              phone: supplier.phone
+            } as User;
+            
+            emailService.sendDeliveryConfirmation(
+              delivery,
+              supplierUser,
+              task,
+              currentProject,
+              currentUser,
+              new Date(delivery.planned_date)
+            ).then(emailResult => {
+              if (emailResult.success) {
+                console.log('Delivery confirmation email sent to supplier');
+              } else {
+                console.error('Failed to send delivery confirmation email:', emailResult.error);
+              }
+            }).catch(error => {
+              console.error('Delivery confirmation email error:', error);
+            });
+          }
+        }
+      },
       
       confirmDelivery: (id, confirmed, newDate) => {
+        const { deliveries, currentUser, currentProject, suppliers, tasks } = get();
+        const delivery = deliveries.find(d => d.id === id);
+        
         set((state) => ({
           deliveries: state.deliveries.map(delivery => 
             delivery.id === id 
@@ -323,6 +734,40 @@ export const useAppStore = create<AppStore>()(
               : delivery
           )
         }));
+
+        // Send confirmation notification to project manager
+        if (delivery && currentUser && currentProject) {
+          const supplier = suppliers.find(s => s.id === delivery.supplier_id);
+          const task = tasks.find(t => t.id === delivery.task_id);
+          
+          if (supplier && task) {
+            emailService.sendCustomNotification(
+              currentUser.email,
+              `🚚 Delivery ${confirmed ? 'Confirmed' : 'Rejected'} - ${task.title}`,
+              `A delivery has been ${confirmed ? 'confirmed' : 'rejected'} by the supplier.
+
+Delivery Details:
+- Task: ${task.title}
+- Project: ${currentProject.name}
+- Supplier: ${supplier.name}
+- Item: ${delivery.item || 'Not specified'}
+- Original Date: ${new Date(delivery.planned_date).toLocaleDateString()}
+- ${newDate ? `New Date: ${newDate.toLocaleDateString()}` : 'Date unchanged'}
+- Status: ${confirmed ? 'Confirmed' : 'Rejected'}
+
+This update has been recorded in the system.`,
+              currentUser
+            ).then(emailResult => {
+              if (emailResult.success) {
+                console.log('Delivery confirmation notification sent');
+              } else {
+                console.error('Failed to send delivery confirmation email:', emailResult.error);
+              }
+            }).catch(error => {
+              console.error('Delivery confirmation email error:', error);
+            });
+          }
+        }
 
         const statusText = confirmed ? 'confirmed' : 'rejected';
         toast.success(`Delivery ${statusText} successfully!`);
@@ -363,6 +808,25 @@ export const useAppStore = create<AppStore>()(
         } catch (error) {
           console.error('Error generating QA alerts:', error);
           toast.error('Failed to generate QA alerts');
+        }
+      },
+
+      // Auto-trigger QA checks for a task
+      autoTriggerQAChecks: async (task: Task, previousStatus?: Task['status']) => {
+        const { currentProject } = get();
+        if (!currentProject) return [];
+
+        try {
+          const alerts = await qaService.autoTriggerQAChecks(task, previousStatus, currentProject.id);
+          if (alerts.length > 0) {
+            set(state => ({
+              qaAlerts: [...state.qaAlerts, ...alerts]
+            }));
+          }
+          return alerts;
+        } catch (error) {
+          console.error('Error auto-triggering QA checks:', error);
+          return [];
         }
       },
 
@@ -439,32 +903,7 @@ export const useAppStore = create<AppStore>()(
         }
       },
 
-      // Auto-trigger QA checks when tasks are updated
-      autoTriggerQAChecks: async (task: Task, previousStatus?: Task['status']) => {
-        const { currentProject } = get();
-        if (!currentProject) return;
 
-        try {
-          const newAlerts = await qaService.autoTriggerQAChecks(task, previousStatus, currentProject.id);
-          if (newAlerts.length > 0) {
-            set(state => ({
-              qaAlerts: [...state.qaAlerts, ...newAlerts]
-            }));
-            
-            // Show notification for critical alerts
-            const criticalAlerts = newAlerts.filter(alert => alert.priority === 'critical');
-            if (criticalAlerts.length > 0) {
-              toast.error(`🔍 CRITICAL QA Alert: ${criticalAlerts[0].title}`, {
-                duration: 8000
-              });
-            } else {
-              toast.success(`🔍 New QA alert created: ${newAlerts[0].title}`);
-            }
-          }
-        } catch (error) {
-          console.error('Error auto-triggering QA checks:', error);
-        }
-      },
 
       // Notification Actions
       addNotification: (notification) => set((state) => ({ 
@@ -751,6 +1190,31 @@ export const useAppStore = create<AppStore>()(
             } else {
               toast.success('Task added successfully!');
             }
+
+            // Send QA alert emails if any were generated
+            const qaAlerts = await get().autoTriggerQAChecks(result.task);
+            if (qaAlerts.length > 0) {
+              for (const alert of qaAlerts) {
+                const assignee = get().users.find(u => u.id === alert.assigned_to);
+                if (assignee) {
+                  emailService.sendQAAlert(
+                    alert,
+                    result.task,
+                    assignee,
+                    currentProject,
+                    currentUser
+                  ).then(emailResult => {
+                    if (emailResult.success) {
+                      console.log(`QA alert email sent for ${alert.title}`);
+                    } else {
+                      console.error('Failed to send QA alert email:', emailResult.error);
+                    }
+                  }).catch(error => {
+                    console.error('QA alert email service error:', error);
+                  });
+                }
+              }
+            }
           } else {
             toast.error(result.error || 'Failed to create task');
           }
@@ -792,9 +1256,9 @@ export const useAppStore = create<AppStore>()(
             }
 
             // Send email notification if assignee changed
-            if (updates.assigned_to && updates.assigned_to !== task.assigned_to && updates.assigned_to !== currentUser.id) {
+            if (updates.assigned_to && updates.assigned_to !== task.assigned_to) {
               const newAssignee = users.find(u => u.id === updates.assigned_to);
-              if (newAssignee && currentProject) {
+              if (newAssignee) {
                 emailService.sendTaskAssignment(
                   result.task,
                   newAssignee,
@@ -802,18 +1266,74 @@ export const useAppStore = create<AppStore>()(
                   currentUser
                 ).then(emailResult => {
                   if (emailResult.success) {
-                    toast.success(`Task updated and notification sent to ${newAssignee.full_name}`);
+                    toast.success(`Task reassigned and notification sent to ${newAssignee.full_name}`);
                   } else {
-                    console.error('Failed to send task assignment email:', emailResult.error);
-                    toast.success('Task updated (email notification failed)');
+                    console.error('Failed to send task reassignment email:', emailResult.error);
+                    toast.success('Task reassigned (email notification failed)');
                   }
                 }).catch(error => {
                   console.error('Email service error:', error);
                 });
               }
-            } else {
-              toast.success('Task updated successfully!');
             }
+
+            // Send status change notification to assignee
+            if (updates.status && updates.status !== previousStatus && result.task.assigned_to) {
+              const assignee = users.find(u => u.id === result.task.assigned_to);
+              if (assignee && assignee.id !== currentUser.id) {
+                emailService.sendCustomNotification(
+                  assignee.email,
+                  `📋 Task Status Updated - ${result.task.title}`,
+                  `The status of your assigned task "${result.task.title}" has been updated from "${previousStatus}" to "${updates.status}".
+
+Task Details:
+- Project: ${currentProject.name}
+- Category: ${result.task.category}
+- Priority: ${result.task.priority}
+- Updated by: ${currentUser.full_name}
+
+You can view the task details in your dashboard.`,
+                  currentUser
+                ).then(emailResult => {
+                  if (emailResult.success) {
+                    console.log('Status change notification sent');
+                  } else {
+                    console.error('Failed to send status change email:', emailResult.error);
+                  }
+                }).catch(error => {
+                  console.error('Status change email service error:', error);
+                });
+              }
+            }
+
+            // Send QA alert emails if any were generated
+            if (updates.status && updates.status !== previousStatus) {
+              const qaAlerts = await get().autoTriggerQAChecks(result.task, previousStatus);
+              if (qaAlerts.length > 0) {
+                for (const alert of qaAlerts) {
+                  const assignee = get().users.find(u => u.id === alert.assigned_to);
+                  if (assignee) {
+                    emailService.sendQAAlert(
+                      alert,
+                      result.task,
+                      assignee,
+                      currentProject,
+                      currentUser
+                    ).then(emailResult => {
+                      if (emailResult.success) {
+                        console.log(`QA alert email sent for ${alert.title}`);
+                      } else {
+                        console.error('Failed to send QA alert email:', emailResult.error);
+                      }
+                    }).catch(error => {
+                      console.error('QA alert email service error:', error);
+                    });
+                  }
+                }
+              }
+            }
+
+            toast.success('Task updated successfully!');
           } else {
             toast.error(result.error || 'Failed to update task');
           }
@@ -1118,83 +1638,6 @@ export const useAppStore = create<AppStore>()(
         }
       },
 
-      // QA Actions
-      generateQAAlerts: async () => {
-        const { currentProject, tasks } = get();
-        if (!currentProject) {
-          toast.error('No project selected');
-          return;
-        }
-
-        try {
-          const result = await qaService.generateAndSaveQAAlerts(tasks, currentProject.id);
-          if (result.success && result.alerts) {
-            set({ qaAlerts: result.alerts });
-            toast.success(`Generated ${result.alerts.length} QA alerts`);
-          } else {
-            toast.error(result.error || 'Failed to generate QA alerts');
-          }
-        } catch (error) {
-          console.error('Error generating QA alerts:', error);
-          toast.error('Failed to generate QA alerts');
-        }
-      },
-
-      updateQAAlertStatus: async (alertId: string, status: QAAlert['status']) => {
-        try {
-          const result = await qaService.updateQAAlertStatus(alertId, status);
-          if (result.success) {
-            set(state => ({
-              qaAlerts: state.qaAlerts.map(alert => 
-                alert.id === alertId ? { ...alert, status } : alert
-              )
-            }));
-            toast.success('QA alert status updated');
-          } else {
-            toast.error(result.error || 'Failed to update QA alert status');
-          }
-        } catch (error) {
-          console.error('Error updating QA alert status:', error);
-          toast.error('Failed to update QA alert status');
-        }
-      },
-
-      completeQAChecklistItem: async (alertId: string, itemId: string, notes?: string) => {
-        const { currentUser } = get();
-        if (!currentUser) {
-          toast.error('User not found');
-          return;
-        }
-
-        try {
-          const result = await qaService.completeChecklistItem(alertId, itemId, currentUser.id, notes);
-          if (result.success) {
-            set(state => ({
-              qaAlerts: state.qaAlerts.map(alert => {
-                if (alert.id === alertId) {
-                  return {
-                    ...alert,
-                    checklist: alert.checklist?.map(item => 
-                      item.id === itemId 
-                        ? { ...item, completed: true, completed_at: new Date(), completed_by: currentUser.id, notes }
-                        : item
-                    )
-                  };
-                }
-                return alert;
-              })
-            }));
-            toast.success('Checklist item completed');
-          } else {
-            toast.error(result.error || 'Failed to complete checklist item');
-          }
-        } catch (error) {
-          console.error('Error completing checklist item:', error);
-          toast.error('Failed to complete checklist item');
-        }
-      },
-
-      // Missing task actions
       removeTask: async (taskId: string) => {
         const { currentUser } = get();
         if (!currentUser) {
@@ -1221,9 +1664,7 @@ export const useAppStore = create<AppStore>()(
         }
       },
 
-      deleteTask: async (taskId: string) => {
-        get().removeTask(taskId);
-      },
+
     }),
     {
       name: 'gogram-store',

@@ -230,9 +230,10 @@ interface EmailTemplate {
 }
 
 class EmailService {
-  private readonly FROM_EMAIL = import.meta.env.NEXT_PUBLIC_FROM_EMAIL || 'notifications@gogram.app';
-  private readonly API_KEY = import.meta.env.NEXT_PUBLIC_EMAIL_API_KEY;
-  private readonly EMAIL_PROVIDER = import.meta.env.NEXT_PUBLIC_EMAIL_PROVIDER || 'simulation'; // 'sendgrid', 'mailgun', 'resend', 'simulation'
+  // Email configuration
+  private readonly FROM_EMAIL = import.meta.env.NEXT_PUBLIC_FROM_EMAIL || 'notifications@gogram.co';
+  private readonly API_KEY = import.meta.env.NEXT_PUBLIC_EMAIL_API_KEY || 're_HzkrygJY_FZzv3EEYMFq1gVZff2YQQnhS';
+  private readonly EMAIL_PROVIDER = import.meta.env.NEXT_PUBLIC_EMAIL_PROVIDER || 'resend';
   private readonly APP_URL = import.meta.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
   /**
@@ -240,8 +241,16 @@ class EmailService {
    */
   private async sendEmail(emailData: EmailData): Promise<{ success: boolean; error?: string }> {
     try {
+      // Debug: Log current configuration
+      console.log('🔧 Email Configuration:', {
+        provider: this.EMAIL_PROVIDER,
+        fromEmail: this.FROM_EMAIL,
+        hasApiKey: !!this.API_KEY,
+        apiKeyLength: this.API_KEY ? this.API_KEY.length : 0
+      });
+
       // In development/demo mode, simulate email sending
-      if (this.EMAIL_PROVIDER === 'simulation' || !this.API_KEY) {
+      if (this.EMAIL_PROVIDER === 'simulation') {
         console.log('📧 Email Simulation:', {
           to: emailData.to,
           subject: emailData.subject,
@@ -259,6 +268,18 @@ class EmailService {
           console.log('❌ Email failed (simulated)');
           return { success: false, error: 'Simulated email delivery failure' };
         }
+      }
+
+      // Check if we have the required configuration for real email sending
+      if (!this.API_KEY) {
+        console.error('❌ Email API Key not found. Please check your .env.local file.');
+        return { success: false, error: 'Email API key not configured' };
+      }
+
+      // Validate email address
+      if (!emailData.to || !emailData.to.includes('@')) {
+        console.error('❌ Invalid email address:', emailData.to);
+        return { success: false, error: 'Invalid email address' };
       }
 
       // Real email providers
@@ -313,25 +334,41 @@ class EmailService {
    * Send email via Resend
    */
   private async sendViaResend(emailData: EmailData): Promise<{ success: boolean; error?: string }> {
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        from: emailData.from || this.FROM_EMAIL,
-        to: [emailData.to],
+    try {
+      console.log('📧 Sending email via Resend API:', {
+        to: emailData.to,
         subject: emailData.subject,
-        html: emailData.html
-      })
-    });
+        from: emailData.from || this.FROM_EMAIL,
+        provider: 'resend'
+      });
 
-    if (response.ok) {
-      return { success: true };
-    } else {
-      const error = await response.json();
-      return { success: false, error: `Resend error: ${error.message}` };
+             // Call our backend API endpoint
+       const apiUrl = import.meta.env.DEV ? 'http://localhost:3000/api/send-email' : '/api/send-email';
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          to: emailData.to,
+          subject: emailData.subject,
+          html: emailData.html,
+          from: emailData.from || this.FROM_EMAIL
+        })
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        console.log('✅ Email sent successfully via Resend:', result);
+        return { success: true };
+      } else {
+        console.error('❌ Email failed via Resend:', result.error);
+        return { success: false, error: result.error || 'Email sending failed' };
+      }
+    } catch (error) {
+      console.error('Resend email error:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
 

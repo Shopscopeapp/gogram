@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Users, 
@@ -164,18 +164,23 @@ function AddUserModal({ isOpen, onClose, onAddUser }: AddUserModalProps) {
 }
 
 export default function TeamPage() {
-  const { users, addUser, updateUser, removeUser, isProjectManager, currentUser } = useAppStore();
+  const { users, addUser, updateUser, removeUser, isProjectManager, currentUser, loadUsers } = useAppStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
 
+  // Load users when component mounts
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
+
   // Convert users to team members with additional stats
   const teamMembers: TeamMember[] = users.map(user => ({
     ...user,
     lastActive: new Date(), // In real app, this would come from user activity tracking
-    projectsAssigned: Math.floor(Math.random() * 5), // Placeholder - would come from actual project assignments
-    tasksCompleted: Math.floor(Math.random() * 50) // Placeholder - would come from task completion stats
+    projectsAssigned: 0, // Will be calculated from actual data
+    tasksCompleted: 0 // Will be calculated from actual data
   }));
 
   const filteredMembers = teamMembers.filter(member => {
@@ -188,15 +193,23 @@ export default function TeamPage() {
     return matchesSearch && matchesRole;
   });
 
-  const handleAddUser = (userData: Omit<User, 'id' | 'created_at' | 'updated_at'>) => {
+  const handleAddUser = async (userData: Omit<User, 'id' | 'created_at' | 'updated_at'>) => {
+    // Generate a proper UUID v4 for the user ID
+    const generateUUID = () => {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    };
+
     const newUser: User = {
-      id: `user_${Date.now()}`,
+      id: generateUUID(),
       ...userData,
       created_at: new Date(),
       updated_at: new Date()
     };
-    addUser(newUser);
-    toast.success(`${userData.full_name} has been added to the team!`);
+    await addUser(newUser);
   };
 
   const handleRemoveMember = (memberId: string) => {
@@ -210,6 +223,8 @@ export default function TeamPage() {
       toast.success('Team member removed successfully');
     }
   };
+
+
 
   const getRoleColor = (role: UserRole) => {
     switch (role) {

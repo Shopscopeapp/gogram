@@ -27,6 +27,7 @@ import TeamPage from './components/pages/TeamPage';
 import SupplierConfirmationPage from './components/pages/SupplierConfirmationPage';
 import PublicProjectPage from './components/pages/PublicProjectPage';
 import LandingPage from './components/landing/LandingPage';
+import InvitePage from './components/pages/InvitePage';
 import AccountSettingsPage from './components/pages/AccountSettingsPage';
 
 type AuthMode = 'login' | 'signup' | 'forgot-password';
@@ -44,6 +45,10 @@ interface AppData {
 }
 
 function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
+  const { currentUser } = useAppStore();
+  
+  console.log('AuthenticatedLayout render:', { currentUser: !!currentUser });
+  
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar />
@@ -190,7 +195,7 @@ function AppContent() {
             completed: 0,
           }
         },
-        sidebarOpen: false,
+        sidebarOpen: true,
         loading: false,
         error: null,
         realtimeChannel: null
@@ -198,6 +203,7 @@ function AppContent() {
       
       // Set in store
       setCurrentUser(user);
+      console.log('CurrentUser set in store, checking store state:', useAppStore.getState().currentUser);
       
       // Initialize project data
       await initializeUserSession();
@@ -555,6 +561,9 @@ function AppContent() {
             </>
           )
         } />
+
+        {/* Invitation route - always accessible */}
+        <Route path="/invite" element={<InvitePage />} />
 
         {/* Unauthenticated routes */}
         {appState === 'unauthenticated' && (

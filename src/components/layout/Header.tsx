@@ -39,7 +39,7 @@ export default function Header() {
       <div className="flex items-center space-x-4">
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-2 rounded-lg hover:bg-gray-100 transition-colors lg:hidden"
+          className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
         >
           <Menu className="w-6 h-6 text-gray-600" />
         </button>
