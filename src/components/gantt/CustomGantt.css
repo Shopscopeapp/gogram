@@ -22,6 +22,7 @@
   z-index: 50;
   backdrop-filter: blur(10px);
   box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
 }
 
 /* Mobile: Show timeline header but with smaller text */
@@ -144,17 +145,20 @@
   position: relative;
   background: white;
   border-left: 1px solid #e2e8f0;
+  flex-shrink: 0;
 }
 
 .gantt-timeline-months {
   display: flex;
   position: relative;
   border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
 }
 
 .gantt-timeline-days {
   display: flex;
   position: relative;
+  flex-shrink: 0;
 }
 
 .gantt-timeline-month {
@@ -222,7 +226,8 @@
 /* Content Area */
 .gantt-content {
   flex: 1;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   position: relative;
   display: flex;
   flex-direction: column;

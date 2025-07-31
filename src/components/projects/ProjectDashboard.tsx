@@ -267,6 +267,20 @@ export default function ProjectDashboard({ currentUser, onProjectSelect, onLogou
   const loadProjects = async () => {
     setIsLoading(true);
     try {
+      // Get the database user ID from the users table using auth_user_id
+      const { data: dbUser, error: dbUserError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('auth_user_id', currentUser.id)
+        .single();
+
+      if (dbUserError) {
+        console.error('Error getting database user ID:', dbUserError);
+        // Fallback to using auth user ID directly
+      }
+
+      const databaseUserId = dbUser?.id || currentUser.id;
+
       const result = await projectService.getUserProjects(currentUser.id);
       if (result.success && result.projects) {
         // Get user roles for each project
@@ -278,20 +292,15 @@ export default function ProjectDashboard({ currentUser, onProjectSelect, onLogou
                 .from('project_members')
                 .select('role')
                 .eq('project_id', project.id)
-                .eq('user_id', currentUser.id)
+                .eq('user_id', databaseUserId)
                 .single();
-
-              if (error && error.code !== 'PGRST116') {
-                console.error('Error fetching user role for project:', project.id, error);
-              }
 
               // If no role found in project_members, check if user is the project creator
               let userRole = memberData?.role;
               
-              if (!userRole) {
-                console.warn(`No role found for user ${currentUser.id} in project ${project.id}, checking if they're the creator`);
+              if (!userRole && error?.code === 'PGRST116') {
                 // Only default to project_manager if they're the actual creator
-                userRole = project.project_manager_id === currentUser.id ? 'project_manager' : 'viewer';
+                userRole = project.project_manager_id === databaseUserId ? 'project_manager' : 'viewer';
               }
 
               return {
@@ -302,7 +311,7 @@ export default function ProjectDashboard({ currentUser, onProjectSelect, onLogou
               console.error('Error processing project role:', error);
               return {
                 ...project,
-                userRole: project.project_manager_id === currentUser.id ? 'project_manager' : 'viewer'
+                userRole: project.project_manager_id === databaseUserId ? 'project_manager' : 'viewer'
               } as ProjectWithRole;
             }
           })
