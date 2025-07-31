@@ -84,6 +84,13 @@ export default function InviteSignupForm({ inviteToken, onSuccess }: InviteSignu
 
       if (authError) {
         console.error('Auth signup error:', authError);
+        
+        // Handle specific error cases
+        if (authError.message?.includes('already registered') || authError.message?.includes('already been registered')) {
+          setError('An account with this email already exists. Please log in instead - you\'ll be automatically added to the project.');
+          return;
+        }
+        
         throw authError;
       }
 
@@ -258,6 +265,16 @@ export default function InviteSignupForm({ inviteToken, onSuccess }: InviteSignu
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
               {error}
+              {error.includes('already exists') && (
+                <div className="mt-2">
+                  <a 
+                    href="/auth?mode=login" 
+                    className="text-blue-600 hover:text-blue-500 underline font-medium"
+                  >
+                    Go to Login Page
+                  </a>
+                </div>
+              )}
             </div>
           )}
 
