@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 import type { Supplier, Delivery } from '../types';
 
 export interface CreateSupplierData {
+  project_id: string;
   name: string;
   company?: string;
   email: string;
@@ -32,6 +33,7 @@ class SupplierService {
       const { data: supplier, error } = await supabase
         .from('suppliers')
         .insert({
+          project_id: supplierData.project_id,
           name: supplierData.name,
           company: supplierData.company,
           email: supplierData.email,
@@ -52,6 +54,7 @@ class SupplierService {
 
       const formattedSupplier: Supplier = {
         id: supplier.id,
+        project_id: supplier.project_id,
         name: supplier.name,
         company: supplier.company,
         email: supplier.email,
@@ -73,7 +76,47 @@ class SupplierService {
   }
 
   /**
-   * Get all active suppliers
+   * Get suppliers for a specific project
+   */
+  async getProjectSuppliers(projectId: string): Promise<{ success: boolean; suppliers?: Supplier[]; error?: string }> {
+    try {
+      const { data: suppliers, error } = await supabase
+        .from('suppliers')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.error('Get project suppliers error:', error);
+        return { success: false, error: 'Failed to fetch suppliers' };
+      }
+
+      const formattedSuppliers: Supplier[] = suppliers.map(supplier => ({
+        id: supplier.id,
+        project_id: supplier.project_id,
+        name: supplier.name,
+        company: supplier.company,
+        email: supplier.email,
+        phone: supplier.phone,
+        address: supplier.address,
+        specialties: supplier.specialties || [],
+        rating: supplier.rating,
+        notes: supplier.notes,
+        is_active: supplier.is_active,
+        created_at: new Date(supplier.created_at),
+        updated_at: new Date(supplier.updated_at),
+      }));
+
+      return { success: true, suppliers: formattedSuppliers };
+    } catch (error) {
+      console.error('Get project suppliers error:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  }
+
+  /**
+   * Get all active suppliers (deprecated - use getProjectSuppliers instead)
    */
   async getSuppliers(): Promise<{ success: boolean; suppliers?: Supplier[]; error?: string }> {
     try {
@@ -90,6 +133,7 @@ class SupplierService {
 
       const formattedSuppliers: Supplier[] = suppliers.map(supplier => ({
         id: supplier.id,
+        project_id: supplier.project_id,
         name: supplier.name,
         company: supplier.company,
         email: supplier.email,
@@ -144,6 +188,7 @@ class SupplierService {
 
       const formattedSupplier: Supplier = {
         id: supplier.id,
+        project_id: supplier.project_id,
         name: supplier.name,
         company: supplier.company,
         email: supplier.email,
@@ -405,6 +450,7 @@ class SupplierService {
 
       const formattedSuppliers: Supplier[] = suppliers.map(supplier => ({
         id: supplier.id,
+        project_id: supplier.project_id,
         name: supplier.name,
         company: supplier.company,
         email: supplier.email,
@@ -444,6 +490,7 @@ class SupplierService {
 
       const formattedSuppliers: Supplier[] = suppliers.map(supplier => ({
         id: supplier.id,
+        project_id: supplier.project_id,
         name: supplier.name,
         company: supplier.company,
         email: supplier.email,

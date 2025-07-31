@@ -25,6 +25,7 @@ import SharePage from './components/pages/SharePage';
 import QAPage from './components/pages/QAPage';
 import TeamPage from './components/pages/TeamPage';
 import SupplierConfirmationPage from './components/pages/SupplierConfirmationPage';
+import SupplierResponsePage from './components/pages/SupplierResponsePage';
 import PublicProjectPage from './components/pages/PublicProjectPage';
 import LandingPage from './components/landing/LandingPage';
 import InvitePage from './components/pages/InvitePage';
@@ -525,6 +526,7 @@ function AppContent() {
       <Routes>
         {/* Public routes - always accessible */}
         <Route path="/confirm-delivery/:deliveryId" element={<SupplierConfirmationPage />} />
+        <Route path="/supplier-response" element={<SupplierResponsePage />} />
         <Route path="/public/project/:shareToken" element={<PublicProjectPage />} />
         
         {/* Demo route - always accessible */}

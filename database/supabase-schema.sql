@@ -209,9 +209,10 @@ CREATE TABLE public.task_change_proposals (
 -- Suppliers table
 CREATE TABLE public.suppliers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     company VARCHAR(255),
-    email VARCHAR(255) UNIQUE NOT NULL,
+    email VARCHAR(255) NOT NULL,
     phone VARCHAR(50),
     address TEXT,
     specialties TEXT[] DEFAULT '{}',
@@ -254,6 +255,19 @@ CREATE TABLE public.delivery_confirmations (
     ip_address INET,
     user_agent TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Delivery responses (for interactive email responses)
+CREATE TABLE public.delivery_responses (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    delivery_id UUID REFERENCES public.deliveries(id) ON DELETE CASCADE,
+    supplier_id UUID REFERENCES public.suppliers(id) ON DELETE CASCADE,
+    response VARCHAR(20) NOT NULL CHECK (response IN ('confirm', 'deny')),
+    comments TEXT,
+    alternative_date TIMESTAMPTZ,
+    responded_at TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- =====================================================

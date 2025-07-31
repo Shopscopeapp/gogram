@@ -20,7 +20,7 @@ import type { Supplier } from '../../types';
 interface AddSupplierModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddSupplier: (supplierData: Omit<Supplier, 'id' | 'created_at' | 'updated_at'>) => void;
+  onAddSupplier: (supplierData: Omit<Supplier, 'id' | 'project_id' | 'created_at' | 'updated_at'>) => void;
 }
 
 function AddSupplierModal({ isOpen, onClose, onAddSupplier }: AddSupplierModalProps) {
@@ -65,7 +65,7 @@ function AddSupplierModal({ isOpen, onClose, onAddSupplier }: AddSupplierModalPr
       return;
     }
 
-    const supplierData: Omit<Supplier, 'id' | 'created_at' | 'updated_at'> = {
+    const supplierData: Omit<Supplier, 'id' | 'project_id' | 'created_at' | 'updated_at'> = {
       name: formData.name.trim(),
       company: formData.company.trim() || undefined,
       email: formData.email.trim(),
@@ -79,7 +79,6 @@ function AddSupplierModal({ isOpen, onClose, onAddSupplier }: AddSupplierModalPr
 
     onAddSupplier(supplierData);
     onClose();
-    toast.success(`✅ Supplier "${formData.name}" added successfully!`);
   };
 
   const addSpecialty = () => {
@@ -382,16 +381,12 @@ export default function SuppliersPage() {
   const [showAddModal, setShowAddModal] = useState(false);
 
   // Filter suppliers to only show project-specific ones
-  // In a real app, suppliers would have a project_id field
-  // For now, we'll start with an empty array and only show suppliers added by the project manager
   const projectSuppliers = suppliers.filter(supplier => {
     // If no current project, show no suppliers
     if (!currentProject) return false;
     
-    // For demo purposes, we'll only show suppliers that were specifically added to this project
-    // In reality, this would check supplier.project_id === currentProject.id
-    // For now, let's show an empty state to indicate no suppliers have been added for this project
-    return false; // This will show the empty state
+    // Show suppliers that belong to the current project
+    return supplier.project_id === currentProject.id;
   });
 
   const getTaskTitle = (taskId: string) => {
@@ -633,7 +628,7 @@ export default function SuppliersPage() {
                       <div className="text-sm text-gray-900">{getTaskTitle(delivery.task_id)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {format(new Date(delivery.expected_date), 'MMM dd, yyyy')}
+                      {format(new Date(delivery.planned_date), 'MMM dd, yyyy')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -655,16 +650,15 @@ export default function SuppliersPage() {
       <AddSupplierModal
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
-        onAddSupplier={(supplierData) => {
-          const newSupplier = {
-            id: `supplier_${Date.now()}`,
-            project_id: currentProject?.id || '', // Associate with current project
+        onAddSupplier={async (supplierData) => {
+          if (!currentProject) {
+            toast.error('No project selected');
+            return;
+          }
+          await addSupplier({
             ...supplierData,
-            created_at: new Date(),
-            updated_at: new Date()
-          };
-          addSupplier(newSupplier);
-          toast.success(`${supplierData.name} has been added to the project!`);
+            project_id: currentProject.id
+          });
         }}
       />
     </div>

@@ -2,8 +2,12 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, ChevronDown, Calendar, Clock, Settings, Smartphone, Monitor, List, BarChart3, Plus, AlertTriangle, Users, Wrench, DollarSign } from 'lucide-react';
 import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, differenceInDays, parseISO, isValid, isWeekend, isSameDay } from 'date-fns';
-import type { Task } from '../../types';
+import type { Task, Delivery, Supplier } from '../../types';
 import { safeDateFormat } from '../../utils/dateHelpers';
+import { useAppStore } from '../../store';
+import DeliveryDateChangeModal from '../modals/DeliveryDateChangeModal';
+import supplierService from '../../services/supplierService';
+import emailService from '../../services/emailService';
 import './CustomGantt.css';
 
 interface CustomGanttChartProps {
@@ -89,7 +93,140 @@ export default function CustomGanttChart({
     dropIndex: -1
   });
 
+  // Delivery change modal state
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [pendingTaskUpdate, setPendingTaskUpdate] = useState<{
+    taskId: string;
+    updates: Partial<Task>;
+    task: Task;
+    newStartDate: Date;
+    newEndDate: Date;
+    affectedDeliveries: Array<{
+      delivery: Delivery;
+      supplier: Supplier;
+      newPlannedDate: Date;
+    }>;
+  } | null>(null);
+
+  // Get store data for delivery checking
+  const { deliveries, suppliers } = useAppStore();
+
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Check if a task has affected deliveries when moved
+  const checkAffectedDeliveries = (task: Task, newStartDate: Date, newEndDate: Date) => {
+    const taskDeliveries = deliveries.filter(delivery => delivery.task_id === task.id);
+    
+    if (taskDeliveries.length === 0) {
+      return [];
+    }
+
+    const affectedDeliveries = taskDeliveries.map(delivery => {
+      const supplier = suppliers.find(s => s.id === delivery.supplier_id);
+      if (!supplier) return null;
+
+      // Calculate new delivery date based on task schedule change
+      // Assume deliveries should be scheduled 1 day before task end date
+      const newPlannedDate = addDays(newEndDate, -1);
+
+      return {
+        delivery,
+        supplier,
+        newPlannedDate
+      };
+    }).filter(Boolean) as Array<{
+      delivery: Delivery;
+      supplier: Supplier;
+      newPlannedDate: Date;
+    }>;
+
+    return affectedDeliveries;
+  };
+
+  // Enhanced task update handler that checks for delivery impacts
+  const handleTaskUpdate = (taskId: string, updates: Partial<Task>) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) {
+      onTaskUpdate?.(taskId, updates);
+      return;
+    }
+
+    // Check if this is a date change that might affect deliveries
+    const hasDateChange = updates.start_date || updates.end_date;
+    if (!hasDateChange) {
+      onTaskUpdate?.(taskId, updates);
+      return;
+    }
+
+    const newStartDate = updates.start_date || task.start_date;
+    const newEndDate = updates.end_date || task.end_date;
+    
+    const affectedDeliveries = checkAffectedDeliveries(task, newStartDate, newEndDate);
+    
+    if (affectedDeliveries.length > 0) {
+      // Show confirmation modal
+      setPendingTaskUpdate({
+        taskId,
+        updates,
+        task,
+        newStartDate,
+        newEndDate,
+        affectedDeliveries
+      });
+      setShowDeliveryModal(true);
+    } else {
+      // No deliveries affected, proceed with normal update
+      onTaskUpdate?.(taskId, updates);
+    }
+  };
+
+  // Handle delivery modal confirmation
+  const handleDeliveryModalConfirm = async () => {
+    if (!pendingTaskUpdate) return;
+
+    try {
+      // Update delivery dates and send emails
+      for (const { delivery, supplier, newPlannedDate } of pendingTaskUpdate.affectedDeliveries) {
+        // Update delivery date in the database
+        await supplierService.updateDelivery(delivery.id, {
+          planned_date: newPlannedDate
+        });
+
+        // Send email notification to supplier
+        const { currentUser, currentProject } = useAppStore.getState();
+        if (currentUser && currentProject) {
+          await emailService.sendDeliveryDateChange(
+            { ...delivery, planned_date: newPlannedDate },
+            supplier as any, // Type conversion for compatibility
+            pendingTaskUpdate.task,
+            currentProject,
+            currentUser,
+            newPlannedDate,
+            pendingTaskUpdate.task.start_date,
+            pendingTaskUpdate.newStartDate
+          );
+        }
+      }
+
+      // Proceed with the task update
+      onTaskUpdate?.(pendingTaskUpdate.taskId, pendingTaskUpdate.updates);
+      
+      setShowDeliveryModal(false);
+      setPendingTaskUpdate(null);
+    } catch (error) {
+      console.error('Error updating deliveries:', error);
+      // Still proceed with task update even if delivery updates fail
+      onTaskUpdate?.(pendingTaskUpdate.taskId, pendingTaskUpdate.updates);
+      setShowDeliveryModal(false);
+      setPendingTaskUpdate(null);
+    }
+  };
+
+  // Handle delivery modal cancellation
+  const handleDeliveryModalCancel = () => {
+    setShowDeliveryModal(false);
+    setPendingTaskUpdate(null);
+  };
 
   // Check for mobile screen size
   useEffect(() => {
@@ -381,7 +518,7 @@ export default function CustomGanttChart({
 
     // Apply all updates
     updates.forEach(({ taskId, updates }) => {
-      onTaskUpdate(taskId, updates);
+      handleTaskUpdate(taskId, updates);
     });
 
     return updates.length > 1; // Return true if other tasks were affected
@@ -738,10 +875,23 @@ export default function CustomGanttChart({
               <div className="day-name">{format(day, 'EEE')}</div>
             </div>
           ))}
-        </div>
-      </div>
-    );
-  };
+              </div>
+
+      {/* Delivery Date Change Modal */}
+      {showDeliveryModal && pendingTaskUpdate && (
+        <DeliveryDateChangeModal
+          isOpen={showDeliveryModal}
+          onClose={handleDeliveryModalCancel}
+          onConfirm={handleDeliveryModalConfirm}
+          task={pendingTaskUpdate.task}
+          newStartDate={pendingTaskUpdate.newStartDate}
+          newEndDate={pendingTaskUpdate.newEndDate}
+          affectedDeliveries={pendingTaskUpdate.affectedDeliveries}
+        />
+      )}
+    </div>
+  );
+};
 
 
 

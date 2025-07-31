@@ -100,6 +100,73 @@ const EMAIL_TEMPLATES = {
     `
   },
 
+  DELIVERY_DATE_CHANGE: {
+    subject: '📅 Delivery Date Change Required - {{taskTitle}}',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #f8fafc; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="color: #1e293b; margin: 0;">🏗️ Gogram</h1>
+          <p style="color: #64748b; margin: 5px 0 0 0;">Construction Project Management</p>
+        </div>
+        
+        <div style="background: white; padding: 30px; border: 1px solid #e2e8f0;">
+          <h2 style="color: #1e293b; margin-top: 0;">⚠️ Delivery Date Change Required</h2>
+          
+          <p>Hi {{supplierName}},</p>
+          
+          <p>Due to schedule changes in the <strong>{{projectName}}</strong> project, we need to adjust the delivery date for the following items:</p>
+          
+          <div style="background: #fef3c7; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+            <h3 style="color: #92400e; margin-top: 0;">Task: {{taskTitle}}</h3>
+            
+            <div style="background: white; padding: 15px; border-radius: 6px; margin: 15px 0;">
+              <h4 style="color: #1e293b; margin-top: 0;">Delivery Details:</h4>
+              <p><strong>Item:</strong> {{deliveryItem}}</p>
+              <p><strong>Quantity:</strong> {{deliveryQuantity}} {{deliveryUnit}}</p>
+              <p><strong>Current Delivery Date:</strong> <span style="color: #6b7280;">{{currentDate}}</span></p>
+              <p><strong>New Required Date:</strong> <span style="color: #dc2626; font-weight: bold;">{{newDate}}</span></p>
+              {{#if deliveryAddress}}<p><strong>Delivery Address:</strong> {{deliveryAddress}}</p>{{/if}}
+            </div>
+            
+            <div style="font-size: 14px; color: #92400e;">
+              <p><strong>Reason for Change:</strong> Task schedule has been moved from {{originalTaskDate}} to {{newTaskDate}}</p>
+            </div>
+          </div>
+          
+          <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6;">
+            <h4 style="color: #1e40af; margin-top: 0;">🤝 Your Response Required</h4>
+            <p style="color: #1e40af; margin-bottom: 0;">Please confirm if you can accommodate this new delivery date or if you need to propose an alternative.</p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="{{confirmUrl}}" 
+               style="background: #10b981; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; display: inline-block; margin: 0 10px 10px 0; font-weight: bold; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);">
+              ✅ CONFIRM NEW DATE
+            </a>
+            <a href="{{denyUrl}}" 
+               style="background: #ef4444; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; display: inline-block; margin: 0 0 10px 10px; font-weight: bold; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);">
+              ❌ CANNOT DELIVER
+            </a>
+          </div>
+          
+          <div style="background: #fef2f2; padding: 15px; border-radius: 6px; margin: 20px 0;">
+            <p style="color: #dc2626; font-size: 14px; margin: 0; text-align: center;">
+              <strong>⏰ Please respond within 24 hours to avoid project delays</strong>
+            </p>
+          </div>
+          
+          <p style="color: #64748b; font-size: 14px; border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 30px;">
+            If you have any questions about this change, please contact us immediately.<br><br>
+            Best regards,<br>
+            {{senderName}}<br>
+            Project Manager - {{projectName}}<br>
+            📧 {{senderEmail}} | 📱 {{senderPhone}}
+          </p>
+        </div>
+      </div>
+    `
+  },
+
   APPROVAL_REQUEST: {
     subject: '✋ Task Change Approval Required - {{taskTitle}}',
     html: `
@@ -498,6 +565,59 @@ class EmailService {
     };
 
     const compiled = this.compileTemplate(EMAIL_TEMPLATES.DELIVERY_CONFIRMATION, templateData);
+
+    return await this.sendEmail({
+      to: supplier.email,
+      subject: compiled.subject,
+      html: compiled.html,
+      replyTo: sender.email
+    });
+  }
+
+  /**
+   * Send delivery date change notification with confirm/deny options
+   */
+  async sendDeliveryDateChange(
+    delivery: Delivery,
+    supplier: User,
+    task: Task,
+    project: Project,
+    sender: User,
+    newDate: Date,
+    originalTaskDate: Date,
+    newTaskDate: Date
+  ): Promise<{ success: boolean; error?: string }> {
+    // Generate unique response URLs with tokens
+    const responseToken = btoa(JSON.stringify({
+      deliveryId: delivery.id,
+      supplierId: supplier.id,
+      projectId: project.id,
+      expires: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
+    }));
+
+    const confirmUrl = `${this.APP_URL}/supplier-response?token=${responseToken}&action=confirm`;
+    const denyUrl = `${this.APP_URL}/supplier-response?token=${responseToken}&action=deny`;
+
+    const templateData = {
+      supplierName: supplier.full_name,
+      projectName: project.name,
+      taskTitle: task.title,
+      deliveryItem: delivery.item,
+      deliveryQuantity: delivery.quantity,
+      deliveryUnit: delivery.unit,
+      currentDate: new Date(delivery.planned_date).toLocaleDateString(),
+      newDate: newDate.toLocaleDateString(),
+      deliveryAddress: delivery.delivery_address,
+      originalTaskDate: originalTaskDate.toLocaleDateString(),
+      newTaskDate: newTaskDate.toLocaleDateString(),
+      confirmUrl,
+      denyUrl,
+      senderName: sender.full_name,
+      senderEmail: sender.email,
+      senderPhone: sender.phone || 'Not provided'
+    };
+
+    const compiled = this.compileTemplate(EMAIL_TEMPLATES.DELIVERY_DATE_CHANGE, templateData);
 
     return await this.sendEmail({
       to: supplier.email,

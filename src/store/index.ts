@@ -5,7 +5,7 @@ import { addDays, format } from 'date-fns';
 import procurementService from '../services/procurementService';
 import qaService from '../services/qaService';
 import taskService from '../services/taskService';
-import supplierService from '../services/supplierService';
+import supplierService, { CreateSupplierData } from '../services/supplierService';
 import { supabase, SupabaseService } from '../lib/supabase';
 import type { 
   User, 
@@ -90,7 +90,7 @@ interface AppActions {
   getTaskDelays: (taskId: string) => TaskDelay[];
   
   // Supplier Actions
-  addSupplier: (supplier: Supplier) => void;
+  addSupplier: (supplier: CreateSupplierData) => Promise<void>;
   updateSupplier: (id: string, updates: Partial<Supplier>) => void;
   removeSupplier: (id: string) => void;
   
@@ -1041,7 +1041,7 @@ This update has been recorded in the system.`,
             supplierService.getProjectDeliveries(projectId),
             SupabaseService.getTaskChangeProposals(projectId),
             SupabaseService.getProjectQAAlerts(projectId),
-            supplierService.getSuppliers()
+            supplierService.getProjectSuppliers(projectId)
           ]);
 
           // Update store with fetched data
@@ -1609,7 +1609,7 @@ You can view the task details in your dashboard.`,
         try {
           const result = await emailService.sendDeliveryConfirmation(
             delivery,
-            { ...supplier, email: supplier.email || `${supplier.contact_person}@${supplier.company}.com` } as any,
+            { ...supplier, email: supplier.email || `${supplier.name.toLowerCase().replace(/\s+/g, '.')}@${supplier.company}.com` } as any,
             task,
             currentProject,
             currentUser,

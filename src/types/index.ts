@@ -114,6 +114,7 @@ export interface Project {
 
 export interface Supplier {
   id: string;
+  project_id: string;
   name: string;
   company?: string;
   email: string;
