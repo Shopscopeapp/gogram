@@ -285,15 +285,24 @@ export default function ProjectDashboard({ currentUser, onProjectSelect, onLogou
                 console.error('Error fetching user role for project:', project.id, error);
               }
 
+              // If no role found in project_members, check if user is the project creator
+              let userRole = memberData?.role;
+              
+              if (!userRole) {
+                console.warn(`No role found for user ${currentUser.id} in project ${project.id}, checking if they're the creator`);
+                // Only default to project_manager if they're the actual creator
+                userRole = project.project_manager_id === currentUser.id ? 'project_manager' : 'viewer';
+              }
+
               return {
                 ...project,
-                userRole: memberData?.role || 'project_manager' // Default to project_manager if no role found
+                userRole
               } as ProjectWithRole;
             } catch (error) {
               console.error('Error processing project role:', error);
               return {
                 ...project,
-                userRole: 'project_manager'
+                userRole: project.project_manager_id === currentUser.id ? 'project_manager' : 'viewer'
               } as ProjectWithRole;
             }
           })

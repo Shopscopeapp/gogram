@@ -333,6 +333,7 @@ export const useAppStore = create<AppStore>()(
               };
               
               console.log('🔥 INSERTING PROJECT MEMBER DATA:', memberInsertData);
+              console.log('🔥 ROLE BEING ASSIGNED:', user.role);
               
               const { data: insertedMember, error: memberError } = await supabase
                 .from('project_members')
