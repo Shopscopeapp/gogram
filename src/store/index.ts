@@ -453,7 +453,7 @@ ${roleInfo.description}
 ${roleInfo.permissions.map(perm => perm).join('\n')}
 
 🚀 NEXT STEPS:
-1. Create your account: ${import.meta.env.NEXT_PUBLIC_APP_URL || 'https://gogram.co'}/invite?token=${btoa(JSON.stringify({
+Click this link to join the project: ${import.meta.env.NEXT_PUBLIC_APP_URL || 'https://gogram.co'}/invite?token=${btoa(JSON.stringify({
   email: user.email,
   role: user.role,
   projectId: currentProject.id,
@@ -461,8 +461,12 @@ ${roleInfo.permissions.map(perm => perm).join('\n')}
   invitedBy: currentUser.full_name,
   expires: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
 }))}
-2. Complete the signup process - your role and project access are already configured
-3. Save this email for reference - it contains your role permissions
+
+📝 WHAT HAPPENS NEXT:
+• If you already have a Gogram account: You'll be automatically added to the project
+• If you're new to Gogram: You'll be guided through a quick signup process
+• Your role and permissions are already configured for this project
+• Save this email for reference - it contains your role permissions
 
 📧 NEED HELP?
 Reply to this email or contact the project manager directly.

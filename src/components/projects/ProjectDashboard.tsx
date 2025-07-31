@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Plus, Building2, Calendar, Users, MapPin, DollarSign, Settings, LogOut, Loader, Search, Trash2 } from 'lucide-react';
 import { projectService, type CreateProjectData } from '../../services/projectService';
 import { authService } from '../../services/authService';
+import { supabase } from '../../lib/supabase';
 import type { Project, User } from '../../types';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -245,13 +246,17 @@ function CreateProjectModal({ isOpen, onClose, onSuccess }: CreateProjectModalPr
   );
 }
 
+interface ProjectWithRole extends Project {
+  userRole?: string;
+}
+
 export default function ProjectDashboard({ currentUser, onProjectSelect, onLogout }: ProjectDashboardProps) {
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<ProjectWithRole[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [projectToDelete, setProjectToDelete] = useState<ProjectWithRole | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -264,7 +269,37 @@ export default function ProjectDashboard({ currentUser, onProjectSelect, onLogou
     try {
       const result = await projectService.getUserProjects(currentUser.id);
       if (result.success && result.projects) {
-        setProjects(result.projects);
+        // Get user roles for each project
+        const projectsWithRoles = await Promise.all(
+          result.projects.map(async (project) => {
+            try {
+              // Get user's role in this project from project_members table
+              const { data: memberData, error } = await supabase
+                .from('project_members')
+                .select('role')
+                .eq('project_id', project.id)
+                .eq('user_id', currentUser.id)
+                .single();
+
+              if (error && error.code !== 'PGRST116') {
+                console.error('Error fetching user role for project:', project.id, error);
+              }
+
+              return {
+                ...project,
+                userRole: memberData?.role || 'project_manager' // Default to project_manager if no role found
+              } as ProjectWithRole;
+            } catch (error) {
+              console.error('Error processing project role:', error);
+              return {
+                ...project,
+                userRole: 'project_manager'
+              } as ProjectWithRole;
+            }
+          })
+        );
+
+        setProjects(projectsWithRoles);
       } else {
         toast.error(result.error || 'Failed to load projects');
       }
@@ -277,7 +312,33 @@ export default function ProjectDashboard({ currentUser, onProjectSelect, onLogou
   };
 
   const handleProjectCreated = (newProject: Project) => {
-    setProjects(prev => [newProject, ...prev]);
+    // Add the new project with default role
+    const projectWithRole: ProjectWithRole = {
+      ...newProject,
+      userRole: 'project_manager' // Creator is always project manager
+    };
+    setProjects(prev => [projectWithRole, ...prev]);
+  };
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case 'project_manager':
+        return 'bg-purple-100 text-purple-800';
+      case 'project_coordinator':
+        return 'bg-blue-100 text-blue-800';
+      case 'subcontractor':
+        return 'bg-green-100 text-green-800';
+      case 'supplier':
+        return 'bg-orange-100 text-orange-800';
+      case 'viewer':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getRoleDisplayName = (role: string) => {
+    return role.replace('_', ' ').toUpperCase();
   };
 
   const filteredProjects = projects.filter(project => {
@@ -423,10 +484,19 @@ export default function ProjectDashboard({ currentUser, onProjectSelect, onLogou
               >
                 <div className="p-6">
                   <div className="flex items-start justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
-                      {project.name}
-                    </h3>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
+                          {project.name}
+                        </h3>
+                        {project.userRole && (
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getRoleColor(project.userRole)}`}>
+                            {getRoleDisplayName(project.userRole)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2 ml-4">
                       <button
                         onClick={(e) => handleDeleteClick(project, e)}
                         className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"

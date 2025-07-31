@@ -93,55 +93,108 @@ export default function InviteSignupForm({ inviteToken, onSuccess }: InviteSignu
 
       console.log('Auth user created:', authData.user);
 
-      // Create user profile in database
-      const { error: profileError } = await supabase
-        .from('users')
-        .insert([{
-          id: crypto.randomUUID(),
-          auth_user_id: authData.user.id,
-          email: inviteData.email,
-          full_name: formData.full_name,
-          role: inviteData.role,
-          company: formData.company,
-          phone: formData.phone,
-          specialties: [],
-          avatar_url: ''
-        }]);
-
-      if (profileError) {
-        console.error('Profile creation error:', profileError);
-        throw profileError;
-      }
-
-      console.log('User profile created successfully');
-
-      // Get the created user profile
-      const { data: userProfile, error: fetchError } = await supabase
+      // Check if user profile already exists (from previous invitation)
+      const { data: existingProfile, error: checkError } = await supabase
         .from('users')
         .select('*')
-        .eq('auth_user_id', authData.user.id)
+        .eq('email', inviteData.email)
         .single();
 
-      if (fetchError || !userProfile) {
-        console.error('Error fetching user profile:', fetchError);
-        throw new Error('Failed to fetch user profile');
+      let userProfile;
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('Error checking existing profile:', checkError);
+        throw checkError;
       }
 
-      // Add user to project
-      const { error: memberError } = await supabase
+      if (existingProfile) {
+        console.log('User profile already exists, updating with auth_user_id:', existingProfile);
+        
+        // Update existing profile with auth_user_id and form data
+        const { data: updatedProfile, error: updateError } = await supabase
+          .from('users')
+          .update({
+            auth_user_id: authData.user.id,
+            full_name: formData.full_name,
+            company: formData.company,
+            phone: formData.phone
+          })
+          .eq('id', existingProfile.id)
+          .select()
+          .single();
+
+        if (updateError) {
+          console.error('Profile update error:', updateError);
+          throw updateError;
+        }
+
+        userProfile = updatedProfile;
+        console.log('User profile updated successfully');
+      } else {
+        console.log('Creating new user profile');
+        
+        // Create new user profile
+        const { data: newProfile, error: profileError } = await supabase
+          .from('users')
+          .insert([{
+            id: crypto.randomUUID(),
+            auth_user_id: authData.user.id,
+            email: inviteData.email,
+            full_name: formData.full_name,
+            role: inviteData.role,
+            company: formData.company,
+            phone: formData.phone,
+            specialties: [],
+            avatar_url: ''
+          }])
+          .select()
+          .single();
+
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
+          throw profileError;
+        }
+
+        userProfile = newProfile;
+        console.log('User profile created successfully');
+      }
+
+      if (!userProfile) {
+        throw new Error('Failed to get user profile');
+      }
+
+      // Check if user is already a member of the project
+      const { data: existingMember, error: memberCheckError } = await supabase
         .from('project_members')
-        .insert([{
-          project_id: inviteData.projectId,
-          user_id: userProfile.id,
-          role: inviteData.role
-        }]);
+        .select('*')
+        .eq('project_id', inviteData.projectId)
+        .eq('user_id', userProfile.id)
+        .single();
 
-      if (memberError) {
-        console.error('Project member creation error:', memberError);
-        throw memberError;
+      if (memberCheckError && memberCheckError.code !== 'PGRST116') {
+        console.error('Error checking project membership:', memberCheckError);
+        throw memberCheckError;
       }
 
-      console.log('User added to project successfully');
+      if (!existingMember) {
+        // Add user to project
+        const { error: memberError } = await supabase
+          .from('project_members')
+          .insert([{
+            project_id: inviteData.projectId,
+            user_id: userProfile.id,
+            role: inviteData.role
+          }]);
+
+        if (memberError) {
+          console.error('Project member creation error:', memberError);
+          throw memberError;
+        }
+
+        console.log('User added to project successfully');
+      } else {
+        console.log('User is already a member of this project');
+      }
 
       toast.success(`Welcome to ${inviteData.projectName}! Your account has been created.`);
       onSuccess();
