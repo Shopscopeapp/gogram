@@ -1168,6 +1168,37 @@ This update has been recorded in the system.`,
               tasks: [...state.tasks, result.task!]
             }));
 
+            // If task requires materials and has a supplier, create delivery record
+            if (result.task.requires_materials && result.task.primary_supplier_id && result.task.material_delivery_date) {
+              try {
+                const deliveryData = {
+                  project_id: currentProject.id,
+                  task_id: result.task.id,
+                  supplier_id: result.task.primary_supplier_id,
+                  item: 'Materials',
+                  quantity: 1,
+                  unit: 'lot',
+                  planned_date: result.task.material_delivery_date,
+                  delivery_address: currentProject.location || '',
+                  notes: result.task.procurement_notes || 'Materials required for task completion'
+                };
+
+                const deliveryResult = await supplierService.createDelivery(deliveryData);
+                
+                if (deliveryResult.success && deliveryResult.delivery) {
+                  // Add delivery to local state
+                  set(state => ({
+                    deliveries: [...state.deliveries, deliveryResult.delivery!]
+                  }));
+
+                } else {
+                  console.error('❌ Failed to create delivery:', deliveryResult.error);
+                }
+              } catch (error) {
+                console.error('Error creating delivery for task:', error);
+              }
+            }
+
             // Auto-trigger QA checks for new task
             await get().autoTriggerQAChecks(result.task);
 
@@ -1253,6 +1284,78 @@ This update has been recorded in the system.`,
                 t.id === taskId ? result.task! : t
               )
             }));
+
+            // Handle delivery updates when material requirements change
+            if (currentProject && (
+              updates.requires_materials !== undefined ||
+              updates.primary_supplier_id !== undefined ||
+              updates.material_delivery_date !== undefined
+            )) {
+              const existingDelivery = get().deliveries.find(d => d.task_id === taskId);
+              
+              if (result.task.requires_materials && result.task.primary_supplier_id && result.task.material_delivery_date) {
+                // Task now requires materials - create or update delivery
+                if (existingDelivery) {
+                  // Update existing delivery
+                  try {
+                    const deliveryUpdates = {
+                      supplier_id: result.task.primary_supplier_id,
+                      planned_date: result.task.material_delivery_date,
+                      notes: result.task.procurement_notes || 'Materials required for task completion'
+                    };
+                    
+                    const deliveryResult = await supplierService.updateDelivery(existingDelivery.id, deliveryUpdates);
+                    if (deliveryResult.success && deliveryResult.delivery) {
+                      set(state => ({
+                        deliveries: state.deliveries.map(d => 
+                          d.id === existingDelivery.id ? deliveryResult.delivery! : d
+                        )
+                      }));
+                      console.log('Delivery updated for task:', result.task.title);
+                    }
+                  } catch (error) {
+                    console.error('Error updating delivery:', error);
+                  }
+                } else {
+                  // Create new delivery
+                  try {
+                    const deliveryData = {
+                      project_id: currentProject.id,
+                      task_id: result.task.id,
+                      supplier_id: result.task.primary_supplier_id,
+                      item: 'Materials',
+                      quantity: 1,
+                      unit: 'lot',
+                      planned_date: result.task.material_delivery_date,
+                      delivery_address: currentProject.location || '',
+                      notes: result.task.procurement_notes || 'Materials required for task completion'
+                    };
+
+                    const deliveryResult = await supplierService.createDelivery(deliveryData);
+                    if (deliveryResult.success && deliveryResult.delivery) {
+                      set(state => ({
+                        deliveries: [...state.deliveries, deliveryResult.delivery!]
+                      }));
+                      console.log('Delivery created for updated task:', result.task.title);
+                    }
+                  } catch (error) {
+                    console.error('Error creating delivery for updated task:', error);
+                  }
+                }
+              } else if (existingDelivery && !result.task.requires_materials) {
+                // Task no longer requires materials - remove delivery
+                try {
+                  // Note: We don't have a deleteDelivery method in supplierService yet
+                  // For now, just remove from local state
+                  set(state => ({
+                    deliveries: state.deliveries.filter(d => d.id !== existingDelivery.id)
+                  }));
+                  console.log('Delivery removed for task (no longer requires materials):', result.task.title);
+                } catch (error) {
+                  console.error('Error removing delivery:', error);
+                }
+              }
+            }
 
             // Auto-trigger QA checks if status changed
             if (updates.status && updates.status !== previousStatus) {

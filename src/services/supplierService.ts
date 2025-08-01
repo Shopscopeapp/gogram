@@ -18,9 +18,14 @@ export interface UpdateSupplierData extends Partial<CreateSupplierData> {
 }
 
 export interface CreateDeliveryData {
+  project_id: string;
   task_id: string;
   supplier_id: string;
+  item: string;
+  quantity: number;
+  unit: string;
   planned_date: Date;
+  delivery_address?: string;
   notes?: string;
 }
 
@@ -243,10 +248,15 @@ class SupplierService {
       const { data: delivery, error } = await supabase
         .from('deliveries')
         .insert({
+          project_id: deliveryData.project_id,
           task_id: deliveryData.task_id,
           supplier_id: deliveryData.supplier_id,
+          item: deliveryData.item,
+          quantity: deliveryData.quantity,
+          unit: deliveryData.unit,
           planned_date: deliveryData.planned_date.toISOString(),
           confirmation_status: 'pending',
+          delivery_address: deliveryData.delivery_address,
           notes: deliveryData.notes,
         })
         .select()
@@ -259,11 +269,19 @@ class SupplierService {
 
       const formattedDelivery: Delivery = {
         id: delivery.id,
+        project_id: delivery.project_id,
         task_id: delivery.task_id,
         supplier_id: delivery.supplier_id,
+        item: delivery.item,
+        quantity: delivery.quantity,
+        unit: delivery.unit,
         planned_date: new Date(delivery.planned_date),
+        actual_date: delivery.actual_date ? new Date(delivery.actual_date) : undefined,
         confirmation_status: delivery.confirmation_status,
+        delivery_address: delivery.delivery_address,
         notes: delivery.notes,
+        confirmed_by: delivery.confirmed_by,
+        confirmed_at: delivery.confirmed_at ? new Date(delivery.confirmed_at) : undefined,
         created_at: new Date(delivery.created_at),
         updated_at: new Date(delivery.updated_at),
       };
@@ -298,11 +316,19 @@ class SupplierService {
 
       const formattedDeliveries: Delivery[] = deliveries.map(delivery => ({
         id: delivery.id,
+        project_id: delivery.project_id,
         task_id: delivery.task_id,
         supplier_id: delivery.supplier_id,
+        item: delivery.item,
+        quantity: delivery.quantity,
+        unit: delivery.unit,
         planned_date: new Date(delivery.planned_date),
+        actual_date: delivery.actual_date ? new Date(delivery.actual_date) : undefined,
         confirmation_status: delivery.confirmation_status,
+        delivery_address: delivery.delivery_address,
         notes: delivery.notes,
+        confirmed_by: delivery.confirmed_by,
+        confirmed_at: delivery.confirmed_at ? new Date(delivery.confirmed_at) : undefined,
         created_at: new Date(delivery.created_at),
         updated_at: new Date(delivery.updated_at),
       }));
@@ -345,11 +371,19 @@ class SupplierService {
 
       const formattedDelivery: Delivery = {
         id: delivery.id,
+        project_id: delivery.project_id,
         task_id: delivery.task_id,
         supplier_id: delivery.supplier_id,
+        item: delivery.item,
+        quantity: delivery.quantity,
+        unit: delivery.unit,
         planned_date: new Date(delivery.planned_date),
+        actual_date: delivery.actual_date ? new Date(delivery.actual_date) : undefined,
         confirmation_status: delivery.confirmation_status,
+        delivery_address: delivery.delivery_address,
         notes: delivery.notes,
+        confirmed_by: delivery.confirmed_by,
+        confirmed_at: delivery.confirmed_at ? new Date(delivery.confirmed_at) : undefined,
         created_at: new Date(delivery.created_at),
         updated_at: new Date(delivery.updated_at),
       };
@@ -379,11 +413,19 @@ class SupplierService {
 
       const formattedDelivery: Delivery = {
         id: delivery.id,
+        project_id: delivery.project_id,
         task_id: delivery.task_id,
         supplier_id: delivery.supplier_id,
+        item: delivery.item,
+        quantity: delivery.quantity,
+        unit: delivery.unit,
         planned_date: new Date(delivery.planned_date),
+        actual_date: delivery.actual_date ? new Date(delivery.actual_date) : undefined,
         confirmation_status: delivery.confirmation_status,
+        delivery_address: delivery.delivery_address,
         notes: delivery.notes,
+        confirmed_by: delivery.confirmed_by,
+        confirmed_at: delivery.confirmed_at ? new Date(delivery.confirmed_at) : undefined,
         created_at: new Date(delivery.created_at),
         updated_at: new Date(delivery.updated_at),
       };

@@ -190,6 +190,8 @@ export default function AddTaskModal({
       // Add the task first
       onAddTask(taskData);
       
+      // Delivery creation is now handled automatically in the store's addTask method
+      
       // If this is a new task and has ITP requirements, create ITP instances
       if (!isEditMode && formData.itp_requirements.length > 0 && currentProject?.id) {
         // We need to wait for the task to be created to get its ID
@@ -383,12 +385,27 @@ export default function AddTaskModal({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-                <input
-                  type="date"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  value={formData.start_date}
-                  onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                />
+                                  <input
+                    type="date"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    value={formData.start_date}
+                    onChange={(e) => {
+                      const newStartDate = e.target.value;
+                      const updates: Partial<typeof formData> = { start_date: newStartDate };
+                      
+                      // Auto-set material delivery date to start date if materials are required
+                      if (formData.requires_materials && (!formData.material_delivery_date || formData.material_delivery_date < newStartDate)) {
+                        updates.material_delivery_date = newStartDate;
+                      }
+                      
+                      // Ensure end date is not before start date
+                      if (formData.end_date && formData.end_date < newStartDate) {
+                        updates.end_date = newStartDate;
+                      }
+                      
+                      setFormData({ ...formData, ...updates });
+                    }}
+                  />
               </div>
 
               <div>
@@ -397,7 +414,18 @@ export default function AddTaskModal({
                   type="date"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   value={formData.end_date}
-                  onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                  min={formData.start_date} // Can't be before start date
+                  onChange={(e) => {
+                    const newEndDate = e.target.value;
+                    const updates: Partial<typeof formData> = { end_date: newEndDate };
+                    
+                    // Ensure material delivery date is not after end date
+                    if (formData.requires_materials && formData.material_delivery_date && formData.material_delivery_date > newEndDate) {
+                      updates.material_delivery_date = newEndDate;
+                    }
+                    
+                    setFormData({ ...formData, ...updates });
+                  }}
                 />
               </div>
             </div>
@@ -515,15 +543,45 @@ export default function AddTaskModal({
                 id="requires_materials"
                 className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                 checked={formData.requires_materials}
-                onChange={(e) => setFormData({ ...formData, requires_materials: e.target.checked })}
+                onChange={(e) => {
+                  const requiresMaterials = e.target.checked;
+                  const updates: Partial<typeof formData> = { requires_materials: requiresMaterials };
+                  
+                  // Auto-set delivery date when enabling materials
+                  if (requiresMaterials && !formData.material_delivery_date) {
+                    updates.material_delivery_date = formData.start_date;
+                  }
+                  
+                  setFormData({ ...formData, ...updates });
+                }}
               />
               <label htmlFor="requires_materials" className="text-sm font-medium text-gray-700">
                 This task requires materials
+                {isEditMode && initialData?.requires_materials && (
+                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                    📦 Has Delivery
+                  </span>
+                )}
               </label>
             </div>
 
             {formData.requires_materials && (
               <div className="space-y-4 pl-6 border-l-2 border-orange-200">
+                {isEditMode && initialData?.requires_materials && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                    <div className="flex items-center">
+                      <svg className="w-4 h-4 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-sm font-medium text-blue-900">
+                        This task has an existing delivery scheduled
+                      </span>
+                    </div>
+                    <p className="text-xs text-blue-700 mt-1">
+                      Modifying supplier or delivery date will update the existing delivery
+                    </p>
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Primary Supplier</label>
                   <select
@@ -541,13 +599,29 @@ export default function AddTaskModal({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Material Delivery Date</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Material Delivery Date
+                    {formData.material_delivery_date === formData.start_date && (
+                      <span className="ml-2 text-xs text-green-600 font-medium">
+                        ✓ Same as start date
+                      </span>
+                    )}
+                  </label>
                   <input
                     type="date"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                      formData.material_delivery_date === formData.start_date 
+                        ? 'border-green-300 bg-green-50' 
+                        : 'border-gray-300'
+                    }`}
                     value={formData.material_delivery_date}
+                    min={formData.start_date} // Can't be before task start date
+                    max={formData.end_date}   // Can't be after task end date
                     onChange={(e) => setFormData({ ...formData, material_delivery_date: e.target.value })}
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    📅 Delivery must be between task start ({formData.start_date || 'not set'}) and end dates ({formData.end_date || 'not set'})
+                  </p>
                 </div>
 
                 <div>
