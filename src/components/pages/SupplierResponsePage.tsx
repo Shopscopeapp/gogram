@@ -47,6 +47,7 @@ export default function SupplierResponsePage() {
     try {
       // Decode token
       const decoded = JSON.parse(atob(token!)) as ResponseToken;
+      console.log('🔍 Decoded token:', decoded);
       
       // Check if token is expired
       if (Date.now() > decoded.expires) {
@@ -58,8 +59,12 @@ export default function SupplierResponsePage() {
       setTokenData(decoded);
 
       // Load delivery data
+      console.log('🔍 Looking for delivery ID:', decoded.deliveryId);
       const deliveryResult = await supplierService.getDeliveryById(decoded.deliveryId);
+      console.log('🔍 Delivery lookup result:', deliveryResult);
+      
       if (!deliveryResult.success || !deliveryResult.delivery) {
+        console.error('❌ Delivery not found:', deliveryResult.error);
         setError('Delivery not found. Please contact the project manager.');
         setIsLoading(false);
         return;
