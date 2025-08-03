@@ -155,6 +155,12 @@ const EMAIL_TEMPLATES = {
             </p>
           </div>
           
+          <div style="background: #f8fafc; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #64748b;">
+            <p style="color: #475569; font-size: 14px; margin: 0;">
+              💬 <strong>Need to discuss this change?</strong> Simply reply to this email - the project manager is CC'd and will receive your response immediately.
+            </p>
+          </div>
+          
           <p style="color: #64748b; font-size: 14px; border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 30px;">
             If you have any questions about this change, please contact us immediately.<br><br>
             Best regards,<br>
@@ -289,6 +295,7 @@ interface EmailData {
   html: string;
   from?: string;
   replyTo?: string;
+  cc?: string; // Optional CC recipient
 }
 
 interface EmailTemplate {
@@ -420,7 +427,8 @@ class EmailService {
           to: emailData.to,
           subject: emailData.subject,
           html: emailData.html,
-          from: emailData.from || this.FROM_EMAIL
+          from: emailData.from || this.FROM_EMAIL,
+          ...(emailData.cc && { cc: emailData.cc }) // Include CC if provided
         })
       });
 
@@ -621,6 +629,7 @@ class EmailService {
 
     return await this.sendEmail({
       to: supplier.email,
+      cc: sender.email, // CC the project manager so they're included in the thread
       subject: compiled.subject,
       html: compiled.html,
       replyTo: sender.email

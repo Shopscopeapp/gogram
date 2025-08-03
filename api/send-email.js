@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { to, subject, html, from } = req.body;
+    const { to, subject, html, from, cc } = req.body;
 
     // Validate required fields
     if (!to || !subject || !html) {
@@ -32,7 +32,8 @@ export default async function handler(req, res) {
         from: from || 'notifications@gogram.co',
         to: [to],
         subject: subject,
-        html: html
+        html: html,
+        ...(cc && { cc: [cc] }) // Include CC if provided
       })
     });
 

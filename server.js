@@ -23,7 +23,7 @@ app.post('/api/send-email', async (req, res) => {
   console.log('📧 Email API request received:', req.body);
   
   try {
-    const { to, subject, html, from } = req.body;
+    const { to, subject, html, from, cc } = req.body;
 
     // Validate required fields
     if (!to || !subject || !html) {
@@ -55,7 +55,8 @@ app.post('/api/send-email', async (req, res) => {
          from: from || 'notifications@gogram.co',
          to: [to],
          subject: subject,
-         html: html
+         html: html,
+         ...(cc && { cc: [cc] }) // Include CC if provided
        })
     });
 
