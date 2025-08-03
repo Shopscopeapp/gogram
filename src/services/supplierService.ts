@@ -400,18 +400,14 @@ class SupplierService {
    */
   async getDeliveryById(deliveryId: string): Promise<{ success: boolean; delivery?: Delivery; error?: string }> {
     try {
-      console.log('🔍 SupplierService.getDeliveryById called with ID:', deliveryId);
-      
       const { data: delivery, error } = await supabase
         .from('deliveries')
         .select('*')
         .eq('id', deliveryId)
         .single();
 
-      console.log('🔍 Database query result:', { delivery, error });
-
       if (error) {
-        console.error('❌ Get delivery error:', error);
+        console.error('Get delivery error:', error);
         return { success: false, error: 'Delivery not found' };
       }
 

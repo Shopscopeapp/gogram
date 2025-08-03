@@ -2,9 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { CheckCircle, XCircle, Calendar, Truck, AlertTriangle, MessageSquare } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
 import emailService from '../../services/emailService';
-import supplierService from '../../services/supplierService';
 import toast from 'react-hot-toast';
 import type { Delivery, Supplier, Task, Project, User } from '../../types';
 
@@ -45,107 +43,66 @@ export default function SupplierResponsePage() {
 
   const loadResponseData = async () => {
     try {
-      // Decode token
-      const decoded = JSON.parse(atob(token!)) as ResponseToken;
-      console.log('🔍 Decoded token:', decoded);
+      // Call the public API endpoint that bypasses RLS
+      const apiUrl = import.meta.env.DEV 
+        ? `http://localhost:3000/api/supplier-response?token=${encodeURIComponent(token!)}`
+        : `/api/supplier-response?token=${encodeURIComponent(token!)}`;
+        
+      const response = await fetch(apiUrl);
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        console.error('API error:', result.error);
+        setError(result.error || 'Failed to load response data.');
+        setIsLoading(false);
+        return;
+      }
+
+      const { delivery, supplier, project, task, tokenData } = result.data;
       
-      // Check if token is expired
-      if (Date.now() > decoded.expires) {
-        setError('This response link has expired. Please contact the project manager for a new link.');
-        setIsLoading(false);
-        return;
-      }
-
-      setTokenData(decoded);
-
-      // Load delivery data
-      console.log('🔍 Looking for delivery ID:', decoded.deliveryId);
-      const deliveryResult = await supplierService.getDeliveryById(decoded.deliveryId);
-      console.log('🔍 Delivery lookup result:', deliveryResult);
-      
-      if (!deliveryResult.success || !deliveryResult.delivery) {
-        console.error('❌ Delivery not found:', deliveryResult.error);
-        setError('Delivery not found. Please contact the project manager.');
-        setIsLoading(false);
-        return;
-      }
-      setDelivery(deliveryResult.delivery);
-
-      // Load supplier data
-      const { data: supplierData, error: supplierError } = await supabase
-        .from('suppliers')
-        .select('*')
-        .eq('id', decoded.supplierId)
-        .single();
-
-      if (supplierError || !supplierData) {
-        setError('Supplier information not found.');
-        setIsLoading(false);
-        return;
-      }
-      setSupplier(supplierData);
-
-      // Load task data
-      const { data: taskData, error: taskError } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('id', deliveryResult.delivery.task_id)
-        .single();
-
-      if (taskError || !taskData) {
-        setError('Task information not found.');
-        setIsLoading(false);
-        return;
-      }
-      setTask({
-        ...taskData,
-        start_date: new Date(taskData.start_date),
-        end_date: new Date(taskData.end_date),
-        created_at: new Date(taskData.created_at),
-        updated_at: new Date(taskData.updated_at)
+      // Set all the data
+      setTokenData(tokenData);
+      setDelivery({
+        id: delivery.id,
+        project_id: delivery.project_id,
+        task_id: delivery.task_id,
+        supplier_id: delivery.supplier_id,
+        item: delivery.item,
+        quantity: delivery.quantity,
+        unit: delivery.unit,
+        planned_date: new Date(delivery.planned_date),
+        actual_date: delivery.actual_date ? new Date(delivery.actual_date) : undefined,
+        confirmation_status: delivery.confirmation_status,
+        delivery_address: delivery.delivery_address,
+        notes: delivery.notes,
+        confirmed_by: delivery.confirmed_by,
+        confirmed_at: delivery.confirmed_at ? new Date(delivery.confirmed_at) : undefined,
+        created_at: new Date(delivery.created_at),
+        updated_at: new Date(delivery.updated_at),
       });
-
-      // Load project data
-      const { data: projectData, error: projectError } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('id', decoded.projectId)
-        .single();
-
-      if (projectError || !projectData) {
-        setError('Project information not found.');
-        setIsLoading(false);
-        return;
-      }
+      setSupplier(supplier);
       setProject({
-        ...projectData,
-        start_date: new Date(projectData.start_date),
-        end_date: new Date(projectData.end_date),
-        created_at: new Date(projectData.created_at),
-        updated_at: new Date(projectData.updated_at)
+        ...project,
+        start_date: new Date(project.start_date),
+        end_date: new Date(project.end_date),
+        created_at: new Date(project.created_at),
+        updated_at: new Date(project.updated_at)
       });
-
-      // Load project manager data
-      const { data: managerData, error: managerError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', projectData.project_manager_id)
-        .single();
-
-      if (managerError || !managerData) {
-        console.warn('Project manager not found, continuing without manager data');
-      } else {
-        setProjectManager({
-          ...managerData,
-          created_at: new Date(managerData.created_at),
-          updated_at: new Date(managerData.updated_at)
+      
+      if (task) {
+        setTask({
+          ...task,
+          start_date: new Date(task.start_date),
+          end_date: new Date(task.end_date),
+          created_at: new Date(task.created_at),
+          updated_at: new Date(task.updated_at)
         });
       }
 
       setIsLoading(false);
     } catch (error) {
       console.error('Error loading response data:', error);
-      setError('Failed to load delivery information. Please try again.');
+      setError('An error occurred while loading the response data.');
       setIsLoading(false);
     }
   };
@@ -159,41 +116,31 @@ export default function SupplierResponsePage() {
     setIsSubmitting(true);
 
     try {
-      const responseData = {
-        delivery_id: delivery.id,
-        supplier_id: supplier.id,
-        response: action,
-        comments: comments.trim() || null,
-        alternative_date: action === 'deny' && alternativeDate ? new Date(alternativeDate) : null,
-        responded_at: new Date()
-      };
+      // Call the API endpoint to record the response
+      const apiUrl = import.meta.env.DEV 
+        ? 'http://localhost:3000/api/supplier-response'
+        : '/api/supplier-response';
+        
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          token: token,
+          action: action,
+          comments: comments.trim() || null,
+          alternativeDate: action === 'deny' && alternativeDate ? alternativeDate : null
+        })
+      });
 
-      // Save response to database
-      const { error: responseError } = await supabase
-        .from('delivery_responses')
-        .insert([responseData]);
+      const result = await response.json();
 
-      if (responseError) {
-        console.error('Error saving response:', responseError);
+      if (!response.ok || !result.success) {
+        console.error('Error saving response:', result.error);
         toast.error('Failed to save response. Please try again.');
         setIsSubmitting(false);
         return;
-      }
-
-      // Update delivery status if confirmed
-      if (action === 'confirm') {
-        const { error: updateError } = await supabase
-          .from('deliveries')
-          .update({ 
-            confirmation_status: 'confirmed',
-            confirmed_by: supplier.name,
-            confirmed_at: new Date()
-          })
-          .eq('id', delivery.id);
-
-        if (updateError) {
-          console.error('Error updating delivery status:', updateError);
-        }
       }
 
       // Send notification to project manager
