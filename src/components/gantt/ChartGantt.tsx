@@ -53,8 +53,49 @@ export default function ChartGantt({
 
   // Transform tasks into Chart.js format
   const chartData = useMemo((): ChartData<'bar', GanttDataPoint[], string> => {
+    // Filter and validate tasks first
+    const validTasks = tasks.filter(task => {
+      // Ensure task has valid dates
+      const startDate = new Date(task.start_date);
+      const endDate = new Date(task.end_date);
+      
+      // Check if dates are valid
+      const isStartValid = !isNaN(startDate.getTime()) && startDate.getTime() > 0;
+      const isEndValid = !isNaN(endDate.getTime()) && endDate.getTime() > 0;
+      
+      if (!isStartValid || !isEndValid) {
+        console.warn('Invalid task dates found:', {
+          taskId: task.id,
+          title: task.title,
+          start_date: task.start_date,
+          end_date: task.end_date,
+          startValid: isStartValid,
+          endValid: isEndValid
+        });
+        return false;
+      }
+      
+      // Ensure end date is after start date
+      if (endDate <= startDate) {
+        console.warn('Task end date is before or equal to start date:', {
+          taskId: task.id,
+          title: task.title,
+          start_date: task.start_date,
+          end_date: task.end_date
+        });
+        return false;
+      }
+      
+      return true;
+    });
+
+    if (validTasks.length === 0) {
+      console.warn('No valid tasks found for Gantt chart');
+      return { labels: [], datasets: [] };
+    }
+
     // Group tasks by category for better organization
-    const tasksByCategory = tasks.reduce((acc, task) => {
+    const tasksByCategory = validTasks.reduce((acc, task) => {
       const category = task.category || 'Uncategorized';
       if (!acc[category]) acc[category] = [];
       acc[category].push(task);
@@ -124,7 +165,7 @@ export default function ChartGantt({
     });
 
     // Create labels from all unique task names
-    const labels = tasks.map(task => task.title);
+    const labels = validTasks.map(task => task.title);
 
     return {
       labels,
@@ -267,6 +308,39 @@ export default function ChartGantt({
     }
   }), [chartData, onTaskClick]);
 
+  // Show fallback if no valid tasks
+  if (chartData.datasets.length === 0) {
+    return (
+      <div className="w-full bg-white rounded-lg border border-gray-200 shadow-sm">
+        <div className="p-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">Project Gantt Chart</h3>
+        </div>
+        <div className="p-8 text-center" style={{ height: height }}>
+          <div className="flex flex-col items-center justify-center h-full">
+            <div className="text-gray-400 mb-4">
+              <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <h4 className="text-lg font-medium text-gray-900 mb-2">No Valid Tasks Found</h4>
+            <p className="text-gray-600 mb-4">
+              {tasks.length > 0 
+                ? "Tasks have invalid dates and cannot be displayed on the timeline."
+                : "No tasks have been created yet."
+              }
+            </p>
+            <p className="text-sm text-gray-500">
+              {tasks.length > 0 
+                ? "Please check the console for details about invalid task dates."
+                : "Add some tasks to see them on the Gantt chart."
+              }
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full bg-white rounded-lg border border-gray-200 shadow-sm">
       <div className="p-4 border-b border-gray-200">
@@ -303,7 +377,7 @@ export default function ChartGantt({
       
       <div className="px-4 pb-4">
         <div className="text-xs text-gray-500 text-center">
-          Click on any task bar to view details • Scroll to zoom • {tasks.length} tasks displayed
+          Click on any task bar to view details • Scroll to zoom • {chartData.labels.length} tasks displayed
         </div>
       </div>
     </div>
