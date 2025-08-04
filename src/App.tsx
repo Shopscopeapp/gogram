@@ -118,14 +118,36 @@ function AppContent() {
       authTimeout = setTimeout(async () => {
         if (user) {
           console.log('Auth state changed: user logged in', user.email);
-          setAppData(prev => ({ ...prev, user }));
           
-          // If we don't have a project selected, stay authenticated but show project selection
-          if (!appData.project) {
-            setAppState('authenticated');
-          } else {
+          // Check for persisted project before making state decisions
+          const persistedProjectData = localStorage.getItem('buildflow_current_project');
+          let persistedProject = null;
+          
+          if (persistedProjectData) {
+            try {
+              persistedProject = JSON.parse(persistedProjectData);
+              console.log('Auth state change: Found persisted project:', persistedProject.name);
+            } catch (e) {
+              console.warn('Auth state change: Failed to parse persisted project data:', e);
+              localStorage.removeItem('buildflow_current_project');
+            }
+          }
+          
+          setAppData(prev => ({ 
+            ...prev, 
+            user,
+            project: persistedProject || prev.project 
+          }));
+          
+          // If we have a persisted project or existing project, initialize with it
+          if (persistedProject) {
+            await initializeWithProject(user, persistedProject);
+          } else if (appData.project) {
             // If we have both user and project, initialize data
             await initializeWithProject(user, appData.project);
+          } else {
+            // No project selected, stay authenticated but show project selection
+            setAppState('authenticated');
           }
         } else {
           console.log('Auth state changed: user logged out');
