@@ -442,6 +442,17 @@ class SupplierService {
    */
   async getProjectDeliveryResponses(projectId: string): Promise<{ success: boolean; responses?: DeliveryResponse[]; error?: string }> {
     try {
+      console.log('🔍 Fetching delivery responses for project:', projectId);
+      
+      // First, let's try a simpler query to see if we get any responses at all
+      const { data: allResponses, error: allError } = await supabase
+        .from('delivery_responses')
+        .select('*')
+        .order('responded_at', { ascending: false });
+
+      console.log('🔍 All delivery responses in DB:', allResponses?.length || 0, allResponses);
+
+      // Now try the complex query
       const { data: responses, error } = await supabase
         .from('delivery_responses')
         .select(`
@@ -450,24 +461,26 @@ class SupplierService {
             project_id,
             item,
             planned_date,
-            tasks!inner (
-              title,
-              project_id
+            task_id,
+            tasks (
+              title
             )
           ),
-          suppliers!inner (
+          suppliers (
             company_name,
             contact_name,
             email
           )
         `)
-        .eq('deliveries.tasks.project_id', projectId)
+        .eq('deliveries.project_id', projectId)
         .order('responded_at', { ascending: false });
 
       if (error) {
         console.error('Get delivery responses error:', error);
         return { success: false, error: 'Failed to fetch delivery responses' };
       }
+
+      console.log('🔍 Filtered delivery responses from DB:', responses?.length || 0, responses);
 
       const formattedResponses: DeliveryResponse[] = responses.map(response => ({
         id: response.id,
@@ -480,14 +493,14 @@ class SupplierService {
         created_at: new Date(response.created_at),
         updated_at: new Date(response.updated_at),
         delivery: {
-          item: response.deliveries.item,
-          planned_date: new Date(response.deliveries.planned_date),
-          task_title: response.deliveries.tasks.title
+          item: response.deliveries?.item || 'Unknown Item',
+          planned_date: response.deliveries?.planned_date ? new Date(response.deliveries.planned_date) : new Date(),
+          task_title: response.deliveries?.tasks?.title || 'Unknown Task'
         },
         supplier: {
-          company_name: response.suppliers.company_name,
-          contact_name: response.suppliers.contact_name,
-          email: response.suppliers.email
+          company_name: response.suppliers?.company_name || 'Unknown Company',
+          contact_name: response.suppliers?.contact_name || 'Unknown Contact',
+          email: response.suppliers?.email || 'Unknown Email'
         }
       }));
 

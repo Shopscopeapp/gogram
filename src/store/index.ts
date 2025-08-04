@@ -1099,7 +1099,11 @@ This update has been recorded in the system.`,
           }
           
           if (deliveryResponsesResult.success && deliveryResponsesResult.responses) {
+            console.log('🔍 Delivery responses loaded:', deliveryResponsesResult.responses.length, deliveryResponsesResult.responses);
             set({ deliveryResponses: deliveryResponsesResult.responses });
+          } else {
+            console.log('❌ Failed to load delivery responses:', deliveryResponsesResult.error);
+            set({ deliveryResponses: [] });
           }
           
           if (taskChangeProposalsData) {
