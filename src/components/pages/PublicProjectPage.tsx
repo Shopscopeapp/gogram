@@ -40,6 +40,11 @@ interface PublicTask {
   progress_percentage: number;
   color: string;
   dependencies: string[];
+  // Required Task properties for GanttChart compatibility
+  project_id: string;
+  planned_duration: number;
+  created_at: Date;
+  updated_at: Date;
 }
 
 export default function PublicProjectPage() {
@@ -61,84 +66,55 @@ export default function PublicProjectPage() {
       setLoading(true);
       setError(null);
 
-      // Validate token
-      const isValid = publicSharingService.validateShareToken(token);
-      if (!isValid) {
-        setError('Invalid or expired share link');
+      // Call the public API endpoint that bypasses RLS
+      const apiUrl = import.meta.env.DEV 
+        ? `http://localhost:3000/api/public-project?shareToken=${encodeURIComponent(token)}`
+        : `/api/public-project?shareToken=${encodeURIComponent(token)}`;
+        
+      const response = await fetch(apiUrl);
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        console.error('API error:', result.error);
+        setError(result.error || 'Failed to load project data');
         return;
       }
 
-      // In a real app, this would fetch from API
-      // For now, we'll simulate the data
-      const mockProject: PublicProject = {
-        id: 'project-1',
-        name: 'Downtown Office Complex',
-        description: 'Modern 12-story office building with underground parking',
-        start_date: new Date('2024-01-15'),
-        end_date: new Date('2024-12-20'),
-        status: 'active',
-        progress_percentage: 65,
-        location: '123 Business District, Downtown',
-        client: 'Metropolitan Development Corp'
+      const { project: projectData, tasks: tasksData } = result.data;
+      
+      const publicProject: PublicProject = {
+        id: projectData.id,
+        name: projectData.name,
+        description: projectData.description || '',
+        start_date: new Date(projectData.start_date),
+        end_date: new Date(projectData.end_date),
+        status: projectData.status,
+        progress_percentage: projectData.progress_percentage || 0,
+        location: projectData.location || '',
+        client: projectData.client || ''
       };
 
-      const mockTasks: PublicTask[] = [
-        {
-          id: 'task-1',
-          title: 'Site Preparation',
-          description: 'Clear site and prepare foundation',
-          category: 'Site Work',
-          status: 'completed',
-          priority: 'high',
-          start_date: new Date('2024-01-15'),
-          end_date: new Date('2024-02-15'),
-          progress_percentage: 100,
-          color: '#10b981',
-          dependencies: []
-        },
-        {
-          id: 'task-2',
-          title: 'Foundation Pour',
-          description: 'Pour concrete foundation and basement',
-          category: 'Concrete',
-          status: 'completed',
-          priority: 'critical',
-          start_date: new Date('2024-02-16'),
-          end_date: new Date('2024-03-30'),
-          progress_percentage: 100,
-          color: '#3b82f6',
-          dependencies: ['task-1']
-        },
-        {
-          id: 'task-3',
-          title: 'Steel Frame Construction',
-          description: 'Install structural steel framework',
-          category: 'Steel',
-          status: 'in_progress',
-          priority: 'critical',
-          start_date: new Date('2024-04-01'),
-          end_date: new Date('2024-07-15'),
-          progress_percentage: 80,
-          color: '#f59e0b',
-          dependencies: ['task-2']
-        },
-        {
-          id: 'task-4',
-          title: 'Electrical Rough-In',
-          description: 'Install electrical systems and wiring',
-          category: 'Electrical',
-          status: 'pending',
-          priority: 'medium',
-          start_date: new Date('2024-06-01'),
-          end_date: new Date('2024-08-30'),
-          progress_percentage: 0,
-          color: '#8b5cf6',
-          dependencies: ['task-3']
-        }
-      ];
+      const publicTasks: PublicTask[] = tasksData.map((task: any) => ({
+        id: task.id,
+        title: task.title,
+        description: task.description || '',
+        category: task.category,
+        status: task.status,
+        priority: task.priority,
+        start_date: new Date(task.start_date),
+        end_date: new Date(task.end_date),
+        progress_percentage: task.progress_percentage || 0,
+        color: task.color || '#3b82f6',
+        dependencies: task.dependencies || [],
+        // Add required Task properties for GanttChart compatibility
+        project_id: projectData.id,
+        planned_duration: Math.ceil((new Date(task.end_date).getTime() - new Date(task.start_date).getTime()) / (1000 * 60 * 60 * 24)),
+        created_at: new Date(task.start_date),
+        updated_at: new Date()
+      }));
 
-      setProject(mockProject);
-      setTasks(mockTasks);
+      setProject(publicProject);
+      setTasks(publicTasks);
     } catch (err) {
       setError('Failed to load project data');
       console.error('Error loading public project:', err);

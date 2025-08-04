@@ -1041,7 +1041,7 @@ This update has been recorded in the system.`,
       generatePublicShareLink: (projectId) => {
         const baseUrl = window.location.origin;
         const shareToken = btoa(projectId + Date.now().toString());
-        return `${baseUrl}/public/${shareToken}`;
+        return `${baseUrl}/public/project/${shareToken}`;
       },
       
               exportDelayRegister: (format) => {

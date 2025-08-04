@@ -19,6 +19,7 @@ import {
 import { useAppStore } from '../../store';
 import { format, parseISO } from 'date-fns';
 import publicSharingService, { type PublicShareSettings } from '../../services/publicSharingService';
+import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 
 // Safe date formatting helper
@@ -284,43 +285,80 @@ export default function SharePage() {
     );
   }
 
-  const handleCreateShare = () => {
+  const handleCreateShare = async () => {
     if (!currentUser || !currentProject) return;
 
-    const expiresAt = newShareSettings.expirationDays > 0 
-      ? new Date(Date.now() + newShareSettings.expirationDays * 24 * 60 * 60 * 1000)
-      : undefined;
+    try {
+      const expiresAt = newShareSettings.expirationDays > 0 
+        ? new Date(Date.now() + newShareSettings.expirationDays * 24 * 60 * 60 * 1000)
+        : null;
 
-    const newShare = publicSharingService.generatePublicShare(
-      currentProject,
-      currentUser.id,
-      {
+      // Generate a secure share token
+      const shareToken = btoa(currentProject.id + '-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9));
+
+      const shareSettings = {
         showTaskDetails: newShareSettings.showTaskDetails,
         showTeamMembers: newShareSettings.showTeamMembers,
         showProgress: newShareSettings.showProgress,
         showMilestones: newShareSettings.showMilestones,
-        showDelays: newShareSettings.showDelays
+        showDelays: newShareSettings.showDelays,
+        hideProcurement: true,
+        hideFinancials: true,
+        hideInternalNotes: true,
+        allowedSections: ['overview', 'schedule', 'progress', 'milestones']
+      };
+
+      // Save to database
+      const { data, error } = await supabase
+        .from('public_shares')
+        .insert({
+          project_id: currentProject.id,
+          share_token: shareToken,
+          created_by: currentUser.id,
+          expires_at: expiresAt,
+          is_active: true,
+          settings: shareSettings
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating share link:', error);
+        toast.error('Failed to create share link. Please try again.');
+        return;
       }
-    );
 
-    if (expiresAt) {
-      newShare.expiresAt = expiresAt;
+      // Create the share object for local state
+      const newShare = {
+        id: data.id,
+        projectId: currentProject.id,
+        shareToken: shareToken,
+        createdBy: currentUser.id,
+        createdAt: new Date(data.created_at),
+        expiresAt: expiresAt || undefined,
+        isActive: true,
+        settings: shareSettings,
+        accessLog: []
+      };
+
+      setPublicShares(prev => [newShare, ...prev]);
+      setShowCreateForm(false);
+      
+      // Reset form
+      setNewShareSettings({
+        showTaskDetails: true,
+        showTeamMembers: false,
+        showProgress: true,
+        showMilestones: true,
+        showDelays: false,
+        expirationDays: 0
+      });
+
+      toast.success('Public share link created successfully!');
+    } catch (error) {
+      console.error('Error creating share link:', error);
+      toast.error('Failed to create share link. Please try again.');
     }
-
-    setPublicShares(prev => [newShare, ...prev]);
-    setShowCreateForm(false);
-    
-    // Reset form
-    setNewShareSettings({
-      showTaskDetails: true,
-      showTeamMembers: false,
-      showProgress: true,
-      showMilestones: true,
-      showDelays: false,
-      expirationDays: 0
-    });
-
-    toast.success('Public share link created successfully!');
   };
 
   const handleToggleStatus = (id: string, isActive: boolean) => {
