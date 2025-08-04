@@ -467,8 +467,8 @@ class SupplierService {
             )
           ),
           suppliers (
-            company_name,
-            contact_name,
+            name,
+            company,
             email
           )
         `)
@@ -498,8 +498,8 @@ class SupplierService {
           task_title: response.deliveries?.tasks?.title || 'Unknown Task'
         },
         supplier: {
-          company_name: response.suppliers?.company_name || 'Unknown Company',
-          contact_name: response.suppliers?.contact_name || 'Unknown Contact',
+          company_name: response.suppliers?.company || 'Unknown Company',
+          contact_name: response.suppliers?.name || 'Unknown Contact',
           email: response.suppliers?.email || 'Unknown Email'
         }
       }));
