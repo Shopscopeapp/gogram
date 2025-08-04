@@ -97,6 +97,7 @@ export default function Sidebar() {
     sidebarOpen,
     setSidebarOpen,
     currentUser,
+    currentProject,
     taskChangeProposals,
     dashboardStats,
     qaAlerts
@@ -106,6 +107,57 @@ export default function Sidebar() {
 
   // Always show sidebar for debugging
   // if (!currentUser) return null;
+
+  // Helper function to get project status display
+  const getProjectStatusDisplay = () => {
+    if (!currentProject) {
+      return {
+        status: 'No Project',
+        timeframe: 'Select a project to continue',
+        color: 'gray'
+      };
+    }
+
+    const endDate = new Date(currentProject.end_date);
+    const now = new Date();
+    const isOverdue = endDate < now && currentProject.status !== 'completed';
+    
+    // Format the end date
+    const timeframe = isOverdue 
+      ? `Overdue since ${endDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`
+      : `Target: ${endDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
+
+    let status = '';
+    let color = 'success';
+
+    switch (currentProject.status) {
+      case 'active':
+        status = isOverdue ? 'Behind Schedule' : 'Project Active';
+        color = isOverdue ? 'red' : 'success';
+        break;
+      case 'planning':
+        status = 'In Planning';
+        color = 'blue';
+        break;
+      case 'on_hold':
+        status = 'On Hold';
+        color = 'yellow';
+        break;
+      case 'completed':
+        status = 'Completed';
+        color = 'green';
+        break;
+      case 'cancelled':
+        status = 'Cancelled';
+        color = 'red';
+        break;
+      default:
+        status = 'Unknown Status';
+        color = 'gray';
+    }
+
+    return { status, timeframe, color };
+  };
 
   const getNavItemCount = (item: NavItem): number | undefined => {
     if (!currentUser) return undefined;
@@ -230,15 +282,20 @@ export default function Sidebar() {
 
           {/* Project Status */}
           <div className="p-4 border-t border-gray-200">
-            <div className="bg-success-50 rounded-xl p-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 bg-success-500 rounded-full animate-pulse"></div>
-                <div>
-                  <p className="font-medium text-success-900">Project Active</p>
-                  <p className="text-sm text-success-700">On track for Aug 2024</p>
+            {(() => {
+              const { status, timeframe, color } = getProjectStatusDisplay();
+              return (
+                <div className={`bg-${color}-50 rounded-xl p-4`}>
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-3 h-3 bg-${color}-500 rounded-full ${color === 'success' || color === 'blue' ? 'animate-pulse' : ''}`}></div>
+                    <div>
+                      <p className={`font-medium text-${color}-900`}>{status}</p>
+                      <p className={`text-sm text-${color}-700`}>{timeframe}</p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              );
+            })()}
           </div>
 
                      {/* User Role Badge */}
