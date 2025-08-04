@@ -640,7 +640,7 @@ export default function CustomGanttChart({
       isExpanded: true,
       isCritical: task.priority === 'critical' || task.title?.toLowerCase().includes('critical'),
           resourceNames: task.resource_names || [],
-      actualProgress: task.progress_percentage || 0,
+                actualProgress: Math.min(100, Math.max(0, task.progress_percentage || 0)),
           predecessors: task.predecessors || task.dependencies || [],
           successors: task.successors || [],
           floatDays: task.float_days || 0,
@@ -1025,7 +1025,7 @@ export default function CustomGanttChart({
               </span>
               <span className="flex items-center">
                 <Clock className="w-3 h-3 mr-1" />
-                {task.progress_percentage || 0}%
+                {Math.min(100, Math.max(0, task.progress_percentage || 0))}%
               </span>
               {task.criticalPath && (
                 <span className="flex items-center text-red-600">
@@ -1104,11 +1104,11 @@ export default function CustomGanttChart({
             >
               <div 
                 className="gantt-task-progress"
-                style={{ width: `${task.actualProgress}%` }}
+                style={{ width: `${Math.min(100, Math.max(0, task.actualProgress || 0))}%` }}
               />
               <span className="gantt-task-label">
                 {isMobile ? task.title : (taskWidth > 100 ? task.title : '')}
-                <span className="progress-text">{task.actualProgress}%</span>
+                <span className="progress-text">{Math.min(100, Math.max(0, task.actualProgress || 0))}%</span>
                   {task.criticalPath && (
                     <span className="ml-1 text-xs bg-red-600 text-white px-1 rounded">
                       CP

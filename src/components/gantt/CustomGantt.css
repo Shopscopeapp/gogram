@@ -358,22 +358,24 @@
   }
 }
 
-/* Task Bar Styles */
+/* Task Bar Styles - Enhanced Design */
 .gantt-task-bar {
-  background: #3b82f6;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   color: white;
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 600;
   display: flex;
   align-items: center;
-  justify-content: center;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  justify-content: space-between;
+  padding: 0 8px;
+  box-shadow: 0 2px 4px 0 rgba(59, 130, 246, 0.15), 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   transition: all 0.2s ease;
   user-select: none;
-  border-radius: 6px;
-  border: none;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   position: relative;
   overflow: hidden;
+  cursor: pointer;
 }
 
 .gantt-task-bar::before {
@@ -387,9 +389,9 @@
 }
 
 .gantt-task-bar:hover {
-  transform: translateY(-50%) translateY(-1px);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  background: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px 0 rgba(59, 130, 246, 0.25), 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
 }
 
 .gantt-task-bar.dragging {
@@ -529,83 +531,45 @@
   }
 }
 
-/* Grid Lines - Dynamic system that extends properly */
+/* Grid Lines - Proper infinite grid system */
 @media (min-width: 641px) {
-  /* Vertical Grid Lines - Dynamic extension */
-  .gantt-content::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 350px;
-    width: calc(100vw * 10); /* Large width to ensure extension */
-    height: 100%;
-    background-image: repeating-linear-gradient(
-      to right,
-      transparent 0,
-      transparent 39px,
-      #f3f4f6 39px,
-      #f3f4f6 40px
-    );
-    background-size: 40px 100%;
-    background-repeat: repeat-x;
-    pointer-events: none;
-    z-index: 1;
+  /* Timeline container needs to establish the grid context */
+  .gantt-task-timeline {
+    position: relative;
+    background-image: 
+      /* Daily grid lines */
+      repeating-linear-gradient(
+        to right,
+        #f3f4f6 0px,
+        #f3f4f6 1px,
+        transparent 1px,
+        transparent 40px
+      ),
+      /* Weekend highlighting */
+      repeating-linear-gradient(
+        to right,
+        transparent 0px,
+        transparent 200px, /* 5 weekdays * 40px */
+        rgba(229, 231, 235, 0.15) 200px,
+        rgba(229, 231, 235, 0.15) 280px /* Weekend (2 days * 40px) */
+      );
+    background-size: 40px 100%, 280px 100%;
+    background-repeat: repeat-x, repeat-x;
+    min-width: 100%;
   }
 
-  /* Weekend Grid Lines - Dynamic extension */
-  .gantt-content::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 350px;
-    width: calc(100vw * 10); /* Large width to ensure extension */
-    height: 100%;
-    background-image: repeating-linear-gradient(
-      to right,
-      transparent 0,
-      transparent 199px, /* 5 days * 40px */
-      rgba(229, 231, 235, 0.3) 199px,
-      rgba(229, 231, 235, 0.3) 279px /* Weekend (2 days * 40px) */
-    );
-    background-size: 280px 100%; /* 7 days * 40px */
-    background-repeat: repeat-x;
-    pointer-events: none;
-    z-index: 2;
+  /* Ensure timeline extends beyond content */
+  .gantt-task-timeline {
+    min-width: max-content;
+    width: fit-content;
   }
 }
 
-/* Ensure timeline content extends properly with grid */
-.gantt-task-timeline {
-  position: relative;
-  min-width: max-content;
-  overflow: visible;
-}
-
-/* Force grid lines to extend with content */
+/* Content area styling */
 .gantt-content {
   overflow-x: auto;
   overflow-y: auto;
   position: relative;
-}
-
-/* Ensure grid lines extend beyond viewport */
-.gantt-content::before,
-.gantt-content::after {
-  min-width: 100%;
-  width: max-content;
-}
-
-/* Ensure timeline content extends properly */
-.gantt-task-timeline {
-  position: relative;
-  min-width: max-content;
-  overflow: visible;
-}
-
-/* Force grid lines to extend with content */
-.gantt-content {
-  overflow-x: auto;
-  overflow-y: auto;
 }
 
 .gantt-content::-webkit-scrollbar {
