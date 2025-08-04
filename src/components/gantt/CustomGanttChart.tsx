@@ -47,11 +47,11 @@ interface GanttTask extends Task {
 }
 
 const GANTT_CONFIG = {
-  rowHeight: 60,
-  taskBarHeight: 32,
-  timelineHeaderHeight: 80,
-  taskNameWidth: 320,
-  dayWidth: 30,
+  rowHeight: 56,
+  taskBarHeight: 28,
+  timelineHeaderHeight: 90,
+  taskNameWidth: 350,
+  dayWidth: 40,
   minChartHeight: 400,
   mobileBreakpoint: 640,
   colors: {
@@ -62,7 +62,7 @@ const GANTT_CONFIG = {
     overdue: '#ef4444',
     critical: '#dc2626',
     dependency: '#6b7280',
-    background: '#f8fafc',
+    background: '#ffffff',
     grid: '#e2e8f0',
     text: '#334155',
     milestone: '#f59e0b'
