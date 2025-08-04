@@ -56,8 +56,8 @@ export default function ChartGantt({
     // Filter and validate tasks first
     const validTasks = tasks.filter(task => {
       // Ensure task has valid dates
-      const startDate = new Date(task.start_date);
-      const endDate = new Date(task.end_date);
+      let startDate = new Date(task.start_date);
+      let endDate = new Date(task.end_date);
       
       // Check if dates are valid
       const isStartValid = !isNaN(startDate.getTime()) && startDate.getTime() > 0;
@@ -75,15 +75,38 @@ export default function ChartGantt({
         return false;
       }
       
-      // Ensure end date is after start date
+      // Auto-fix tasks with end date before or equal to start date
       if (endDate <= startDate) {
-        console.warn('Task end date is before or equal to start date:', {
+        console.warn('Auto-fixing task with invalid date range:', {
           taskId: task.id,
           title: task.title,
-          start_date: task.start_date,
-          end_date: task.end_date
+          original_start: task.start_date,
+          original_end: task.end_date
         });
-        return false;
+        
+        // If end date is before start date, swap them
+        if (endDate < startDate) {
+          const temp = startDate;
+          startDate = endDate;
+          endDate = temp;
+        }
+        
+        // Ensure at least 1 day duration for single-day tasks
+        if (endDate.getTime() === startDate.getTime()) {
+          endDate = new Date(startDate.getTime() + 24 * 60 * 60 * 1000); // Add 1 day
+        }
+        
+        // Update the task object with corrected dates
+        task.start_date = startDate;
+        task.end_date = endDate;
+        
+        console.log('Fixed dates:', {
+          taskId: task.id,
+          title: task.title,
+          fixed_start: startDate,
+          fixed_end: endDate,
+          duration_days: Math.ceil((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000))
+        });
       }
       
       return true;
