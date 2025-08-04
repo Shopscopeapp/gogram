@@ -213,7 +213,7 @@ export default function Sidebar() {
               </div>
               <div>
                 <h2 className="font-semibold text-gray-900">Project</h2>
-                <p className="text-sm text-gray-500">Riverside Complex</p>
+                <p className="text-sm text-gray-500">{currentProject?.name || 'No Project Selected'}</p>
               </div>
             </div>
             <button

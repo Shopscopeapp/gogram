@@ -735,7 +735,7 @@ function AppContent() {
 
       {/* Project switcher for real users */}
       {!appData.isDemoMode && appState === 'authenticated' && appData.project && (
-        <div className="fixed top-20 left-4 z-50">
+        <div className="fixed top-4 left-72 z-50">
           <button
             onClick={handleBackToProjects}
             className="bg-white shadow-lg rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 border"
