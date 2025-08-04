@@ -11,7 +11,9 @@ import {
   Smartphone,
   Monitor,
   MoreVertical,
-  Eye
+  Eye,
+  MessageSquare,
+  Clock
 } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { format } from 'date-fns';
@@ -24,6 +26,7 @@ import { taskService } from '../../services/taskService';
 
 export default function SchedulePage() {
   const { tasks, currentProject, currentUser, addTask, updateTask, moveTask, removeTask, deliveryResponses } = useAppStore();
+  const [activeTab, setActiveTab] = useState<'schedule' | 'responses'>('schedule');
   const [view, setView] = useState<'gantt' | 'list'>('gantt');
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [showEditTaskModal, setShowEditTaskModal] = useState(false);
@@ -289,6 +292,53 @@ export default function SchedulePage() {
             Manage project timeline and task dependencies
           </p>
         </div>
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-4 md:space-x-8 overflow-x-auto" aria-label="Tabs">
+          <button
+            onClick={() => setActiveTab('schedule')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+              activeTab === 'schedule'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex items-center">
+              <Calendar className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Schedule & Tasks</span>
+              <span className="sm:hidden">Schedule</span>
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('responses')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+              activeTab === 'responses'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex items-center">
+              <MessageSquare className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Delivery Responses</span>
+              <span className="sm:hidden">Responses</span>
+              {deliveryResponses.length > 0 && (
+                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  {deliveryResponses.length}
+                </span>
+              )}
+            </div>
+          </button>
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'schedule' && (
+        <div className="space-y-4">
+          {/* Schedule Tab Header Controls */}
+          <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
+            <div></div>
         
         {/* Desktop Controls */}
         {!isMobile && (
@@ -554,11 +604,26 @@ export default function SchedulePage() {
         initialData={selectedTask ?? undefined}
         isEditMode={true}
       />
+        </div>
+      )}
 
-      {/* Delivery Response Log */}
-      <div className="mt-8">
-        <DeliveryResponseLog responses={deliveryResponses} />
-      </div>
+      {/* Delivery Responses Tab */}
+      {activeTab === 'responses' && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                <MessageSquare className="w-5 h-5 mr-2 text-blue-600" />
+                Delivery Response Log
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Track supplier responses to delivery date change notifications
+              </p>
+            </div>
+            <DeliveryResponseLog responses={deliveryResponses} />
+          </div>
+        </div>
+      )}
     </div>
   );
 } 
