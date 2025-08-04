@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, X, Calendar, Clock, Palette, Package, Truck, FileText, Edit3, Link } from 'lucide-react';
+import { Plus, X, Calendar, Clock, Palette, Package, Truck, FileText, Edit3, Link, Trash2 } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { useAppStore } from '../../store';
 import { Task, ITPTemplate } from '../../types';
@@ -11,6 +11,7 @@ interface AddTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddTask: (taskData: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => void;
+  onDeleteTask?: (taskId: string) => void;
   initialData?: Partial<Task>;
   isEditMode?: boolean;
 }
@@ -19,6 +20,7 @@ export default function AddTaskModal({
   isOpen, 
   onClose, 
   onAddTask, 
+  onDeleteTask,
   initialData, 
   isEditMode = false 
 }: AddTaskModalProps) {
@@ -222,6 +224,22 @@ export default function AddTaskModal({
     } catch (error) {
       console.error('Error creating task:', error);
       toast.error('Failed to create task. Please try again.');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!initialData?.id || !onDeleteTask) return;
+    
+    const confirmDelete = window.confirm('Are you sure you want to delete this task? This action cannot be undone.');
+    if (!confirmDelete) return;
+
+    try {
+      await onDeleteTask(initialData.id);
+      onClose();
+      toast.success('Task deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      toast.error('Failed to delete task. Please try again.');
     }
   };
 
@@ -710,21 +728,38 @@ export default function AddTaskModal({
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
-            >
-              <Plus className="w-4 h-4" />
-              <span>{isEditMode ? 'Update Task' : 'Add Task'}</span>
-            </button>
+          <div className="flex justify-between pt-6 border-t border-gray-200">
+            {/* Delete button - only show in edit mode */}
+            <div>
+              {isEditMode && onDeleteTask && initialData?.id && (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  className="px-4 py-2 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors flex items-center space-x-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Delete Task</span>
+                </button>
+              )}
+            </div>
+            
+            {/* Cancel and Submit buttons */}
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>{isEditMode ? 'Update Task' : 'Add Task'}</span>
+              </button>
+            </div>
           </div>
         </form>
       </motion.div>

@@ -22,7 +22,7 @@ import toast from 'react-hot-toast';
 import { taskService } from '../../services/taskService';
 
 export default function SchedulePage() {
-  const { tasks, currentProject, currentUser, addTask, updateTask, moveTask } = useAppStore();
+  const { tasks, currentProject, currentUser, addTask, updateTask, moveTask, removeTask } = useAppStore();
   const [view, setView] = useState<'gantt' | 'list'>('gantt');
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [showEditTaskModal, setShowEditTaskModal] = useState(false);
@@ -544,6 +544,11 @@ export default function SchedulePage() {
             updateTask(selectedTask.id, updatedTaskData);
             toast.success('Task updated successfully!');
           }
+        }}
+        onDeleteTask={(taskId: string) => {
+          removeTask(taskId);
+          setShowEditTaskModal(false);
+          setSelectedTask(null);
         }}
         initialData={selectedTask ?? undefined}
         isEditMode={true}
