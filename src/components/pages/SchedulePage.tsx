@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { format } from 'date-fns';
-import CustomGanttChart from '../gantt/CustomGanttChart';
+import GanttChart from '../gantt/GanttChart';
 import AddTaskModal from '../modals/AddTaskModal';
 import DeliveryResponseLog from '../schedule/DeliveryResponseLog';
 import type { Task } from '../../types';
@@ -518,7 +518,7 @@ export default function SchedulePage() {
         {view === 'gantt' ? (
           <>
             <div className="h-[600px] md:h-[700px]">
-              <CustomGanttChart
+                              <GanttChart
                 tasks={filteredTasks}
                 onTaskUpdate={(taskId, updates) => updateTask(taskId, updates)}
                 onTaskClick={handleTaskClick}
