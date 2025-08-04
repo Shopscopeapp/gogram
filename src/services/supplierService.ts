@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import type { Supplier, Delivery } from '../types';
+import type { Supplier, Delivery, DeliveryResponse } from '../types';
 
 export interface CreateSupplierData {
   project_id: string;
@@ -433,6 +433,67 @@ class SupplierService {
       return { success: true, delivery: formattedDelivery };
     } catch (error) {
       console.error('Get delivery error:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  }
+
+  /**
+   * Get delivery responses for a project
+   */
+  async getProjectDeliveryResponses(projectId: string): Promise<{ success: boolean; responses?: DeliveryResponse[]; error?: string }> {
+    try {
+      const { data: responses, error } = await supabase
+        .from('delivery_responses')
+        .select(`
+          *,
+          deliveries!inner (
+            project_id,
+            item,
+            planned_date,
+            tasks!inner (
+              title,
+              project_id
+            )
+          ),
+          suppliers!inner (
+            company_name,
+            contact_name,
+            email
+          )
+        `)
+        .eq('deliveries.tasks.project_id', projectId)
+        .order('responded_at', { ascending: false });
+
+      if (error) {
+        console.error('Get delivery responses error:', error);
+        return { success: false, error: 'Failed to fetch delivery responses' };
+      }
+
+      const formattedResponses: DeliveryResponse[] = responses.map(response => ({
+        id: response.id,
+        delivery_id: response.delivery_id,
+        supplier_id: response.supplier_id,
+        response: response.response,
+        comments: response.comments,
+        alternative_date: response.alternative_date ? new Date(response.alternative_date) : undefined,
+        responded_at: new Date(response.responded_at),
+        created_at: new Date(response.created_at),
+        updated_at: new Date(response.updated_at),
+        delivery: {
+          item: response.deliveries.item,
+          planned_date: new Date(response.deliveries.planned_date),
+          task_title: response.deliveries.tasks.title
+        },
+        supplier: {
+          company_name: response.suppliers.company_name,
+          contact_name: response.suppliers.contact_name,
+          email: response.suppliers.email
+        }
+      }));
+
+      return { success: true, responses: formattedResponses };
+    } catch (error) {
+      console.error('Get delivery responses error:', error);
       return { success: false, error: 'An unexpected error occurred' };
     }
   }

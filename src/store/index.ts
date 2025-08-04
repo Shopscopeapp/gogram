@@ -15,6 +15,7 @@ import type {
   TaskDelay, 
   Supplier, 
   Delivery, 
+  DeliveryResponse,
   Notification,
   UserRole,
   DashboardStats,
@@ -39,6 +40,7 @@ interface AppState {
   // Supplier & Delivery Management
   suppliers: Supplier[];
   deliveries: Delivery[];
+  deliveryResponses: DeliveryResponse[];
   
   // QA Management
   qaAlerts: QAAlert[];
@@ -74,7 +76,7 @@ interface AppActions {
   removeProject: (id: string) => void;
   
   // Task Actions
-  addTask: (task: Task) => void;
+  addTask: (task: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   removeTask: (id: string) => void;
   moveTask: (id: string, newStartDate: Date, newEndDate: Date) => void;
@@ -100,6 +102,7 @@ interface AppActions {
   confirmDelivery: (id: string, confirmed: boolean, newDate?: Date) => void;
   
   // QA Actions
+  initializeQAAlerts: () => Promise<void>;
   generateQAAlerts: () => void;
   updateQAAlertStatus: (alertId: string, status: QAAlert['status']) => void;
   completeQAChecklistItem: (alertId: string, itemId: string, notes?: string) => void;
@@ -128,6 +131,7 @@ interface AppActions {
   // Database Integration Actions
   initializeUserSession: () => Promise<void>;
   initializeProjectData: (projectId: string) => Promise<void>;
+  loadDeliveryResponses: (projectId: string) => Promise<void>;
   subscribeToRealTimeUpdates: (projectId: string) => void;
   unsubscribeFromRealTimeUpdates: () => void;
   initializeDemoData: () => void;
@@ -176,6 +180,7 @@ export const useAppStore = create<AppStore>()(
       taskDelays: [],
       suppliers: [],
       deliveries: [],
+      deliveryResponses: [],
       qaAlerts: [],
       notifications: [],
       unreadCount: 0,
@@ -1032,6 +1037,7 @@ This update has been recorded in the system.`,
             projectData,
             tasksResult,
             deliveriesResult,
+            deliveryResponsesResult,
             taskChangeProposalsData,
             qaAlertsData,
             suppliersResult
@@ -1039,6 +1045,7 @@ This update has been recorded in the system.`,
             SupabaseService.getProjectWithMembers(projectId),
             taskService.getProjectTasks(projectId),
             supplierService.getProjectDeliveries(projectId),
+            supplierService.getProjectDeliveryResponses(projectId),
             SupabaseService.getTaskChangeProposals(projectId),
             SupabaseService.getProjectQAAlerts(projectId),
             supplierService.getProjectSuppliers(projectId)
@@ -1055,6 +1062,10 @@ This update has been recorded in the system.`,
           
           if (deliveriesResult.success && deliveriesResult.deliveries) {
             set({ deliveries: deliveriesResult.deliveries });
+          }
+          
+          if (deliveryResponsesResult.success && deliveryResponsesResult.responses) {
+            set({ deliveryResponses: deliveryResponsesResult.responses });
           }
           
           if (taskChangeProposalsData) {
@@ -1076,6 +1087,17 @@ This update has been recorded in the system.`,
         } catch (error) {
           console.error('Error initializing project data:', error);
           set({ error: 'Failed to initialize project data', loading: false });
+        }
+      },
+
+      loadDeliveryResponses: async (projectId) => {
+        try {
+          const result = await supplierService.getProjectDeliveryResponses(projectId);
+          if (result.success && result.responses) {
+            set({ deliveryResponses: result.responses });
+          }
+        } catch (error) {
+          console.error('Error loading delivery responses:', error);
         }
       },
 
@@ -1233,7 +1255,14 @@ This update has been recorded in the system.`,
                 const assignee = get().users.find(u => u.id === alert.assigned_to);
                 if (assignee) {
                   emailService.sendQAAlert(
-                    alert,
+                    {
+                      type: alert.type,
+                      title: alert.title,
+                      description: alert.description || 'No description provided',
+                      priority: alert.priority,
+                      due_date: alert.due_date || new Date(),
+                      checklist: alert.checklist.map(item => item.text)
+                    },
                     result.task,
                     assignee,
                     currentProject,
@@ -1363,9 +1392,9 @@ This update has been recorded in the system.`,
             }
 
             // Send email notification if assignee changed
-            if (updates.assigned_to && updates.assigned_to !== task.assigned_to) {
+            if (updates.assigned_to && updates.assigned_to !== task.assigned_to && currentProject) {
               const newAssignee = users.find(u => u.id === updates.assigned_to);
-              if (newAssignee) {
+              if (newAssignee && result.task) {
                 emailService.sendTaskAssignment(
                   result.task,
                   newAssignee,
@@ -1385,18 +1414,19 @@ This update has been recorded in the system.`,
             }
 
             // Send status change notification to assignee
-            if (updates.status && updates.status !== previousStatus && result.task.assigned_to) {
-              const assignee = users.find(u => u.id === result.task.assigned_to);
+            if (updates.status && updates.status !== previousStatus && result.task && result.task.assigned_to && currentProject) {
+              const task = result.task; // Create local reference for TypeScript
+              const assignee = users.find(u => u.id === task.assigned_to);
               if (assignee && assignee.id !== currentUser.id) {
                 emailService.sendCustomNotification(
                   assignee.email,
-                  `📋 Task Status Updated - ${result.task.title}`,
-                  `The status of your assigned task "${result.task.title}" has been updated from "${previousStatus}" to "${updates.status}".
+                  `📋 Task Status Updated - ${task.title}`,
+                  `The status of your assigned task "${task.title}" has been updated from "${previousStatus}" to "${updates.status}".
 
 Task Details:
 - Project: ${currentProject.name}
-- Category: ${result.task.category}
-- Priority: ${result.task.priority}
+- Category: ${task.category}
+- Priority: ${task.priority}
 - Updated by: ${currentUser.full_name}
 
 You can view the task details in your dashboard.`,
@@ -1414,14 +1444,21 @@ You can view the task details in your dashboard.`,
             }
 
             // Send QA alert emails if any were generated
-            if (updates.status && updates.status !== previousStatus) {
+            if (updates.status && updates.status !== previousStatus && result.task && currentProject) {
               const qaAlerts = await get().autoTriggerQAChecks(result.task, previousStatus);
               if (qaAlerts.length > 0) {
                 for (const alert of qaAlerts) {
                   const assignee = get().users.find(u => u.id === alert.assigned_to);
                   if (assignee) {
                     emailService.sendQAAlert(
-                      alert,
+                      {
+                        type: alert.type,
+                        title: alert.title,
+                        description: alert.description || 'No description provided',
+                        priority: alert.priority,
+                        due_date: alert.due_date || new Date(),
+                        checklist: alert.checklist.map(item => item.text)
+                      },
                       result.task,
                       assignee,
                       currentProject,
@@ -1482,7 +1519,7 @@ You can view the task details in your dashboard.`,
         }
       },
 
-      deleteTask: async (taskId) => {
+      deleteTask: async (taskId: string) => {
         const { currentUser } = get();
         if (!currentUser) {
           toast.error('User not found');
@@ -1527,7 +1564,7 @@ You can view the task details in your dashboard.`,
               } else if (eventType === 'UPDATE') {
                 get().updateTask(newRecord.id, newRecord);
               } else if (eventType === 'DELETE') {
-                get().deleteTask(oldRecord.id);
+                get().removeTask(oldRecord.id);
               }
               break;
               

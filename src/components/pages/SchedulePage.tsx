@@ -17,12 +17,13 @@ import { useAppStore } from '../../store';
 import { format } from 'date-fns';
 import CustomGanttChart from '../gantt/CustomGanttChart';
 import AddTaskModal from '../modals/AddTaskModal';
+import DeliveryResponseLog from '../schedule/DeliveryResponseLog';
 import type { Task } from '../../types';
 import toast from 'react-hot-toast';
 import { taskService } from '../../services/taskService';
 
 export default function SchedulePage() {
-  const { tasks, currentProject, currentUser, addTask, updateTask, moveTask, removeTask } = useAppStore();
+  const { tasks, currentProject, currentUser, addTask, updateTask, moveTask, removeTask, deliveryResponses } = useAppStore();
   const [view, setView] = useState<'gantt' | 'list'>('gantt');
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [showEditTaskModal, setShowEditTaskModal] = useState(false);
@@ -553,6 +554,11 @@ export default function SchedulePage() {
         initialData={selectedTask ?? undefined}
         isEditMode={true}
       />
+
+      {/* Delivery Response Log */}
+      <div className="mt-8">
+        <DeliveryResponseLog responses={deliveryResponses} />
+      </div>
     </div>
   );
 } 

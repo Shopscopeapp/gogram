@@ -157,6 +157,29 @@ export interface DeliveryConfirmation {
   created_at: Date;
 }
 
+export interface DeliveryResponse {
+  id: string;
+  delivery_id: string;
+  supplier_id: string;
+  response: 'confirm' | 'deny';
+  comments?: string;
+  alternative_date?: Date;
+  responded_at: Date;
+  created_at: Date;
+  updated_at: Date;
+  // Joined data for display
+  delivery: {
+    item: string;
+    planned_date: Date;
+    task_title: string;
+  };
+  supplier: {
+    company_name: string;
+    contact_name: string;
+    email: string;
+  };
+}
+
 export interface Notification {
   id: string;
   user_id: string;
