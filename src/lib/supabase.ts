@@ -272,6 +272,18 @@ export class SupabaseService {
         },
         callback
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'delivery_responses'
+        },
+        (payload) => {
+          // Filter by project_id in the callback since delivery_responses doesn't have project_id directly
+          callback({ ...payload, table: 'delivery_responses', projectId });
+        }
+      )
       .subscribe();
 
     return channel;

@@ -101,6 +101,11 @@ interface AppActions {
   updateDelivery: (id: string, updates: Partial<Delivery>) => void;
   confirmDelivery: (id: string, confirmed: boolean, newDate?: Date) => void;
   
+  // Delivery Response Actions
+  addDeliveryResponse: (response: DeliveryResponse) => void;
+  updateDeliveryResponse: (id: string, updates: Partial<DeliveryResponse>) => void;
+  removeDeliveryResponse: (id: string) => void;
+  
   // QA Actions
   initializeQAAlerts: () => Promise<void>;
   generateQAAlerts: () => void;
@@ -780,6 +785,35 @@ This update has been recorded in the system.`,
 
         const statusText = confirmed ? 'confirmed' : 'rejected';
         toast.success(`Delivery ${statusText} successfully!`);
+      },
+
+      // Delivery Response Actions
+      addDeliveryResponse: (response) => {
+        set(state => ({
+          deliveryResponses: [...state.deliveryResponses, response]
+        }));
+        
+        // Show specific notification with supplier info
+        const responseText = response.response === 'confirm' ? 'confirmed' : 'denied';
+        const supplierName = response.supplier?.company_name || 'Supplier';
+        toast.success(`${supplierName} ${responseText} delivery for "${response.delivery.task_title}"`, {
+          duration: 5000,
+          icon: response.response === 'confirm' ? '✅' : '❌'
+        });
+      },
+
+      updateDeliveryResponse: (id, updates) => {
+        set(state => ({
+          deliveryResponses: state.deliveryResponses.map(response =>
+            response.id === id ? { ...response, ...updates } : response
+          )
+        }));
+      },
+
+      removeDeliveryResponse: (id) => {
+        set(state => ({
+          deliveryResponses: state.deliveryResponses.filter(response => response.id !== id)
+        }));
       },
 
       // Note: Async supplier and delivery actions are defined later in the file
@@ -1579,6 +1613,32 @@ You can view the task details in your dashboard.`,
             case 'task_change_proposals':
               if (eventType === 'INSERT') {
                 get().addTaskChangeProposal(newRecord);
+              }
+              break;
+              
+            case 'delivery_responses':
+              // Since delivery_responses doesn't have project_id directly, we need to check
+              // if the delivery belongs to the current project
+              const { deliveries } = get();
+              const relatedDelivery = deliveries.find(d => d.id === newRecord?.delivery_id || oldRecord?.delivery_id);
+              
+              if (relatedDelivery) {
+                if (eventType === 'INSERT') {
+                  // Fetch the full delivery response data with joined info
+                  supplierService.getProjectDeliveryResponses(payload.projectId).then(result => {
+                    if (result.success && result.responses) {
+                      const newResponse = result.responses.find(r => r.id === newRecord.id);
+                      if (newResponse) {
+                        get().addDeliveryResponse(newResponse);
+                      }
+                    }
+                  });
+                } else if (eventType === 'UPDATE') {
+                  // For updates, we can update the existing response
+                  get().updateDeliveryResponse(newRecord.id, newRecord);
+                } else if (eventType === 'DELETE') {
+                  get().removeDeliveryResponse(oldRecord.id);
+                }
               }
               break;
           }
