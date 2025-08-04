@@ -146,6 +146,15 @@
   background: white;
   border-left: 1px solid #e2e8f0;
   flex-shrink: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* Hide scrollbar but allow scrolling */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.gantt-timeline-header::-webkit-scrollbar {
+  display: none;
 }
 
 .gantt-timeline-months {
@@ -153,12 +162,14 @@
   position: relative;
   border-bottom: 1px solid #e2e8f0;
   flex-shrink: 0;
+  min-width: max-content;
 }
 
 .gantt-timeline-days {
   display: flex;
   position: relative;
   flex-shrink: 0;
+  min-width: max-content;
 }
 
 .gantt-timeline-month {
@@ -172,6 +183,7 @@
   justify-content: center;
   text-align: center;
   min-height: 40px;
+  flex-shrink: 0;
 }
 
 .gantt-timeline-day {
@@ -188,6 +200,7 @@
   min-height: 40px;
   background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
   transition: background-color 0.2s ease;
+  flex-shrink: 0;
 }
 
 .gantt-timeline-day:hover {
@@ -227,7 +240,7 @@
 .gantt-content {
   flex: 1;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: auto;
   position: relative;
   display: flex;
   flex-direction: column;

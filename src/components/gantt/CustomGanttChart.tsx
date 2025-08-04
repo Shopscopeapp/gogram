@@ -111,6 +111,9 @@ export default function CustomGanttChart({
   // Get store data for delivery checking
   const { deliveries, suppliers } = useAppStore();
 
+  // Refs for scroll synchronization
+  const timelineHeaderRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Check if a task has affected deliveries when moved
@@ -237,6 +240,43 @@ export default function CustomGanttChart({
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Scroll synchronization between timeline header and content
+  useEffect(() => {
+    const timelineHeader = timelineHeaderRef.current;
+    const content = contentRef.current;
+    
+    if (!timelineHeader || !content) return;
+
+    let isHeaderScrolling = false;
+    let isContentScrolling = false;
+
+    const handleHeaderScroll = () => {
+      if (isContentScrolling) return;
+      isHeaderScrolling = true;
+      content.scrollLeft = timelineHeader.scrollLeft;
+      requestAnimationFrame(() => {
+        isHeaderScrolling = false;
+      });
+    };
+
+    const handleContentScroll = () => {
+      if (isHeaderScrolling) return;
+      isContentScrolling = true;
+      timelineHeader.scrollLeft = content.scrollLeft;
+      requestAnimationFrame(() => {
+        isContentScrolling = false;
+      });
+    };
+
+    timelineHeader.addEventListener('scroll', handleHeaderScroll);
+    content.addEventListener('scroll', handleContentScroll);
+
+    return () => {
+      timelineHeader.removeEventListener('scroll', handleHeaderScroll);
+      content.removeEventListener('scroll', handleContentScroll);
+    };
   }, []);
 
   // Handle mobile view toggle
@@ -848,7 +888,7 @@ export default function CustomGanttChart({
     }, {} as Record<string, { name: string; days: Date[] }>);
 
     return (
-      <div className="gantt-timeline-header">
+      <div className="gantt-timeline-header" ref={timelineHeaderRef}>
         <div className="gantt-timeline-months">
           {Object.entries(months).map(([key, month]) => (
             <div
@@ -1153,7 +1193,7 @@ export default function CustomGanttChart({
       </div>
 
       {/* Content */}
-      <div className={`gantt-content ${isMobile && mobileView === 'timeline' ? 'timeline-mode' : ''}`}>
+      <div className={`gantt-content ${isMobile && mobileView === 'timeline' ? 'timeline-mode' : ''}`} ref={contentRef}>
         {/* Today Line - Desktop only */}
         {!isMobile && (() => {
           const today = new Date();
