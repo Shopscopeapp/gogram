@@ -13,11 +13,13 @@ import {
   MoreVertical,
   Eye,
   MessageSquare,
-  Clock
+  Clock,
+  Settings
 } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { format } from 'date-fns';
 import GanttChart from '../gantt/GanttChart';
+import GanttComparison from '../gantt/GanttComparison';
 import AddTaskModal from '../modals/AddTaskModal';
 import DeliveryResponseLog from '../schedule/DeliveryResponseLog';
 import type { Task } from '../../types';
@@ -27,7 +29,7 @@ import { taskService } from '../../services/taskService';
 export default function SchedulePage() {
   const { tasks, currentProject, currentUser, addTask, updateTask, moveTask, removeTask, deliveryResponses } = useAppStore();
   const [activeTab, setActiveTab] = useState<'schedule' | 'responses'>('schedule');
-  const [view, setView] = useState<'gantt' | 'list'>('gantt');
+  const [view, setView] = useState<'gantt' | 'list' | 'comparison'>('gantt');
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [showEditTaskModal, setShowEditTaskModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -356,6 +358,17 @@ export default function SchedulePage() {
                 Gantt
               </button>
               <button
+                onClick={() => setView('comparison')}
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  view === 'comparison'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Compare
+              </button>
+              <button
                 onClick={() => setView('list')}
                 className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                   view === 'list'
@@ -515,7 +528,16 @@ export default function SchedulePage() {
 
       {/* Main Content */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        {view === 'gantt' ? (
+        {view === 'comparison' ? (
+          <div className="p-6">
+            <GanttComparison
+              tasks={filteredTasks}
+              onTaskClick={handleTaskClick}
+              onTaskUpdate={(taskId, updates) => updateTask(taskId, updates)}
+              readOnly={!currentUser || currentUser.role === 'viewer'}
+            />
+          </div>
+        ) : view === 'gantt' ? (
           <>
             <div className="h-[600px] md:h-[700px]">
                               <GanttChart

@@ -50,6 +50,16 @@ export default function ChartGantt({
   height = 600 
 }: ChartGanttProps) {
   const chartRef = useRef<ChartJS<'bar', GanttDataPoint[], string>>(null);
+  
+  // Cleanup chart instance on unmount
+  useEffect(() => {
+    return () => {
+      if (chartRef.current) {
+        chartRef.current.destroy();
+        chartRef.current = null;
+      }
+    };
+  }, []);
 
   // Transform tasks into Chart.js format
   const chartData = useMemo((): ChartData<'bar', GanttDataPoint[], string> => {
@@ -59,9 +69,15 @@ export default function ChartGantt({
       let startDate = new Date(task.start_date);
       let endDate = new Date(task.end_date);
       
-      // Check if dates are valid
-      const isStartValid = !isNaN(startDate.getTime()) && startDate.getTime() > 0;
-      const isEndValid = !isNaN(endDate.getTime()) && endDate.getTime() > 0;
+      // Check if dates are valid and within reasonable range
+      const isStartValid = !isNaN(startDate.getTime()) && 
+                          startDate.getTime() > 0 && 
+                          startDate.getFullYear() >= 2000 && 
+                          startDate.getFullYear() <= 2100;
+      const isEndValid = !isNaN(endDate.getTime()) && 
+                        endDate.getTime() > 0 && 
+                        endDate.getFullYear() >= 2000 && 
+                        endDate.getFullYear() <= 2100;
       
       if (!isStartValid || !isEndValid) {
         console.warn('Invalid task dates found:', {
@@ -75,39 +91,42 @@ export default function ChartGantt({
         return false;
       }
       
-      // Auto-fix tasks with end date before or equal to start date
-      if (endDate <= startDate) {
-        console.warn('Auto-fixing task with invalid date range:', {
-          taskId: task.id,
-          title: task.title,
-          original_start: task.start_date,
-          original_end: task.end_date
-        });
-        
-        // If end date is before start date, swap them
-        if (endDate < startDate) {
-          const temp = startDate;
-          startDate = endDate;
-          endDate = temp;
+              // Auto-fix tasks with invalid date ranges
+        if (endDate <= startDate) {
+                  // Auto-fixing task with invalid date range
+          
+          // Set reasonable default dates if dates are completely invalid
+          const now = new Date();
+          const currentYear = now.getFullYear();
+          
+          // If dates are way off (before 2000 or after 2100), reset to current timeframe
+          if (startDate.getFullYear() < 2000 || startDate.getFullYear() > 2100) {
+            startDate = new Date(now);
+            startDate.setHours(0, 0, 0, 0);
+          }
+          
+          if (endDate.getFullYear() < 2000 || endDate.getFullYear() > 2100) {
+            endDate = new Date(startDate.getTime() + 24 * 60 * 60 * 1000); // Add 1 day
+          }
+          
+          // If end date is still before start date, swap them
+          if (endDate < startDate) {
+            const temp = startDate;
+            startDate = endDate;
+            endDate = temp;
+          }
+          
+          // Ensure at least 1 day duration
+          if (endDate.getTime() === startDate.getTime()) {
+            endDate = new Date(startDate.getTime() + 24 * 60 * 60 * 1000);
+          }
+          
+          // Update the task object with corrected dates
+          task.start_date = startDate;
+          task.end_date = endDate;
+          
+                  // Date range fixed successfully
         }
-        
-        // Ensure at least 1 day duration for single-day tasks
-        if (endDate.getTime() === startDate.getTime()) {
-          endDate = new Date(startDate.getTime() + 24 * 60 * 60 * 1000); // Add 1 day
-        }
-        
-        // Update the task object with corrected dates
-        task.start_date = startDate;
-        task.end_date = endDate;
-        
-        console.log('Fixed dates:', {
-          taskId: task.id,
-          title: task.title,
-          fixed_start: startDate,
-          fixed_end: endDate,
-          duration_days: Math.ceil((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000))
-        });
-      }
       
       return true;
     });
@@ -140,12 +159,18 @@ export default function ChartGantt({
 
       return {
         label: category,
-        data: categoryTasks.map(task => ({
-          x: [new Date(task.start_date), new Date(task.end_date)] as [Date, Date],
-          y: task.title,
-          taskId: task.id,
-          task: task
-        })),
+        data: categoryTasks.map(task => {
+          // Ensure dates are valid Date objects
+          const startDate = new Date(task.start_date);
+          const endDate = new Date(task.end_date);
+          
+          return {
+            x: [startDate, endDate] as [Date, Date],
+            y: task.title,
+            taskId: task.id,
+            task: task
+          };
+        }),
         backgroundColor: (ctx: any) => {
           const task = ctx.parsed?.task;
           if (!task) return colors.bg;
@@ -197,7 +222,25 @@ export default function ChartGantt({
   }, [tasks]);
 
   // Chart configuration
-  const options = useMemo((): ChartOptions<'bar'> => ({
+  const options = useMemo((): ChartOptions<'bar'> => {
+    // Get valid tasks for min/max calculation
+    const validTasks = tasks.filter(task => {
+      const startDate = new Date(task.start_date);
+      const endDate = new Date(task.end_date);
+      
+      const isStartValid = !isNaN(startDate.getTime()) && 
+                          startDate.getTime() > 0 && 
+                          startDate.getFullYear() >= 2000 && 
+                          startDate.getFullYear() <= 2100;
+      const isEndValid = !isNaN(endDate.getTime()) && 
+                        endDate.getTime() > 0 && 
+                        endDate.getFullYear() >= 2000 && 
+                        endDate.getFullYear() <= 2100;
+      
+      return isStartValid && isEndValid;
+    });
+
+    return {
     indexAxis: 'y' as const,
     responsive: true,
     maintainAspectRatio: false,
@@ -267,15 +310,52 @@ export default function ChartGantt({
         padding: 12
       }
     },
-    scales: {
-      x: {
-        type: 'time',
-        time: {
-          unit: 'day',
-          displayFormats: {
-            day: 'MMM dd'
-          }
-        },
+          scales: {
+        x: {
+          type: 'time',
+          time: {
+            unit: 'day',
+            displayFormats: {
+              day: 'MMM dd'
+            }
+          },
+          // Set reasonable min/max to prevent extreme date ranges
+          min: (() => {
+            if (validTasks.length === 0) return new Date('2024-01-01');
+            
+            const allDates = validTasks.flatMap(task => {
+              const start = new Date(task.start_date);
+              const end = new Date(task.end_date);
+              return [start, end].filter(date => 
+                !isNaN(date.getTime()) && 
+                date.getFullYear() >= 2000 && 
+                date.getFullYear() <= 2100
+              );
+            });
+            
+            if (allDates.length === 0) return new Date('2024-01-01');
+            
+            const minDate = new Date(Math.min(...allDates.map(d => d.getTime())));
+            return minDate;
+          })(),
+          max: (() => {
+            if (validTasks.length === 0) return new Date('2025-12-31');
+            
+            const allDates = validTasks.flatMap(task => {
+              const start = new Date(task.start_date);
+              const end = new Date(task.end_date);
+              return [start, end].filter(date => 
+                !isNaN(date.getTime()) && 
+                date.getFullYear() >= 2000 && 
+                date.getFullYear() <= 2100
+              );
+            });
+            
+            if (allDates.length === 0) return new Date('2025-12-31');
+            
+            const maxDate = new Date(Math.max(...allDates.map(d => d.getTime())));
+            return maxDate;
+          })(),
         title: {
           display: true,
           text: 'Timeline',
@@ -329,7 +409,8 @@ export default function ChartGantt({
       duration: 750,
       easing: 'easeInOutQuart'
     }
-  }), [chartData, onTaskClick]);
+  };
+  }, [chartData, onTaskClick, tasks]);
 
   // Show fallback if no valid tasks
   if (chartData.datasets.length === 0) {
@@ -395,6 +476,7 @@ export default function ChartGantt({
           ref={chartRef}
           data={chartData} 
           options={options}
+          key={`gantt-chart-${tasks.length}-${Date.now()}`} // Force re-render on data changes
         />
       </div>
       

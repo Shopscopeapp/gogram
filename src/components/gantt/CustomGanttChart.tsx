@@ -981,7 +981,7 @@ export default function CustomGanttChart({
           minHeight: isMobile ? '80px' : GANTT_CONFIG.rowHeight
         }}
       >
-        {/* Task Name Cell */}
+        {/* Task Name Cell - Updated Design */}
         <div
           className={`gantt-task-name-cell ${isGroupHeader ? 'group-header' : ''}`}
           onClick={() => !isGroupHeader && onTaskClick?.(task)}
@@ -991,61 +991,85 @@ export default function CustomGanttChart({
             paddingLeft: isGroupHeader ? '16px' : `${16 + task.level * 20}px`
           }}
         >
-          {!isGroupHeader && (
-          <div
-            className="gantt-drag-handle"
-            onMouseDown={(e) => !isMobile && handleTaskDragStart(task, e, 'vertical')}
-            onTouchStart={(e) => isMobile && handleTaskDragStart(task, e, 'vertical')}
-          >
-            ⋮⋮
-          </div>
-          )}
-          <div className="gantt-task-info">
-            <div className={`gantt-task-name ${isGroupHeader ? 'font-bold text-lg' : ''}`}>
-              {isGroupHeader ? (
-                <div className="flex items-center">
-                  <div className="w-4 h-4 mr-2 rounded-full" style={{ backgroundColor: task.color }}></div>
-                  {task.title}
-                </div>
-              ) : (
-                <>
-              {task.title}
-              {task.isCritical && (
-                <span className="ml-2 px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">
-                  Critical
-                </span>
-                  )}
-                </>
-              )}
-            </div>
-            <div className="gantt-task-meta">
-              <span className="flex items-center">
-                <Calendar className="w-3 h-3 mr-1" />
-                {safeDateFormat(task.start_date, 'MMM dd')} - {safeDateFormat(task.end_date, 'MMM dd')}
-              </span>
-              <span className="flex items-center">
-                <Clock className="w-3 h-3 mr-1" />
-                {Math.min(100, Math.max(0, task.progress_percentage || 0))}%
-              </span>
-              {task.criticalPath && (
-                <span className="flex items-center text-red-600">
-                  <AlertTriangle className="w-3 h-3 mr-1" />
-                  Critical Path
-                </span>
-              )}
+          <div className="gantt-task-row-content">
+            {/* Expand/Collapse Arrow for Groups */}
+            {isGroupHeader && (
+              <div className="gantt-expand-arrow">
+                <ChevronDown className="w-4 h-4 text-gray-500" />
+              </div>
+            )}
+            
+            {/* Indent Arrow for Sub-tasks */}
+            {!isGroupHeader && task.level > 0 && (
+              <div className="gantt-indent-arrow">
+                <ChevronRight className="w-3 h-3 text-gray-400" />
+              </div>
+            )}
 
-              {task.resource_names && task.resource_names.length > 0 && (
-                <span className="flex items-center text-blue-600">
-                  <Users className="w-3 h-3 mr-1" />
-                  {task.resource_names.join(', ')}
+            {/* Task Info */}
+            <div className="gantt-task-info">
+              <div className={`gantt-task-name ${isGroupHeader ? 'font-bold text-lg' : ''}`}>
+                {isGroupHeader ? (
+                  <div className="flex items-center">
+                    <div className="w-4 h-4 mr-2 rounded-full" style={{ backgroundColor: task.color }}></div>
+                    {task.title}
+                  </div>
+                ) : (
+                  <>
+                    {task.title}
+                    {task.isCritical && (
+                      <span className="ml-2 px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">
+                        Critical
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
+              
+              {/* Task Meta - Only show on hover or mobile */}
+              <div className="gantt-task-meta">
+                <span className="flex items-center">
+                  <Calendar className="w-3 h-3 mr-1" />
+                  {safeDateFormat(task.start_date, 'MMM dd')} - {safeDateFormat(task.end_date, 'MMM dd')}
                 </span>
-              )}
-              {task.costImpact && task.costImpact > 0 && (
-                <span className="flex items-center text-green-600">
-                  <DollarSign className="w-3 h-3 mr-1" />
-                  ${task.costImpact.toLocaleString()}
+                <span className="flex items-center">
+                  <Clock className="w-3 h-3 mr-1" />
+                  {Math.min(100, Math.max(0, task.progress_percentage || 0))}%
                 </span>
-              )}
+                {task.criticalPath && (
+                  <span className="flex items-center text-red-600">
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    Critical Path
+                  </span>
+                )}
+
+                {task.resource_names && task.resource_names.length > 0 && (
+                  <span className="flex items-center text-blue-600">
+                    <Users className="w-3 h-3 mr-1" />
+                    {task.resource_names.join(', ')}
+                  </span>
+                )}
+                {task.costImpact && task.costImpact > 0 && (
+                  <span className="flex items-center text-green-600">
+                    <DollarSign className="w-3 h-3 mr-1" />
+                    ${task.costImpact.toLocaleString()}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Action Button */}
+            <div className="gantt-task-action">
+              <button 
+                className="gantt-action-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddTask?.();
+                }}
+                title="Add sub-task"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
@@ -1169,25 +1193,29 @@ export default function CustomGanttChart({
       {/* Header */}
       <div className="gantt-header">
         <div className="gantt-task-names-header">
-          <span>Tasks ({processedTasks.length})</span>
-          {isMobile && (
-            <div className="gantt-mobile-controls">
-              <button
-                className={`gantt-mobile-toggle ${mobileView === 'list' ? 'active' : ''}`}
-                onClick={() => setMobileView('list')}
-              >
-                <List className="w-3 h-3 mr-1" />
-                List
-              </button>
-              <button
-                className={`gantt-mobile-toggle ${mobileView === 'timeline' ? 'active' : ''}`}
-                onClick={() => setMobileView('timeline')}
-              >
-                <BarChart3 className="w-3 h-3 mr-1" />
-                Timeline
-              </button>
+          <div className="gantt-header-content">
+            <div className="gantt-header-title">
+              <span>Tasks ({processedTasks.length})</span>
             </div>
-          )}
+            {isMobile && (
+              <div className="gantt-mobile-controls">
+                <button
+                  className={`gantt-mobile-toggle ${mobileView === 'list' ? 'active' : ''}`}
+                  onClick={() => setMobileView('list')}
+                >
+                  <List className="w-3 h-3 mr-1" />
+                  List
+                </button>
+                <button
+                  className={`gantt-mobile-toggle ${mobileView === 'timeline' ? 'active' : ''}`}
+                  onClick={() => setMobileView('timeline')}
+                >
+                  <BarChart3 className="w-3 h-3 mr-1" />
+                  Timeline
+                </button>
+              </div>
+            )}
+          </div>
         </div>
         {renderTimelineHeader()}
       </div>

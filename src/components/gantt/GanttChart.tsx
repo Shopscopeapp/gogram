@@ -1,5 +1,5 @@
 import React from 'react';
-import ChartGantt from './ChartGantt';
+import CustomGanttChart from './CustomGanttChart';
 import type { Task } from '../../types';
 
 interface GanttChartProps {
@@ -25,20 +25,31 @@ export default function GanttChart({
   timelineEnd,
   onAddTask
 }: GanttChartProps) {
-  
+
   const handleTaskUpdate = (taskId: string, updates: Partial<Task>) => {
     if (onTaskMove && updates.start_date && updates.end_date) {
       onTaskMove(taskId, new Date(updates.start_date), new Date(updates.end_date));
     }
   };
 
+  const handleTaskReorder = (draggedTaskId: string, targetIndex: number) => {
+    if (onTaskReorder && targetIndex >= 0 && targetIndex < tasks.length) {
+      const targetTask = tasks[targetIndex];
+      onTaskReorder(draggedTaskId, targetTask.id);
+    }
+  };
+
   return (
-    <ChartGantt
+    <CustomGanttChart
       tasks={tasks}
       onTaskClick={onTaskClick}
       onTaskUpdate={handleTaskUpdate}
+      onTaskReorder={handleTaskReorder}
       readOnly={readOnly}
-      height={Math.max(400, tasks.length * 40 + 200)} // Dynamic height based on task count
+      showDependencies={showDependencies}
+      timelineStart={timelineStart}
+      timelineEnd={timelineEnd}
+      onAddTask={onAddTask}
     />
   );
 }
