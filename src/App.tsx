@@ -106,7 +106,7 @@ function AppContent() {
     if (appData.isDemoMode) return;
     
     let mounted = true;
-    let authTimeout: NodeJS.Timeout;
+    let authTimeout: NodeJS.Timeout | null = null;
     
     const { data: { subscription } } = authService.onAuthStateChange(async (user) => {
       if (!mounted) return;
@@ -119,23 +119,31 @@ function AppContent() {
         if (user) {
           console.log('Auth state changed: user logged in', user.email);
           
-          // Only update user data, don't reinitialize project
-          // The initializeApp function already handles project initialization
-          setAppData(prev => ({ 
-            ...prev, 
-            user
-          }));
+          // Only update user data if it's different from current user
+          setAppData(prev => {
+            if (prev.user?.id === user.id) {
+              console.log('User already logged in, skipping update');
+              return prev;
+            }
+            return { 
+              ...prev, 
+              user
+            };
+          });
           
           // Only set authenticated state if we don't already have a project
           // This prevents race conditions with initializeApp
-          if (!appData.project && appState !== 'project_selected') {
+          if (!appData.project && appState !== 'authenticated') {
             setAppState('authenticated');
           }
         } else {
           console.log('Auth state changed: user logged out');
-          handleSignOut();
+          // Only handle sign out if we're not in the middle of initializing
+          if (appState !== 'initializing') {
+            handleSignOut();
+          }
         }
-      }, 100); // 100ms debounce
+      }, 200); // Increased debounce to 200ms for better stability
     });
 
     return () => {
@@ -143,7 +151,7 @@ function AppContent() {
       if (authTimeout) clearTimeout(authTimeout);
       subscription.unsubscribe();
     };
-  }, [appData.isDemoMode, appData.project]);
+  }, [appData.isDemoMode, appData.project, appState]);
 
   const initializeApp = async () => {
     try {

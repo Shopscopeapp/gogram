@@ -38,6 +38,14 @@ export default function SchedulePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
+  // Debug: Log tasks when they change
+  useEffect(() => {
+    console.log('SchedulePage: Tasks updated', tasks.length);
+    tasks.forEach(task => {
+      console.log(`Task ${task.id}: ${task.title} - ${task.start_date} to ${task.end_date}`);
+    });
+  }, [tasks]);
+
   // Check for mobile screen size
   useEffect(() => {
     const checkMobile = () => {
@@ -99,14 +107,15 @@ export default function SchedulePage() {
     return matchesSearch && matchesStatus;
   });
 
-  const handleTaskReorder = (draggedTaskId: string, targetIndex: number) => {
-    console.log('Reordering task:', draggedTaskId, 'to index:', targetIndex);
+  const handleTaskReorder = (draggedTaskId: string, overId: string) => {
+    console.log('Reordering task:', draggedTaskId, 'over:', overId);
     const currentTasks = [...filteredTasks];
     const draggedTaskIndex = currentTasks.findIndex(t => t.id === draggedTaskId);
+    const overTaskIndex = currentTasks.findIndex(t => t.id === overId);
 
-    if (draggedTaskIndex !== -1) {
+    if (draggedTaskIndex !== -1 && overTaskIndex !== -1) {
       const [draggedTask] = currentTasks.splice(draggedTaskIndex, 1);
-      currentTasks.splice(targetIndex, 0, draggedTask);
+      currentTasks.splice(overTaskIndex, 0, draggedTask);
 
       currentTasks.forEach((task, index) => {
         updateTask(task.id, {
@@ -533,16 +542,27 @@ export default function SchedulePage() {
             <GanttComparison
               tasks={filteredTasks}
               onTaskClick={handleTaskClick}
-              onTaskUpdate={(taskId, updates) => updateTask(taskId, updates)}
+              onTaskUpdate={(taskId: string, updates: Partial<Task>) => {
+                  console.log('SchedulePage: Updating task', taskId, updates);
+                  updateTask(taskId, updates);
+                  console.log('SchedulePage: Task update called');
+                }}
               readOnly={!currentUser || currentUser.role === 'viewer'}
             />
           </div>
         ) : view === 'gantt' ? (
           <>
             <div className="h-[600px] md:h-[700px]">
-                              <GanttChart
+              <GanttChart
                 tasks={filteredTasks}
-                onTaskUpdate={(taskId, updates) => updateTask(taskId, updates)}
+                onTaskMove={(taskId: string, newStartDate: Date, newEndDate: Date) => {
+                  console.log('SchedulePage: Moving task', taskId, newStartDate, newEndDate);
+                  updateTask(taskId, {
+                    start_date: newStartDate,
+                    end_date: newEndDate
+                  });
+                  console.log('SchedulePage: Task move called');
+                }}
                 onTaskClick={handleTaskClick}
                 onTaskReorder={handleTaskReorder}
                 onAddTask={() => setShowAddTaskModal(true)}

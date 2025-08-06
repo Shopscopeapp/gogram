@@ -195,9 +195,9 @@ class AuthService {
    */
   async getCurrentUser(): Promise<User | null> {
     try {
-      // Add timeout with retry capability
+      // Add timeout with retry capability - increased timeout for better reliability
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Session check timeout')), 3000); // Reduced to 3s for faster response
+        setTimeout(() => reject(new Error('Session check timeout')), 10000); // Increased to 10s for better reliability
       });
 
       const sessionPromise = supabase.auth.getSession();
@@ -211,9 +211,9 @@ class AuthService {
 
       console.log('Active session found for:', session.user.email);
 
-      // Fetch user profile with shorter timeout
+      // Fetch user profile with longer timeout
       const profileTimeout = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Profile fetch timeout')), 2000); // Reduced to 2s
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 5000); // Increased to 5s
       });
 
       const profilePromise = supabase
@@ -288,6 +288,7 @@ class AuthService {
     } catch (error) {
       if (error instanceof Error && error.message.includes('timeout')) {
         console.error('Session check timeout - this usually indicates network issues');
+        // Don't return null immediately, let the auth state change handle it
         return null;
       }
       console.error('Get current user error:', error);

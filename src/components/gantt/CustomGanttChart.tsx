@@ -108,6 +108,10 @@ export default function CustomGanttChart({
     }>;
   } | null>(null);
 
+  // Force re-render when tasks change
+  const [forceUpdate, setForceUpdate] = useState(0);
+  const [updatingDependencies, setUpdatingDependencies] = useState<Set<string>>(new Set());
+
   // Get store data for delivery checking
   const { deliveries, suppliers } = useAppStore();
 
@@ -180,6 +184,8 @@ export default function CustomGanttChart({
     } else {
       // No deliveries affected, proceed with normal update
       onTaskUpdate?.(taskId, updates);
+      // Force re-render to update visual position
+      setForceUpdate(prev => prev + 1);
     }
   };
 
@@ -484,11 +490,22 @@ export default function CustomGanttChart({
 
   // New function to handle dependency-based scheduling when a task is moved
   const handleDependencyBasedScheduling = (movedTask: GanttTask, newStartDate: Date, newEndDate: Date) => {
-    if (!onTaskUpdate) return;
+    console.log('🔗 Starting dependency-based scheduling...');
+    console.log('📋 Moved task:', { id: movedTask.id, title: movedTask.title });
+    console.log('📅 New dates:', { start: newStartDate, end: newEndDate });
+    console.log('📊 Total tasks available:', tasks.length);
+    
+    if (!onTaskUpdate) {
+      console.log('❌ No onTaskUpdate function provided');
+      return false;
+    }
 
     const taskMap = new Map(tasks.map(task => [task.id, { ...task }]));
     const updatedTasks = new Set<string>();
     const updates: Array<{ taskId: string; updates: Partial<Task> }> = [];
+    const dependencyUpdates = new Set<string>();
+
+    console.log('🗺️ Task map created with', taskMap.size, 'tasks');
 
     // Update the moved task first
     updates.push({
@@ -499,38 +516,63 @@ export default function CustomGanttChart({
       }
     });
     updatedTasks.add(movedTask.id);
+    console.log('✅ Added moved task to updates');
 
     // Find all tasks that depend on the moved task (successors)
     const findSuccessors = (taskId: string): string[] => {
       const successors: string[] = [];
+      console.log('🔍 Looking for successors of task:', taskId);
+      
       tasks.forEach(task => {
+        console.log(`  📋 Checking task ${task.id}: predecessors =`, task.predecessors);
         if (task.predecessors?.includes(taskId)) {
           successors.push(task.id);
+          console.log(`  ✅ Found successor: ${task.id} (${task.title})`);
         }
       });
+      
+      console.log('📊 Found', successors.length, 'successors:', successors);
       return successors;
     };
 
     // Recursively update dependent tasks
     const updateDependentTasks = (taskId: string) => {
+      console.log('🔄 Updating dependents for task:', taskId);
       const successors = findSuccessors(taskId);
       
       successors.forEach(successorId => {
-        if (updatedTasks.has(successorId)) return; // Avoid circular updates
+        if (updatedTasks.has(successorId)) {
+          console.log(`  ⚠️ Skipping ${successorId} - already updated`);
+          return;
+        }
         
         const successor = taskMap.get(successorId);
-        if (!successor) return;
+        if (!successor) {
+          console.log(`  ❌ Successor ${successorId} not found in task map`);
+          return;
+        }
+
+        console.log(`  📋 Processing successor: ${successorId} (${successor.title})`);
+        console.log(`  📅 Current dates: ${successor.start_date} to ${successor.end_date}`);
 
         // Calculate new start date based on the moved task's end date
         const movedTaskEnd = taskMap.get(taskId)?.end_date;
-        if (!movedTaskEnd) return;
+        if (!movedTaskEnd) {
+          console.log(`  ❌ No end date found for moved task ${taskId}`);
+          return;
+        }
 
         const newSuccessorStart = addDays(movedTaskEnd, successor.lag_days || 0);
         const duration = differenceInDays(successor.end_date, successor.start_date);
         const newSuccessorEnd = addDays(newSuccessorStart, duration);
 
+        console.log(`  📅 Calculated new dates: ${newSuccessorStart} to ${newSuccessorEnd}`);
+        console.log(`  ⏱️ Lag days: ${successor.lag_days || 0}, Duration: ${duration} days`);
+
         // Only update if the new start date is later than current start date
         if (newSuccessorStart > successor.start_date) {
+          console.log(`  ✅ Updating successor ${successorId} - new start is later`);
+          
           updates.push({
             taskId: successorId,
             updates: {
@@ -539,6 +581,9 @@ export default function CustomGanttChart({
             }
           });
           updatedTasks.add(successorId);
+          dependencyUpdates.add(successorId);
+          
+          console.log(`  📝 Added update for ${successorId}`);
           
           // Update the task map for subsequent calculations
           taskMap.set(successorId, {
@@ -549,23 +594,53 @@ export default function CustomGanttChart({
 
           // Recursively update this successor's dependents
           updateDependentTasks(successorId);
+        } else {
+          console.log(`  ⚠️ Skipping ${successorId} - new start date is not later`);
         }
       });
     };
 
     // Start the cascade from the moved task
+    console.log('🚀 Starting cascade from moved task:', movedTask.id);
     updateDependentTasks(movedTask.id);
 
+    console.log('📊 Final results:');
+    console.log('  - Updates to apply:', updates.length);
+    console.log('  - Tasks with dependency updates:', dependencyUpdates.size);
+    console.log('  - All updated tasks:', Array.from(updatedTasks));
+
+    // Show visual feedback for dependency updates
+    if (dependencyUpdates.size > 0) {
+      console.log('🎨 Setting visual feedback for', dependencyUpdates.size, 'tasks');
+      setUpdatingDependencies(dependencyUpdates);
+      setTimeout(() => {
+        console.log('🧹 Clearing visual feedback');
+        setUpdatingDependencies(new Set());
+      }, 2000);
+    }
+
     // Apply all updates
-    updates.forEach(({ taskId, updates }) => {
+    console.log('🔄 Applying', updates.length, 'updates...');
+    updates.forEach(({ taskId, updates }, index) => {
+      console.log(`  ${index + 1}. Updating task ${taskId}:`, updates);
       handleTaskUpdate(taskId, updates);
     });
 
-    return updates.length > 1; // Return true if other tasks were affected
+    const hasUpdates = updates.length > 1;
+    console.log('🏁 Dependency scheduling complete. Has updates:', hasUpdates);
+    return hasUpdates;
   };
 
   // Process tasks with hierarchical grouping and construction-specific enhancements
   const processedTasks = useMemo(() => {
+    console.log('🔄 Processing tasks for Gantt chart...');
+    console.log('📊 Raw tasks:', tasks.map(t => ({ 
+      id: t.id, 
+      title: t.title, 
+      predecessors: t.predecessors,
+      dependencies: t.dependencies 
+    })));
+    
     // Group tasks by category
     const taskGroups = new Map<string, { category: string; tasks: Task[] }>();
     
@@ -685,7 +760,7 @@ export default function CustomGanttChart({
       weatherImpact: task.weather_dependent && isWeekend(new Date()),
       costImpact: (task.cost_per_day || 0) * task.planned_duration
     }));
-  }, [tasks]);
+  }, [tasks, forceUpdate]);
 
   // Calculate timeline bounds with proper date handling
   const timelineBounds = useMemo(() => {
@@ -740,29 +815,89 @@ export default function CustomGanttChart({
     }
   };
 
+  // Helper function to find all dependent tasks
+  const findDependentTasks = (taskId: string): GanttTask[] => {
+    const dependentTasks: GanttTask[] = [];
+    const visited = new Set<string>();
+
+    const findDependents = (currentTaskId: string) => {
+      if (visited.has(currentTaskId)) return;
+      visited.add(currentTaskId);
+
+      processedTasks.forEach(task => {
+        if (task.predecessors?.includes(currentTaskId)) {
+          dependentTasks.push(task);
+          findDependents(task.id); // Recursively find dependents of dependents
+        }
+      });
+    };
+
+    findDependents(taskId);
+    return dependentTasks;
+  };
+
+  // Helper function to calculate how much a dependent task should shift
+  const calculateDependentTaskShift = (movedTask: GanttTask, dependentTask: GanttTask, daysDelta: number): number => {
+    // Calculate the new end date of the moved task
+    const movedTaskEnd = addDays(new Date(movedTask.end_date), daysDelta);
+    
+    // Calculate when the dependent task should start (with lag days)
+    const newDependentStart = addDays(movedTaskEnd, dependentTask.lag_days || 0);
+    const currentDependentStart = new Date(dependentTask.start_date);
+    
+    // Calculate the difference in days
+    const shiftDays = differenceInDays(newDependentStart, currentDependentStart);
+    
+    return shiftDays;
+  };
+
   const handleHorizontalDragStart = (task: GanttTask, startX: number) => {
+    console.log('Starting horizontal drag for task:', task.id);
+    
     const handleMouseMove = (e: MouseEvent | TouchEvent) => {
+      e.preventDefault(); // Prevent default to avoid text selection
       const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const deltaX = clientX - startX;
       const daysDelta = Math.round(deltaX / GANTT_CONFIG.dayWidth);
       
+      console.log('Drag delta:', { deltaX, daysDelta });
+      
+      // Visual feedback for the dragged task
+      const taskElement = document.querySelector(`[data-task-id="${task.id}"]`) as HTMLElement;
+      if (taskElement) {
+        taskElement.style.transform = `translateX(${deltaX}px)`;
+        taskElement.style.opacity = '0.8';
+        taskElement.style.zIndex = '50';
+      }
+
+      // Visual feedback for ALL dependent tasks
       if (daysDelta !== 0) {
-        // Visual feedback only - always show visual feedback during drag
-        const taskElement = document.querySelector(`[data-task-id="${task.id}"]`) as HTMLElement;
-        if (taskElement) {
-          taskElement.style.transform = `translateX(${deltaX}px)`;
-          taskElement.style.opacity = '0.8';
-          taskElement.style.zIndex = '50';
-        }
+        const dependentTasks = findDependentTasks(task.id);
+        dependentTasks.forEach(depTask => {
+          const depElement = document.querySelector(`[data-task-id="${depTask.id}"]`) as HTMLElement;
+          if (depElement) {
+            // Calculate how much this dependent task should move
+            const depDaysDelta = calculateDependentTaskShift(task, depTask, daysDelta);
+            const depDeltaX = depDaysDelta * GANTT_CONFIG.dayWidth;
+            
+            depElement.style.transform = `translateX(${depDeltaX}px)`;
+            depElement.style.opacity = '0.7';
+            depElement.style.zIndex = '40';
+            depElement.style.border = '2px solid #f59e0b';
+          }
+        });
       }
     };
 
     const handleMouseUp = (e: MouseEvent | TouchEvent) => {
+      e.preventDefault();
       const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const deltaX = clientX - startX;
       const daysDelta = Math.round(deltaX / GANTT_CONFIG.dayWidth);
       
-      // Reset visual feedback
+      console.log('Drag ended:', { deltaX, daysDelta });
+      
+      // Reset visual feedback for dragged task
       const taskElement = document.querySelector(`[data-task-id="${task.id}"]`) as HTMLElement;
       if (taskElement) {
         taskElement.style.transform = '';
@@ -770,27 +905,51 @@ export default function CustomGanttChart({
         taskElement.style.zIndex = '';
       }
 
+      // Reset visual feedback for all dependent tasks
+      const dependentTasks = findDependentTasks(task.id);
+      dependentTasks.forEach(depTask => {
+        const depElement = document.querySelector(`[data-task-id="${depTask.id}"]`) as HTMLElement;
+        if (depElement) {
+          depElement.style.transform = '';
+          depElement.style.opacity = '';
+          depElement.style.zIndex = '';
+          depElement.style.border = '';
+        }
+      });
+
       if (daysDelta !== 0 && onTaskUpdate) {
-        // Use task's original start date if drag state is not available
-        const originalStartDate = dragState.dragStartDate || task.start_date;
+        console.log('✅ Valid dates calculated, updating task...');
         
-        if (isValid(originalStartDate)) {
-          const newStartDate = addDays(originalStartDate, daysDelta);
+        // Calculate new dates
+        const originalStartDate = new Date(task.start_date);
+        const newStartDate = addDays(originalStartDate, daysDelta);
         const duration = differenceInDays(task.end_date, task.start_date);
         const newEndDate = addDays(newStartDate, duration);
         
-          // Validate that the calculated dates are valid
-          if (isValid(newStartDate) && isValid(newEndDate)) {
-            // Use dependency-based scheduling to automatically adjust dependent tasks
-            const tasksAffected = handleDependencyBasedScheduling(task, newStartDate, newEndDate);
-            
-            // Show feedback if multiple tasks were affected
-            if (tasksAffected) {
-              // You could add a toast notification here
-              console.log('Dependent tasks automatically adjusted');
-            }
-          }
+        // Update the task immediately
+        onTaskUpdate(task.id, {
+          start_date: newStartDate,
+          end_date: newEndDate
+        });
+        
+        console.log('🔄 Calling dependency-based scheduling...');
+        // Use dependency-based scheduling to automatically adjust dependent tasks
+        const tasksAffected = handleDependencyBasedScheduling(task, newStartDate, newEndDate);
+        
+        // Force re-render to update visual position
+        setForceUpdate(prev => prev + 1);
+        
+        console.log('✅ Task updated successfully');
+        
+        // Show feedback if multiple tasks were affected
+        if (tasksAffected) {
+          console.log('🎯 Dependent tasks automatically adjusted');
+          // Note: You can add a toast notification here if you have a toast library
+        } else {
+          console.log('ℹ️ No dependent tasks were affected');
         }
+      } else {
+        console.error('❌ Invalid dates calculated');
       }
 
       setDragState({
@@ -960,21 +1119,23 @@ export default function CustomGanttChart({
     };
 
     const getResourceConflictClass = (task: GanttTask) => {
-      if (task.resourceConflicts && task.resourceConflicts.length > 0) {
-        return 'bg-red-100 border-red-300';
-      }
-      return '';
+      return task.resourceConflicts && task.resourceConflicts.length > 0 ? 'resource-conflict' : '';
+    };
+
+    const getDependencyUpdateClass = (task: GanttTask) => {
+      return updatingDependencies.has(task.id) ? 'dependency-updating' : '';
     };
 
     const statusClass = getStatusClass(task.status);
     const criticalClass = task.isCritical ? 'critical' : '';
     const criticalPathClass = getCriticalPathClass(task);
     const resourceConflictClass = getResourceConflictClass(task);
+    const dependencyUpdateClass = getDependencyUpdateClass(task);
 
     return (
       <div
         key={task.id}
-        className={`gantt-task-row ${dragState.dropIndex === index ? 'drag-target' : ''}`}
+        className={`gantt-task-row ${dragState.dropIndex === index ? 'drag-target' : ''} ${dependencyUpdateClass}`}
         data-task-row={index}
         style={{ 
           height: isMobile ? 'auto' : GANTT_CONFIG.rowHeight,
@@ -1003,6 +1164,18 @@ export default function CustomGanttChart({
             {!isGroupHeader && task.level > 0 && (
               <div className="gantt-indent-arrow">
                 <ChevronRight className="w-3 h-3 text-gray-400" />
+              </div>
+            )}
+
+            {/* Drag Handle - Only for non-group tasks */}
+            {!isGroupHeader && (
+              <div
+                className="gantt-drag-handle"
+                onMouseDown={(e) => !isMobile && handleTaskDragStart(task, e, 'vertical')}
+                onTouchStart={(e) => isMobile && handleTaskDragStart(task, e, 'vertical')}
+                title="Drag to reorder"
+              >
+                ⋮⋮
               </div>
             )}
 
@@ -1080,48 +1253,23 @@ export default function CustomGanttChart({
             className="gantt-task-timeline"
             style={{ height: isMobile ? '60px' : GANTT_CONFIG.rowHeight }}
           >
-            {/* Dependency Lines */}
-            {showDependencies && task.predecessors && task.predecessors.length > 0 && (
-              <svg
-                className="absolute inset-0 pointer-events-none"
-                style={{ zIndex: 10 }}
-              >
-                {task.predecessors.map((predId, idx) => {
-                  const predTask = processedTasks.find(t => t.id === predId);
-                  if (!predTask) return null;
-                  
-                  const predEnd = new Date(predTask.end_date);
-                  const predEndOffset = differenceInDays(predEnd, timelineBounds.start) * GANTT_CONFIG.dayWidth;
-                  const taskStartOffset = startOffset;
-                  
-                  return (
-                    <g key={`${task.id}-${predId}-${idx}`}>
-                      <line
-                        x1={predEndOffset + GANTT_CONFIG.dayWidth}
-                        y1={index * GANTT_CONFIG.rowHeight + GANTT_CONFIG.rowHeight / 2}
-                        x2={taskStartOffset}
-                        y2={index * GANTT_CONFIG.rowHeight + GANTT_CONFIG.rowHeight / 2}
-                        stroke={predTask.criticalPath ? "#dc2626" : "#6b7280"}
-                        strokeWidth="2"
-                        strokeDasharray={predTask.criticalPath ? "none" : "5,5"}
-                        markerEnd="url(#arrowhead)"
-                      />
-                    </g>
-                  );
-                })}
-              </svg>
-            )}
+            {/* Simple Visual Indicators Only - No Complex Line Drawing */}
             {!isGroupHeader && (
               <div
-                className={`gantt-task-bar ${statusClass} ${criticalClass} ${criticalPathClass} ${resourceConflictClass} ${
+                className={`gantt-task-bar ${statusClass} ${criticalClass} ${criticalPathClass} ${resourceConflictClass} ${dependencyUpdateClass} ${
                 dragState.dragTaskId === task.id ? 'dragging' : ''
               }`}
               data-task-id={task.id}
+              data-has-dependencies={task.predecessors && task.predecessors.length > 0 ? "true" : "false"}
+              data-critical={task.criticalPath ? "true" : "false"}
               style={{
                 left: isMobile ? 0 : startOffset,
                 width: isMobile ? '100%' : taskWidth,
                 height: isMobile ? '24px' : GANTT_CONFIG.taskBarHeight,
-                position: isMobile ? 'relative' : 'absolute'
+                position: isMobile ? 'relative' : 'absolute',
+                // Add visual indicators for dependencies
+                border: task.predecessors && task.predecessors.length > 0 ? '3px solid #3b82f6' : 'none',
+                boxShadow: task.predecessors && task.predecessors.length > 0 ? '0 0 0 3px rgba(59, 130, 246, 0.3)' : 'none'
               }}
               onMouseDown={(e) => !isMobile && handleTaskDragStart(task, e, 'horizontal')}
               onTouchStart={(e) => isMobile && handleTaskDragStart(task, e, 'horizontal')}
@@ -1133,23 +1281,48 @@ export default function CustomGanttChart({
               <span className="gantt-task-label">
                 {isMobile ? task.title : (taskWidth > 100 ? task.title : '')}
                 <span className="progress-text">{Math.min(100, Math.max(0, task.actualProgress || 0))}%</span>
-                  {task.criticalPath && (
-                    <span className="ml-1 text-xs bg-red-600 text-white px-1 rounded">
-                      CP
-                    </span>
-                  )}
-                  {task.resourceConflicts && task.resourceConflicts.length > 0 && (
-                    <span className="ml-1 text-xs bg-red-500 text-white px-1 rounded">
-                      RC
-                    </span>
-                  )}
-                  {task.weatherImpact && (
-                    <span className="ml-1 text-xs bg-blue-500 text-white px-1 rounded">
-                      W
-                    </span>
-                  )}
+                
+                {/* Dependency indicators */}
+                {task.predecessors && task.predecessors.length > 0 && (
+                  <span className="ml-2 text-xs bg-blue-600 text-white px-2 py-1 rounded-full">
+                    🔗 {task.predecessors.length} deps
+                  </span>
+                )}
+                
+                {task.criticalPath && (
+                  <span className="ml-1 text-xs bg-red-600 text-white px-1 rounded">
+                    CP
+                  </span>
+                )}
+                {task.resourceConflicts && task.resourceConflicts.length > 0 && (
+                  <span className="ml-1 text-xs bg-red-500 text-white px-1 rounded">
+                    RC
+                  </span>
+                )}
+                {task.weatherImpact && (
+                  <span className="ml-1 text-xs bg-blue-500 text-white px-1 rounded">
+                    W
+                  </span>
+                )}
               </span>
             </div>
+            )}
+            
+            {/* SUPER SIMPLE DEPENDENCY LINE */}
+            {showDependencies && task.predecessors && task.predecessors.length > 0 && (
+              <div 
+                style={{
+                  position: 'absolute',
+                  left: '0px',
+                  top: '0px',
+                  width: '100px',
+                  height: '4px',
+                  backgroundColor: '#ff0000',
+                  zIndex: 1000
+                }}
+              >
+                DEPENDENCY LINE
+              </div>
             )}
           </div>
         )}
@@ -1177,15 +1350,34 @@ export default function CustomGanttChart({
         <defs>
           <marker
             id="arrowhead"
-            markerWidth="10"
-            markerHeight="7"
-            refX="9"
-            refY="3.5"
+            markerWidth="12"
+            markerHeight="8"
+            refX="10"
+            refY="4"
             orient="auto"
+            markerUnits="strokeWidth"
           >
             <polygon
-              points="0 0, 10 3.5, 0 7"
-              fill="#6b7280"
+              points="0,0 0,8 12,4"
+              fill="#3b82f6"
+              stroke="#3b82f6"
+              strokeWidth="1"
+            />
+          </marker>
+          <marker
+            id="arrowhead-critical"
+            markerWidth="14"
+            markerHeight="10"
+            refX="12"
+            refY="5"
+            orient="auto"
+            markerUnits="strokeWidth"
+          >
+            <polygon
+              points="0,0 0,10 14,5"
+              fill="#dc2626"
+              stroke="#dc2626"
+              strokeWidth="1"
             />
           </marker>
         </defs>

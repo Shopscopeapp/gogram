@@ -365,7 +365,7 @@
   }
 }
 
-/* Task Bar Styles - Enhanced Design */
+/* Task Bar Styles - Enhanced Design with Better Drag Support */
 .gantt-task-bar {
   background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   color: white;
@@ -382,7 +382,8 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   position: relative;
   overflow: hidden;
-  cursor: pointer;
+  cursor: grab;
+  touch-action: pan-x;
 }
 
 .gantt-task-bar::before {
@@ -401,10 +402,76 @@
   background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
 }
 
+.gantt-task-bar:active {
+  cursor: grabbing;
+  transform: translateY(0px);
+}
+
 .gantt-task-bar.dragging {
   opacity: 0.8;
   z-index: 50;
   cursor: grabbing;
+  box-shadow: 0 8px 24px 0 rgba(59, 130, 246, 0.4), 0 4px 8px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* Enhanced drag feedback */
+.gantt-task-bar[style*="transform"] {
+  transition: none !important;
+  box-shadow: 0 8px 24px 0 rgba(59, 130, 246, 0.4), 0 4px 8px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* Dependency update visual feedback */
+.gantt-task-bar.dependency-updating {
+  animation: dependency-pulse 1.5s ease-in-out infinite;
+  border: 3px solid #f59e0b;
+  box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.3);
+  position: relative;
+}
+
+.gantt-task-bar.dependency-updating::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  right: -8px;
+  bottom: -8px;
+  border: 2px solid #f59e0b;
+  border-radius: 12px;
+  animation: dependency-ring 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.gantt-task-row.dependency-updating {
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%);
+  border-left: 4px solid #f59e0b;
+}
+
+@keyframes dependency-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.3);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(245, 158, 11, 0.1);
+    transform: scale(1.02);
+  }
+}
+
+@keyframes dependency-ring {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+/* Resource conflict styling */
+.gantt-task-bar.resource-conflict {
+  border: 2px solid #ef4444;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
 }
 
 /* Task Status Colors */
@@ -598,9 +665,42 @@
   }
 }
 
-/* Remove old drag handle styles */
+/* Drag Handle - Updated for Cleaner Design */
 .gantt-drag-handle {
-  display: none;
+  width: 20px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  margin-right: 8px;
+  color: #64748b;
+  transition: all 0.2s;
+  touch-action: manipulation;
+  opacity: 0.6;
+}
+
+.gantt-drag-handle:hover {
+  background: white;
+  color: #374151;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  opacity: 1;
+}
+
+.gantt-drag-handle:active {
+  cursor: grabbing;
+  transform: scale(1.05);
+}
+
+@media (max-width: 640px) {
+  .gantt-drag-handle {
+    width: 24px;
+    height: 24px;
+    margin-right: 12px;
+    opacity: 0.8;
+  }
 }
 
 /* Enhanced hover states */
@@ -963,4 +1063,126 @@
   font-weight: 600;
   color: #1e293b;
   font-size: 14px;
+} 
+
+/* Enhanced dependency lines and visual indicators */
+.gantt-container svg {
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Dependency lines - more prominent */
+.gantt-container svg line {
+  stroke-width: 3px;
+  opacity: 0.9;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+/* Critical path dependencies */
+.gantt-container svg line[stroke="#dc2626"] {
+  stroke-width: 4px;
+  stroke-dasharray: none;
+  filter: drop-shadow(0 2px 4px rgba(220, 38, 38, 0.3));
+}
+
+/* Normal dependencies */
+.gantt-container svg line[stroke="#3b82f6"] {
+  stroke-width: 3px;
+  stroke-dasharray: 8, 4;
+  filter: drop-shadow(0 1px 3px rgba(59, 130, 246, 0.3));
+}
+
+/* Connection points - more visible */
+.gantt-container svg circle {
+  r: 4px;
+  opacity: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+}
+
+/* Critical path connection points */
+.gantt-container svg circle[fill="#dc2626"] {
+  r: 5px;
+  filter: drop-shadow(0 2px 4px rgba(220, 38, 38, 0.4));
+}
+
+/* Normal dependency connection points */
+.gantt-container svg circle[fill="#3b82f6"] {
+  r: 4px;
+  filter: drop-shadow(0 1px 3px rgba(59, 130, 246, 0.4));
+}
+
+/* Enhanced dependency update visual feedback */
+.gantt-task-bar.dependency-updating {
+  animation: dependency-pulse 1.5s ease-in-out infinite;
+  border: 3px solid #f59e0b;
+  box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.3);
+  position: relative;
+}
+
+.gantt-task-bar.dependency-updating::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  right: -8px;
+  bottom: -8px;
+  border: 2px solid #f59e0b;
+  border-radius: 12px;
+  animation: dependency-ring 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.gantt-task-row.dependency-updating {
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%);
+  border-left: 4px solid #f59e0b;
+}
+
+@keyframes dependency-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.3);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(245, 158, 11, 0.1);
+    transform: scale(1.02);
+  }
+}
+
+@keyframes dependency-ring {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+/* Task bars with dependencies - subtle indicator */
+.gantt-task-bar[data-has-dependencies="true"] {
+  position: relative;
+}
+
+.gantt-task-bar[data-has-dependencies="true"]::after {
+  content: '🔗';
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  font-size: 10px;
+  background: rgba(59, 130, 246, 0.9);
+  color: white;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+/* Critical path tasks with dependencies */
+.gantt-task-bar[data-has-dependencies="true"][data-critical="true"]::after {
+  background: rgba(220, 38, 38, 0.9);
+  content: '⚡';
 } 
