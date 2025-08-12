@@ -1,5 +1,5 @@
 import React from 'react';
-import CustomGanttChart from './CustomGanttChart';
+import NextGanttChart from './NextGanttChart';
 import type { Task } from '../../types';
 
 interface GanttChartProps {
@@ -40,16 +40,14 @@ export default function GanttChart({
   };
 
   return (
-    <CustomGanttChart
+    <NextGanttChart
       tasks={tasks}
       onTaskClick={onTaskClick}
       onTaskUpdate={handleTaskUpdate}
-      onTaskReorder={handleTaskReorder}
       readOnly={readOnly}
       showDependencies={showDependencies}
       timelineStart={timelineStart}
       timelineEnd={timelineEnd}
-      onAddTask={onAddTask}
     />
   );
 }

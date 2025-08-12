@@ -26,7 +26,9 @@ const CONFIG = {
   rowHeight: 44,
   taskBarHeight: 22,
   taskNameWidth: 320,
-  dayWidth: 36,
+  defaultDayWidth: 40,
+  minDayWidth: 24,
+  maxDayWidth: 72,
   mobileBreakpoint: 768,
 };
 
@@ -41,6 +43,7 @@ export default function NextGanttChart({
 }: NextGanttChartProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [mobileView, setMobileView] = useState<'list' | 'timeline'>('timeline');
+  const [dayWidth, setDayWidth] = useState<number>(CONFIG.defaultDayWidth);
 
   const headerRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -130,7 +133,7 @@ export default function NextGanttChart({
     const onUp = (e: MouseEvent | TouchEvent) => {
       const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
       const deltaX = clientX - startClientX;
-      const daysDelta = Math.round(deltaX / CONFIG.dayWidth);
+      const daysDelta = Math.round(deltaX / dayWidth);
       // Reset visual
       const el = document.querySelector(`[data-next-task-id="${task.id}"]`) as HTMLElement | null;
       if (el) {
@@ -197,14 +200,14 @@ export default function NextGanttChart({
         <div className="nextgantt-timeline" ref={headerRef}>
           <div className="nextgantt-months">
             {months.map((m, idx) => (
-              <div key={idx} className="nextgantt-month" style={{ width: m.count * CONFIG.dayWidth }}>
+              <div key={idx} className="nextgantt-month" style={{ width: m.count * dayWidth }}>
                 {m.name}
               </div>
             ))}
           </div>
           <div className="nextgantt-days">
             {bounds.days.map((d, i) => (
-              <div key={i} className="nextgantt-day" style={{ width: CONFIG.dayWidth }}>
+              <div key={i} className="nextgantt-day" style={{ width: dayWidth }}>
                 <div className="nextgantt-day-num">{format(d, 'd')}</div>
                 <div className="nextgantt-day-name">{format(d, 'EEE')}</div>
               </div>
@@ -216,9 +219,10 @@ export default function NextGanttChart({
   };
 
   const renderRow = (t: GanttTask, index: number) => {
-    const startOffset = differenceInDays(new Date(t.start_date), bounds.start) * CONFIG.dayWidth;
-    const barWidth = Math.max(CONFIG.dayWidth, differenceInDays(new Date(t.end_date), new Date(t.start_date)) * CONFIG.dayWidth);
+    const startOffset = differenceInDays(new Date(t.start_date), bounds.start) * dayWidth;
+    const barWidth = Math.max(dayWidth, differenceInDays(new Date(t.end_date), new Date(t.start_date)) * dayWidth);
     const critical = t.is_critical ? 'critical' : '';
+    const statusClass = `status-${t.status}`;
     return (
       <div key={t.id} className="nextgantt-row" style={{ height: CONFIG.rowHeight }}>
         <div className="nextgantt-name-cell" onClick={() => onTaskClick?.(t)}>
@@ -230,7 +234,7 @@ export default function NextGanttChart({
         </div>
         <div className="nextgantt-canvas">
           <div
-            className={`nextgantt-bar ${critical}`}
+            className={`nextgantt-bar ${critical} ${statusClass}`}
             data-next-task-id={t.id}
             style={{ left: startOffset, width: barWidth, height: CONFIG.taskBarHeight }}
             onMouseDown={(e) => onDragStart(t, e.clientX)}
@@ -264,6 +268,11 @@ export default function NextGanttChart({
         <div className="left">
           <strong>Next‑Gen Gantt</strong>
         </div>
+        <div className="controls">
+          <button className="zoom" onClick={() => setDayWidth(w => Math.max(CONFIG.minDayWidth, w - 4))}>−</button>
+          <span className="zoom-level">{dayWidth}px/day</span>
+          <button className="zoom" onClick={() => setDayWidth(w => Math.min(CONFIG.maxDayWidth, w + 4))}>＋</button>
+        </div>
         {isMobile && (
           <button className="toggle" onClick={() => setMobileView(mobileView === 'list' ? 'timeline' : 'list')}>
             <List className="icon" /> {mobileView === 'list' ? 'Show Timeline' : 'Show List'}
@@ -291,9 +300,12 @@ export default function NextGanttChart({
           <div className="nextgantt-grid">
             {processedTasks.map((t, i) => (
               <div key={`grid-${t.id}`} className="grid-row" style={{ height: CONFIG.rowHeight }}>
-                {bounds.days.map((d, idx) => (
-                  <div key={idx} className="grid-cell" style={{ width: CONFIG.dayWidth }} />
-                ))}
+                {bounds.days.map((d, idx) => {
+                  const isWeekend = [0,6].includes(new Date(d).getDay());
+                  return (
+                    <div key={idx} className={`grid-cell ${isWeekend ? 'weekend' : ''}`} style={{ width: dayWidth }} />
+                  );
+                })}
               </div>
             ))}
           </div>
@@ -301,6 +313,12 @@ export default function NextGanttChart({
           <div className="nextgantt-rows">
             {processedTasks.map((t, i) => renderRow(t, i))}
           </div>
+          {(() => {
+            const today = new Date();
+            if (today < bounds.start || today > bounds.end) return null;
+            const left = differenceInDays(today, bounds.start) * dayWidth + 0;
+            return <div className="nextgantt-today-line" style={{ left }} />
+          })()}
         </div>
       </div>
     </div>
