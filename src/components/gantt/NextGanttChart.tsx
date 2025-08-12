@@ -44,6 +44,7 @@ export default function NextGanttChart({
   const [isMobile, setIsMobile] = useState(false);
   const [mobileView, setMobileView] = useState<'list' | 'timeline'>('timeline');
   const [dayWidth, setDayWidth] = useState<number>(CONFIG.defaultDayWidth);
+  const [density, setDensity] = useState<'compact' | 'comfortable' | 'spacious'>('comfortable');
 
   const headerRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -223,8 +224,11 @@ export default function NextGanttChart({
     const barWidth = Math.max(dayWidth, differenceInDays(new Date(t.end_date), new Date(t.start_date)) * dayWidth);
     const critical = t.is_critical ? 'critical' : '';
     const statusClass = `status-${t.status}`;
+    const rowHeight = density === 'compact' ? 40 : density === 'comfortable' ? 48 : 56;
+    const barHeight = density === 'compact' ? 20 : density === 'comfortable' ? 26 : 30;
+    const barTop = Math.max(0, (rowHeight - barHeight) / 2);
     return (
-      <div key={t.id} className="nextgantt-row" style={{ height: CONFIG.rowHeight }}>
+      <div key={t.id} className="nextgantt-row" style={{ height: rowHeight }}>
         <div className="nextgantt-name-cell" onClick={() => onTaskClick?.(t)}>
           <div className="nextgantt-name-main">{t.title}</div>
           <div className="nextgantt-name-meta">
@@ -236,12 +240,17 @@ export default function NextGanttChart({
           <div
             className={`nextgantt-bar ${critical} ${statusClass}`}
             data-next-task-id={t.id}
-            style={{ left: startOffset, width: barWidth, height: CONFIG.taskBarHeight }}
+            style={{ left: startOffset, width: barWidth, height: barHeight, top: barTop }}
             onMouseDown={(e) => onDragStart(t, e.clientX)}
             onTouchStart={(e) => onDragStart(t, e.touches[0].clientX)}
           >
             <div className="nextgantt-progress" style={{ width: `${Math.max(0, Math.min(100, t.progress_percentage || 0))}%` }} />
             <span className="nextgantt-label">{barWidth > 80 ? t.title : ''}</span>
+            <div className="nextgantt-tooltip">
+              <div className="tip-title">{t.title}</div>
+              <div className="tip-row">{format(new Date(t.start_date), 'MMM dd, yyyy')} → {format(new Date(t.end_date), 'MMM dd, yyyy')}</div>
+              <div className="tip-row">Progress: {Math.max(0, Math.min(100, t.progress_percentage || 0))}%</div>
+            </div>
           </div>
           {/* Simple dependency indicators (lines can be enhanced later) */}
           {showDependencies && (t.predecessors && t.predecessors.length > 0) && (
@@ -272,6 +281,11 @@ export default function NextGanttChart({
           <button className="zoom" onClick={() => setDayWidth(w => Math.max(CONFIG.minDayWidth, w - 4))}>−</button>
           <span className="zoom-level">{dayWidth}px/day</span>
           <button className="zoom" onClick={() => setDayWidth(w => Math.min(CONFIG.maxDayWidth, w + 4))}>＋</button>
+          <div className="segmented">
+            <button className={`seg ${density === 'compact' ? 'active' : ''}`} onClick={() => setDensity('compact')}>Compact</button>
+            <button className={`seg ${density === 'comfortable' ? 'active' : ''}`} onClick={() => setDensity('comfortable')}>Comfy</button>
+            <button className={`seg ${density === 'spacious' ? 'active' : ''}`} onClick={() => setDensity('spacious')}>Spacious</button>
+          </div>
         </div>
         {isMobile && (
           <button className="toggle" onClick={() => setMobileView(mobileView === 'list' ? 'timeline' : 'list')}>
@@ -299,7 +313,7 @@ export default function NextGanttChart({
           {/* grid days */}
           <div className="nextgantt-grid">
             {processedTasks.map((t, i) => (
-              <div key={`grid-${t.id}`} className="grid-row" style={{ height: CONFIG.rowHeight }}>
+              <div key={`grid-${t.id}`} className="grid-row" style={{ height: (density === 'compact' ? 40 : density === 'comfortable' ? 48 : 56) }}>
                 {bounds.days.map((d, idx) => {
                   const isWeekend = [0,6].includes(new Date(d).getDay());
                   return (
