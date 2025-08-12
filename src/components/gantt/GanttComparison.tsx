@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import ChartGantt from './ChartGantt';
 import CustomGanttChart from './CustomGanttChart';
+import NextGanttChart from './NextGanttChart';
 import type { Task } from '../../types';
 
 interface GanttComparisonProps {
@@ -25,7 +26,7 @@ interface GanttComparisonProps {
   readOnly?: boolean;
 }
 
-type GanttFramework = 'chartjs' | 'custom';
+type GanttFramework = 'custom' | 'next' | 'chartjs';
 
 interface FrameworkInfo {
   id: GanttFramework;
@@ -48,6 +49,38 @@ interface FrameworkInfo {
 }
 
 const frameworks: FrameworkInfo[] = [
+  {
+    id: 'next',
+    name: 'Next‑Gen Gantt (New)',
+    description: 'Refined design, faster UI, simpler dependency cascade, mobile-first timeline/list',
+    icon: <Zap className="w-6 h-6" />,
+    pros: [
+      'Modern, clean visual design',
+      'Smooth drag & cascade updates',
+      'Sticky name column, grid lines',
+      'Mobile timeline/list toggle',
+      'Critical path highlighting'
+    ],
+    cons: [
+      'Arrows/lines intentionally minimal',
+      'Early iteration for advanced features'
+    ],
+    bestFor: [
+      'Side-by-side comparison',
+      'User testing & iteration',
+      'Production-ready with gradual enhancement'
+    ],
+    features: {
+      dragDrop: true,
+      dependencies: true,
+      criticalPath: true,
+      resourceManagement: false,
+      mobileOptimized: true,
+      customStyling: true,
+      realTimeUpdates: true,
+      largeDatasets: true
+    }
+  },
   {
     id: 'chartjs',
     name: 'Chart.js',
@@ -126,7 +159,7 @@ export default function GanttComparison({
   onTaskUpdate, 
   readOnly = false 
 }: GanttComparisonProps) {
-  const [selectedFramework, setSelectedFramework] = useState<GanttFramework>('custom');
+  const [selectedFramework, setSelectedFramework] = useState<GanttFramework>('next');
   const [showComparison, setShowComparison] = useState(false);
 
   const currentFramework = frameworks.find(f => f.id === selectedFramework)!;
@@ -142,6 +175,8 @@ export default function GanttComparison({
     switch (selectedFramework) {
       case 'custom':
         return <CustomGanttChart {...commonProps} />;
+      case 'next':
+        return <NextGanttChart {...commonProps} />;
       case 'chartjs':
       default:
         return <ChartGantt {...commonProps} />;
@@ -302,7 +337,33 @@ export default function GanttComparison({
       {/* Feature Comparison Table */}
       {showComparison && renderFeatureComparison()}
 
-      {/* Gantt Chart Display */}
+      {/* Side-by-Side Live Compare */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Side-by-Side Live Compare</h3>
+          <div className="text-sm text-gray-500">Current vs New • Interact with both</div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-medium text-gray-700">Current (Custom)</div>
+            </div>
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <CustomGanttChart tasks={tasks} onTaskClick={onTaskClick} onTaskUpdate={onTaskUpdate} readOnly={readOnly} />
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-medium text-gray-700">New (Next‑Gen)</div>
+            </div>
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <NextGanttChart tasks={tasks} onTaskClick={onTaskClick} onTaskUpdate={onTaskUpdate} readOnly={readOnly} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Gantt Chart Display (Single-Select Demo) */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-900">
